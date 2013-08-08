@@ -9,5 +9,8 @@ python-dev
 #a to pipem
 zerorpc
 gevent
-gevent-zmq
+gevent-z
+mq
 
+# jeśli ma działać szyfrowanie, to jeszcze to
+pycrypto

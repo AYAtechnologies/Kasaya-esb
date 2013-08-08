@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
 from client import sync, async
-print
-
 
 
 # wywołanie synchroniczne, anonimowe
@@ -20,3 +18,5 @@ async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False )
 # wywołanie asynchroniczne, anonimowe
 # rezultatem jest jakiś ID zadania
 async.messages.mail.send_heavy_spam("ksiegowy@buziaczek.pl", howmany=5000 )
+
+
