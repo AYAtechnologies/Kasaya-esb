@@ -2,7 +2,7 @@
 #coding: utf-8
 import settings
 import zmq
-from esb.protocol import serialize, deserialize
+from servicebus.protocol import serialize, deserialize
 
 
 class SyncClient(object):

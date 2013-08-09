@@ -9,7 +9,7 @@ Broadcasting service for synchronising state of all sync servers in network
 """
 import settings
 from gevent import socket
-from esb.protocol import serialize, deserialize
+from servicebus.protocol import serialize, deserialize
 
 
 class UDPBroadcast(object):

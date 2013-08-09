@@ -6,7 +6,7 @@ print esbpath
 sys.path.append( esbpath )
 
 
-from esb.worker.decorators import Task
+from servicebus.worker.decorators import Task
 
 
 @Task()
@@ -15,7 +15,7 @@ def print_foo(param):
 
 
 
-from esb.worker.syncclient import SyncClient
+from servicebus.worker.syncclient import SyncClient
 
 try:
     import random

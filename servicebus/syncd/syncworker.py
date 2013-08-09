@@ -11,7 +11,7 @@ import settings
 import gevent
 from gevent_zeromq import zmq
 from gevent import socket
-from esb.protocol import serialize, deserialize
+from servicebus.protocol import serialize, deserialize
 
 from pprint import pprint
 import sys

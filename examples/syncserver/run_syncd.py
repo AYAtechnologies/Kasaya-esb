@@ -6,7 +6,7 @@ print esbpath
 sys.path.append( esbpath )
 
 
-from esb.syncd import SyncDaemon
+from servicebus.syncd import SyncDaemon
 
 if __name__=="__main__":
     daemon = SyncDaemon()
