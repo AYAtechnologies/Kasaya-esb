@@ -7,7 +7,7 @@
 Core service of nameserver
 
 """
-import settings
+from servicebus.conf import settings
 import gevent
 from gevent_zeromq import zmq
 from gevent import socket

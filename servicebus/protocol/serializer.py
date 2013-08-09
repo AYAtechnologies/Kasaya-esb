@@ -1,8 +1,8 @@
 #coding: utf-8
+from servicebus.conf import settings
 import msgpack
 import datetime
 import encryption
-import settings
 
 __all__ = ("serialize", "deserialize")
 

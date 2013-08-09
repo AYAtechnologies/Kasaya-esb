@@ -7,7 +7,7 @@
 Broadcasting service for synchronising state of all sync servers in network
 
 """
-import settings
+from servicebus.conf import settings
 from gevent import socket
 from servicebus.protocol import serialize, deserialize
 

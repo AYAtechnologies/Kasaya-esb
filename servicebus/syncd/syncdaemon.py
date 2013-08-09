@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
-import settings
+from servicebus.conf import settings
 import gevent
 from syncworker import SyncWorker
 

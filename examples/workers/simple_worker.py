@@ -2,9 +2,10 @@
 #coding: utf-8
 import sys,os
 esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-print esbpath
 sys.path.append( esbpath )
 
+from servicebus.conf import load_config_from_file
+load_config_from_file("../config.txt")
 
 from servicebus.worker.decorators import Task
 
