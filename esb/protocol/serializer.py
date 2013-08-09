@@ -74,7 +74,7 @@ def decode_obj_types(obj):
 def serialize(msg):
     msg = msgpack.packb(msg, default=encode_ext_types)
     if settings.ENCRYPTION:
-        meta = encryption.encrypt(msg, settings.PASSWORD)
+        meta = encryption.encrypt(msg, settings.PASSWORD, compress=settings.COMPRESSION)
         return msgpack.packb(meta)
     return msg
 

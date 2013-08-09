@@ -11,7 +11,10 @@ import settings
 import gevent
 from gevent_zeromq import zmq
 from gevent import socket
+from esb.protocol import serialize, deserialize
 
+from pprint import pprint
+import sys
 
 
 class SyncWorker(object):
@@ -44,7 +47,7 @@ class SyncWorker(object):
         global DB, BC
         while True:
             msg = self.local_input.recv()
-            msg = message_decode(msg)
+            msg = deserialize(msg)
 
             if msg['message']=="connect":
                 # przyłączenie serwisu
@@ -74,7 +77,7 @@ class SyncWorker(object):
                 print "pytanie o worker", name
                 res = DB.get_worker_for_service(name)
                 msg = {'message':'result', 'service':name, 'address':res}
-                msg = message_encode(msg)
+                msg = serialize(msg)
                 self.queries.send(msg)
             else:
                 # zawsze trzeba odpowiedzieć na zapytanie
