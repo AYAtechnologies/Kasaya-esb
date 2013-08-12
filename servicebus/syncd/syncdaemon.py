@@ -41,6 +41,7 @@ class SyncDaemon(object):
         if backend=="udp-broadcast":
             from broadcast.udp import UDPBroadcast
             return UDPBroadcast(server=self)
+        raise Exception("Unknown broadcast backend: %s" % backend)
 
 
     def run(self):

@@ -9,7 +9,7 @@ Broadcasting service for synchronising state of all sync servers in network
 """
 from servicebus.conf import settings
 from gevent import socket
-from servicebus.protocol import serialize, deserialize
+from servicebus.protocol import serialize, deserialize, messages
 
 
 class UDPBroadcast(object):
@@ -17,6 +17,7 @@ class UDPBroadcast(object):
 
     def __init__(self, server):
         self.SRV = server
+        self.port = settings.BROADCAST_PORT
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(('',settings.BROADCAST_PORT))
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -33,13 +34,12 @@ class UDPBroadcast(object):
         """
         while True:
             msg, addr = self.sock.recvfrom(2048)
-            msg = message_decode(msg)
-            if msg["message"]=="connect":
-                # przyłączenie serwisu
-                self.SRV.DB.register(msg['service'], msg['commchannel'])
-            elif msg['message']=="disconnect":
-                # odłączenie serwisu
-                self.SRV.DB.unregister(msg['commchannel'])
+            msg = deserialize(msg)
+
+            if msg['message'] in (
+                messages.WORKER_JOIN,
+                messages.WORKER_LEAVE):
+                self.SRV.worker_change_state(msg, frombroadcast=True)
 
             print "Received broadcast >>>",msg, addr
 
@@ -48,7 +48,7 @@ class UDPBroadcast(object):
         """
         Wysłanie komunikatu do wszystkich workerów w sieci
         """
-        msg = message_encode(msg)
-        self.sock.sendto(msg, ('<broadcast>', self.PORT) )
-        print "sending broadcast",msg
+        print "sending broadcast", msg
+        msg = serialize(msg)
+        self.sock.sendto(msg, ('<broadcast>', self.port) )
 

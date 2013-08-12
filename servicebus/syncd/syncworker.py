@@ -11,7 +11,7 @@ from servicebus.conf import settings
 import gevent
 from gevent_zeromq import zmq
 from gevent import socket
-from servicebus.protocol import serialize, deserialize
+from servicebus.protocol import serialize, deserialize, messages
 
 from pprint import pprint
 import sys
@@ -40,26 +40,38 @@ class SyncWorker(object):
         self.queries.close()
 
 
+    def worker_change_state(self, msg, frombroadcast=False):
+        """
+        Register and broadcast worker state change
+        """
+        if msg['message'] == messages.WORKER_JOIN:
+            # przyłączenie serwisu
+            self.SRV.DB.register(msg['service'], msg['addr'])
+        elif msg['message'] == messages.WORKER_LEAVE:
+            # odłączenie serwisu
+            self.SRV.DB.unregister(msg['addr'])
+        # rozesłanie w sieci
+        if not frombroadcast:
+            self.SRV.BC.broadcast_message(msg)
+
+
     def run_local_loop(self):
         """
         Pętla nasłuchująca na lokalnym sockecie o pojawiających się i znikających workerach na własnym localhoście
         """
-        global DB, BC
         while True:
-            msg = self.local_input.recv()
-            msg = deserialize(msg)
+            msgdata = self.local_input.recv()
+            msgdata = deserialize(msgdata)
+            msg = msgdata['message']
 
-            if msg['message']=="connect":
-                # przyłączenie serwisu
-                DB.register(msg['service'], msg['commchannel'])
-                BC.send_broadcast(msg)
-            elif msg['message']=="disconnect":
-                # odłączenie serwisu
-                DB.unregister(msg['commchannel'])
-                BC.send_broadcast(msg)
-            else:
-                pprint(msg)
+            # join / leave net by network
+            if msg in (
+                messages.WORKER_JOIN,
+                messages.WORKER_LEAVE):
+                self.worker_change_state(msgdata)
 
+            print
+            pprint(msgdata)
             sys.stdout.flush()
 
 
@@ -67,18 +79,18 @@ class SyncWorker(object):
         """
         Pętla nasłuchująca na lokalnym sockecie i odpowiadająca klientom na zapytania o workery
         """
-        global DB
         while True:
-            msg = self.queries.recv()
-            msg = message_decode(msg)
+            msgdata = self.queries.recv()
+            msgdata = deserialize(msgdata)
+            msg = msgdata['message']
 
-            if msg['message']=="query":
-                name = msg['service']
+            if msg==messages.QUERY:
+                # pytanie o worker
+                name = msgdata['service']
                 print "pytanie o worker", name
-                res = DB.get_worker_for_service(name)
-                msg = {'message':'result', 'service':name, 'address':res}
-                msg = serialize(msg)
-                self.queries.send(msg)
+                res = self.SRV.DB.get_worker_for_service(name)
+                reply = {'message':messages.WORKER_ADDR, 'service':name, 'addr':res}
+                self.queries.send( serialize(reply) )
             else:
                 # zawsze trzeba odpowiedzieć na zapytanie
                 self.queries.send("")

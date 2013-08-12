@@ -5,6 +5,7 @@
 Database which keep information abut all workers nameservers in all network
 
 """
+import random
 
 
 class DictDB(object):
