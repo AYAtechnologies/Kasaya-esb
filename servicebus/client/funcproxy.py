@@ -3,6 +3,13 @@
 from .task_caller import execute_sync_task, register_async_task
 
 
+AUTHPROC = None
+
+def register_auth_processor(func):
+    global AUTHPROC
+    AUTHPROC = func
+
+
 
 class FuncProxy(object):
     """
@@ -87,7 +94,10 @@ class ExecAndContext(object):
 
         Wynikiem jest nowa instancja własnej klasy z ustawionym authinfo.
         """
-        authexec = cls( auth_info_processor(authinfo) )
+        global AUTHPROC
+        if not AUTHPROC is None:
+            authinfo = AUTHPROC(authinfo)
+        authexec = cls( authinfo )
         return authexec
 
     def __enter__(self):

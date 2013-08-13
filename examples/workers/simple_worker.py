@@ -15,7 +15,6 @@ def print_foo(param):
     print "param", param
 
 
-
 from servicebus.worker.syncclient import SyncClient
 
 try:

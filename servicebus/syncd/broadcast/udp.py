@@ -39,7 +39,7 @@ class UDPBroadcast(object):
             if msg['message'] in (
                 messages.WORKER_JOIN,
                 messages.WORKER_LEAVE):
-                self.SRV.worker_change_state(msg, frombroadcast=True)
+                self.SRV.WORKER.worker_change_state(msg, frombroadcast=True)
 
             print "Received broadcast >>>",msg, addr
 

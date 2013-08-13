@@ -6,7 +6,8 @@ sys.path.append( esbpath )
 
 
 from servicebus import client, conf
-from servicebus.client import sync, async
+from servicebus.client import sync, async, register_auth_processor
+
 
 
 if __name__=="__main__":
