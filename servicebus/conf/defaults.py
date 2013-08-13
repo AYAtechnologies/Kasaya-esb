@@ -11,6 +11,14 @@ PASSWORD = ""
 SOCK_QUERIES = "/tmp/esb_queries.sock"
 SOCK_LOCALWORKERS = "/tmp/esb_local_workers.sock"
 
+# adres do jakiego zostaną podłączona sockety tcp
+# dopuszczalne są:
+#  nazwa interfejsu - "eth0", "eth1", ...
+#  "LOCAL" - podpięty do lokalnego IP (127.0.0.1)
+#  "AUTO" - podpięty do pierwszego interfejsu nie-lokalnego (zwykle eth0)
+BIND_TO = "AUTO"
+
+
 # zakres portów do automatycznej alokacji dla workerów
 WORKER_MIN_PORT = 5000
 WORKER_MAX_PORT = 6000
@@ -27,4 +35,5 @@ BROADCAST_PORT = 4040
 # stan sieci może być przechowywany w lokalnej bazie danych, jeśli
 ## przemyśleć to
 DB_BACKEND = "dict"
+
 

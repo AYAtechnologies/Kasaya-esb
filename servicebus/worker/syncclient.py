@@ -25,4 +25,6 @@ class SyncClient(object):
         msg['addr'] = self.addr
         self.sync_sender.send( serialize(msg) )
 
+    def close(self):
+        self.sync_sender.close()
 

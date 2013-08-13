@@ -10,7 +10,6 @@ class SyncQuery(object):
     def __init__(self):
         self.ctx = zmq.Context()
         self.queries = self.ctx.socket(zmq.REQ)
-        print settings.SOCK_QUERIES
         self.queries.connect('ipc://'+settings.SOCK_QUERIES)
 
     def query(self, service):
