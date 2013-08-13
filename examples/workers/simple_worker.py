@@ -12,9 +12,16 @@ load_config_from_file("../config.txt")
 from servicebus.worker.decorators import Task
 
 
-@Task()
+@Task(name="print_foo")
 def print_foo(param):
-    print "param", param
+    print "print_foo", param
+    print
+
+@Task(name="do_work")
+def do_work(a,b,foo=None, baz=None):
+    print "do_work"
+    print "params", a,b,foo,baz
+    print
 
 
 

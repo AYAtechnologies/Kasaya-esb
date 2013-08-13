@@ -6,7 +6,7 @@ from gevent_zeromq import zmq
 import gevent
 from servicebus.protocol import serialize, deserialize, messages
 from syncclient import SyncClient
-
+from worker_reg import worker_methods_db
 
 
 class WorkerDaemon(object):
@@ -24,17 +24,32 @@ class WorkerDaemon(object):
         while True:
             msgdata = self.WORKER.recv()
             msgdata = deserialize(msgdata)
-            print "<<<",msgdata
             msg = msgdata['message']
 
             if msg==messages.SYNC_CALL:
                 # żądanie wykonania zadania
                 name = msgdata['service']
-                reply = {'fikuku':"jajeczko"}
-                self.WORKER.send( serialize(reply) )
+                result = self.run_task(
+                        funcname = msgdata['method'],
+                        args = msgdata['args'],
+                        kwargs = msgdata['kwargs']
+                )
+                self.WORKER.send( serialize(result) )
             else:
                 # zawsze trzeba odpowiedzieć na zapytanie
                 self.WORKER.send("")
+                result = func(*args, **kwargs)
+
+
+    def run_task(self, funcname, args, kwargs):
+        funcname = ".".join( funcname )
+        try:
+            func = worker_methods_db[funcname]
+        except KeyError:
+            return {'message':messages.ERROR, 'internal':True, 'value':'Method %s not found' % funcname }
+
+        result = func(*args, **kwargs)
+        return {'message':messages.RESULT, 'result':result}
 
 
     def run(self):

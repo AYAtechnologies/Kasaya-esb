@@ -51,8 +51,13 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs):
         "kwargs":kwargs
     }
     # wysłanie żądania
-    result = worker_caller.send_request_to_worker(addr, msg)
-    return result
+    msg = worker_caller.send_request_to_worker(addr, msg)
+    if msg['message']==messages.RESULT:
+        return msg['result']
+    elif msg['message']==messages.ERROR:
+        raise Exception(msg['value'])
+    else:
+        raise Exception("Wrong worker response")
 
 
 

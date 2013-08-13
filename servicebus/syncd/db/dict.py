@@ -19,8 +19,10 @@ class DictDB(object):
         self.SRV = server
         self.services = {}
 
+
     def close(self):
         pass
+
 
     def register(self, name, addr):
         """
