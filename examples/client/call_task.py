@@ -14,7 +14,8 @@ if __name__=="__main__":
     conf.load_config_from_file("../config.txt")
 
     # wywołanie synchroniczne, anonimowe
-    sync.fikumiku.do_work("parameter", 1, foo=123, baz=True )
+    res = sync.fikumiku.do_work("parameter", 1, foo=123, baz=True )
+    print "wynik fikumiku.do_work:" , repr(res)
 
     # dwa wywołania synchroniczne z prawami usera "roman"
     with sync("roman") as S:
@@ -28,5 +29,7 @@ if __name__=="__main__":
     # wywołanie asynchroniczne, anonimowe
     # rezultatem jest jakiś ID zadania
     async.messages.mail.send_heavy_spam("ksiegowy@buziaczek.pl", howmany=5000 )
+
+    sync.fikumiku.wyjebka(234)
 
 

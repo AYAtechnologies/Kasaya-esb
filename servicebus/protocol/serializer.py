@@ -1,10 +1,13 @@
 #coding: utf-8
 from servicebus.conf import settings
+from servicebus import exceptions
 import msgpack
 import datetime
 import encryption
 
+
 __all__ = ("serialize", "deserialize")
+
 
 def encode_ext_types(obj):
     """
@@ -72,17 +75,54 @@ def decode_obj_types(obj):
 
 
 def serialize(msg):
-    msg = msgpack.packb(msg, default=encode_ext_types)
     if settings.ENCRYPTION:
+        msg = msgpack.packb(msg, default=encode_ext_types)
         meta = encryption.encrypt(msg, settings.PASSWORD, compress=settings.COMPRESSION)
+        meta['ver'] = 1
         return msgpack.packb(meta)
-    return msg
+    else:
+        msg['ver'] = 1
+        msg = msgpack.packb(msg, default=encode_ext_types)
+        return msg
+
 
 
 def deserialize(msg):
     if settings.ENCRYPTION:
-        msg = msgpack.unpackb(msg)
-        msg = encryption.decrypt(msg, settings.PASSWORD)
-    data = msgpack.unpackb(msg, object_hook=decode_obj_types)
-    return data
+        # message is encrypted
+        try:
+            msg = msgpack.unpackb(msg)
+        except msgpack.exceptions.UnpackException:
+            raise exceptions.MessageCorrupted()
+
+        # check protocol version
+        try:
+            if msg['ver']!=1:
+                raise exceptions.ServiceBusException("Unknown service bus protocol version")
+        except:
+            raise exceptions.MessageCorrupted()
+
+        try:
+            msg = encryption.decrypt(msg, settings.PASSWORD)
+        except Exception:
+            raise exceptions.MessageCorrupted()
+
+        # unpack message
+        data = msgpack.unpackb(msg, object_hook=decode_obj_types)
+        return data
+
+    else:
+        # message is unencrypted
+        try:
+            data = msgpack.unpackb(msg, object_hook=decode_obj_types)
+        except msgpack.exceptions.UnpackException:
+            raise exceptions.MessageCorrupted()
+
+        # check protocol version
+        try:
+            if data['ver']!=1:
+                raise exceptions.ServiceBusException("Unknown service bus protocol version")
+        except:
+            raise exceptions.MessageCorrupted()
+        return data
 

@@ -7,6 +7,8 @@ import gevent
 from servicebus.protocol import serialize, deserialize, messages
 from syncclient import SyncClient
 from worker_reg import worker_methods_db
+import traceback
+
 
 
 class WorkerDaemon(object):
@@ -43,13 +45,32 @@ class WorkerDaemon(object):
 
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )
+        # find task in worker db
         try:
             func = worker_methods_db[funcname]
         except KeyError:
-            return {'message':messages.ERROR, 'internal':True, 'value':'Method %s not found' % funcname }
-
-        result = func(*args, **kwargs)
-        return {'message':messages.RESULT, 'result':result}
+            # we dont know tish task
+            return {
+                'message' : messages.ERROR,
+                'internal' : True,  # internal service bus problem
+                'info' : 'Method %s not found' % funcname,
+            }
+        # try to run function and catch exceptions
+        try:
+            result = func(*args, **kwargs)
+        except Exception as e:
+            msg = {
+                'message' : messages.ERROR,
+                'internal' : False, # means that error is not internal bus error
+                'traceback' : traceback.format_exc(),
+                'info' : e.message,
+                }
+            return msg
+        # normal function return
+        return {
+            'message' : messages.RESULT,
+            'result' : result
+        }
 
 
     def run(self):

@@ -4,6 +4,7 @@ from servicebus.protocol import messages, serialize, deserialize
 from servicebus.client.queries import SyncDQuery
 from servicebus.binder import get_bind_address, bind_socket_to_port_range
 from servicebus.conf import settings
+from servicebus import exceptions
 import zmq
 
 
@@ -28,9 +29,9 @@ def find_worker(method):
     srvce = method[0]
     msg = SyncDQuery.query( srvce )
     if not msg['message']==messages.WORKER_ADDR:
-        raise Exception("Wrong response from syncd")
+        raise exceptions.ServiceBusException("Wrong response from sync server")
     if msg['addr'] is None:
-        raise Exception("No service %s found" % srvce)
+        raise exceptions.ServiceNotFound("No service %s found" % srvce)
     return msg['addr']
 
 
@@ -43,19 +44,25 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs):
     addr = find_worker(method)
     # zbudowanie komunikatu
     msg = {
-        "message":messages.SYNC_CALL,
-        "service":method[0],
-        "method":method[1:],
-        "authinfo":authinfo,
-        "args":args,
-        "kwargs":kwargs
+        "message" : messages.SYNC_CALL,
+        "service" : method[0],
+        "method" : method[1:],
+        "authinfo" : authinfo,
+        "args" : args,
+        "kwargs" : kwargs
     }
     # wysłanie żądania
     msg = worker_caller.send_request_to_worker(addr, msg)
     if msg['message']==messages.RESULT:
         return msg['result']
     elif msg['message']==messages.ERROR:
-        raise Exception(msg['value'])
+        # internal service bus error
+        if msg['internal']:
+            raise Exception(msg['info'])
+        # error during task execution
+        e = Exception(msg['info'])
+        e.traceback = msg['traceback']
+        raise e
     else:
         raise Exception("Wrong worker response")
 
@@ -68,6 +75,7 @@ def register_async_task(method, authinfo, timeout, args, kwargs):
     sprawdzić jego status.
     """
     return
+
     print "ASYNCHRONOUS",
     print "AUTHINFO:", authinfo, "TIMEOUT:", timeout,
     print "method:", method

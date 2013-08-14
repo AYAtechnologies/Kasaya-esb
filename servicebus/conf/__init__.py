@@ -24,14 +24,19 @@ def _parse_config(filename):
 
 def load_config_from_file(filename):
     """
-    Load config and change valuse to types used in default settings
+    Load config and change values to types used in default settings
     """
     for k,v in _parse_config(filename).iteritems():
         if k in settings:
             typ = type( settings[k] )
-            settings[k] = typ(v)
+            # boolean has some special values
+            if typ is bool:
+                settings[k] = v.lower() in ("1", "tak", "yes","true")
+            else:
+                settings[k] = typ(v)
         else:
             settings[k] = v
+
 
 # load default settings
 settings = SettingsProxy()

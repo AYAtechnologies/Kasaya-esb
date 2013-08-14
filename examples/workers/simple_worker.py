@@ -22,7 +22,22 @@ def do_work(a,b,foo=None, baz=None):
     print "do_work"
     print "params", a,b,foo,baz
     print
+    return "hopsasa fikumiku rezultat"
 
+@Task(name="another_task")
+def fiku(a,b=None,foo=None, baz=None):
+    print "another_task"
+    print
+
+@Task(name="messages.mail.send_heavy_spam")
+def sendspam(a,b):
+    print "sendspam"
+    print a,b
+
+
+@Task(name="wyjebka")
+def wyjebka(param):
+    return param / 0
 
 
 from servicebus.worker import WorkerDaemon

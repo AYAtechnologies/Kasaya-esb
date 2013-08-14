@@ -8,7 +8,9 @@ Core service of nameserver
 
 """
 from servicebus.conf import settings
+from servicebus import exceptions
 import gevent
+import time
 from gevent_zeromq import zmq
 from gevent import socket
 from servicebus.protocol import serialize, deserialize, messages
@@ -61,7 +63,11 @@ class SyncWorker(object):
         """
         while True:
             msgdata = self.local_input.recv()
-            msgdata = deserialize(msgdata)
+            try:
+                msgdata = deserialize(msgdata)
+            except exceptions.ServiceBusException:
+                continue
+
             msg = msgdata['message']
 
             # join / leave net by network
@@ -70,10 +76,6 @@ class SyncWorker(object):
                 messages.WORKER_LEAVE):
                 self.worker_change_state(msgdata)
 
-            print
-            pprint(msgdata)
-            sys.stdout.flush()
-
 
     def run_query_loop(self):
         """
@@ -81,18 +83,28 @@ class SyncWorker(object):
         """
         while True:
             msgdata = self.queries.recv()
-            msgdata = deserialize(msgdata)
+            try:
+                msgdata = deserialize(msgdata)
+            except exceptions.ServiceBusException:
+                self.queries.send("")
+                continue
+
             msg = msgdata['message']
 
             if msg==messages.QUERY:
                 # pytanie o worker
                 name = msgdata['service']
-                print "pytanie o worker", name
                 res = self.SRV.DB.get_worker_for_service(name)
                 reply = {'message':messages.WORKER_ADDR, 'service':name, 'addr':res}
                 self.queries.send( serialize(reply) )
             else:
                 # zawsze trzeba odpowiedzieć na zapytanie
                 self.queries.send("")
+
+
+    def run_hearbeat_loop(self):
+        print time.time()
+        while True:
+            gevent.sleep(1)
 
 
