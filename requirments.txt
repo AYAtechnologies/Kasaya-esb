@@ -10,8 +10,7 @@ python-dev
 netifaces
 zerorpc
 gevent
-gevent-z
-mq
+gevent-zmq
 
 # jeśli ma działać szyfrowanie, to jeszcze to
 pycrypto

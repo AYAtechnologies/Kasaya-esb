@@ -24,7 +24,7 @@ if __name__=="__main__":
 
     # wywołanie asynchroniczne,
     # user o nazwie "stefan"
-    async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False )
+    print async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False )
 
     # wywołanie asynchroniczne, anonimowe
     # rezultatem jest jakiś ID zadania
