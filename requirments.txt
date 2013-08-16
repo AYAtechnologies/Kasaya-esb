@@ -7,6 +7,7 @@ g++
 python-dev
 
 #a to pipem
+netifaces
 zerorpc
 gevent
 gevent-z

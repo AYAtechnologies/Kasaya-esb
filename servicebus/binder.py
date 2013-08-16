@@ -3,6 +3,7 @@
 from __future__ import unicode_literals
 from zmq.core.error import ZMQError
 from servicebus.conf import settings
+import netifaces
 import sys, socket, fcntl, struct, array
 
 
@@ -23,37 +24,28 @@ def get_ip_for_nic(ifname):
 def all_interfaces():
     """
     Return list of interfaces and associated IP addresses
-    http://code.activestate.com/recipes/439093-get-names-of-all-up-network-interfaces-linux-only/
-    """
-    is_64bits = sys.maxsize > 2**32
-    struct_size = 40 if is_64bits else 32
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    max_possible = 8 # initial value
-    while True:
-        bytes = max_possible * struct_size
-        names = array.array(b'B', b'\0' * bytes)
-        outbytes = struct.unpack(b'iL', fcntl.ioctl(
-            s.fileno(),
-            0x8912,  # SIOCGIFCONF
-            struct.pack(b'iL', bytes, names.buffer_info()[0])
-        ))[0]
-        if outbytes == bytes:
-            max_possible *= 2
-        else:
-            break
-    namestr = names.tostring()
-    return [(namestr[i:i+16].split(b'\0', 1)[0],
-             socket.inet_ntoa(namestr[i+20:i+24]))
-            for i in range(0, outbytes, struct_size)]
 
+    """
+    res = {}
+    for ifc in netifaces.interfaces():
+        try:
+            ip_list = netifaces.ifaddresses(ifc)[netifaces.AF_INET]
+            if len(ip_list) > 1:
+                raise NotImplemented("Only one IP per interface supported")
+            res[ifc] = ip_list[0]["addr"] #IP info also available: "mask" "broadcast"
+        except KeyError:
+            #interface is not supporting IP address
+            pass
+    print res
+    return res
 
 
 def get_bind_address():
     """
     Returns address to bind socket as specified in configuration
     """
-    avail = dict( all_interfaces() )
     bindto = settings.BIND_TO
+    avail = all_interfaces()
     # network interface name
     if bindto in avail:
         return avail[bindto]
