@@ -40,12 +40,13 @@ class WorkerDaemon(object):
             else:
                 # zawsze trzeba odpowiedzieć na zapytanie
                 self.WORKER.send("")
-                result = func(*args, **kwargs)
+                #result = func(*args, **kwargs)
 
 
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )
         # find task in worker db
+        print self.servicename, ":", funcname
         try:
             func = worker_methods_db[funcname]
         except KeyError:

@@ -24,11 +24,12 @@ if __name__=="__main__":
 
     # wywołanie asynchroniczne,
     # user o nazwie "stefan"
+    print "async"
     print async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False )
 
     # wywołanie asynchroniczne, anonimowe
     # rezultatem jest jakiś ID zadania
-    async.messages.mail.send_heavy_spam("ksiegowy@buziaczek.pl", howmany=5000 )
+    #async.messages.mail.send_heavy_spam("ksiegowy@buziaczek.pl", howmany=5000 )
 
     sync.fikumiku.wyjebka(234)
 
