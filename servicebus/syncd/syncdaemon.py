@@ -49,7 +49,7 @@ class SyncDaemon(object):
             gevent.joinall([
                 gevent.spawn(self.WORKER.run_local_loop),
                 gevent.spawn(self.WORKER.run_query_loop),
-                #gevent.spawn(self.WORKER.run_hearbeat_loop),
+                gevent.spawn(self.WORKER.run_hearbeat_loop),
                 gevent.spawn(self.BC.run_listener),
             ])
         finally:

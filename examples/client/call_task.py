@@ -30,6 +30,6 @@ if __name__=="__main__":
     # rezultatem jest jakiś ID zadania
     async.messages.mail.send_heavy_spam("ksiegowy@buziaczek.pl", howmany=5000 )
 
-    sync.fikumiku.wyjebka(234)
+    #sync.fikumiku.wyjebka(234)
 
 

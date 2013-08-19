@@ -18,6 +18,10 @@ SOCK_LOCALWORKERS = "/tmp/esb_local_workers.sock"
 #  "AUTO" - podpięty do pierwszego interfejsu nie-lokalnego (zwykle eth0)
 BIND_TO = "AUTO"
 
+# hearbeat
+WORKER_HEARTBEAT = 1
+PING_TIMEOUT = 2
+HEARTBEAT_TIMEOUT = 3
 
 # zakres portów do automatycznej alokacji dla workerów
 WORKER_MIN_PORT = 5000

@@ -10,13 +10,16 @@ Core service of nameserver
 from servicebus.conf import settings
 from servicebus import exceptions
 import gevent
-import time
+from datetime import datetime, timedelta
 from gevent_zeromq import zmq
 from gevent import socket
 from servicebus.protocol import serialize, deserialize, messages
 
 from pprint import pprint
 import sys
+
+
+class TooLong(Exception): pass
 
 
 class SyncWorker(object):
@@ -48,7 +51,8 @@ class SyncWorker(object):
         """
         if msg['message'] == messages.WORKER_JOIN:
             # przyłączenie serwisu
-            self.SRV.DB.register(msg['service'], msg['addr'])
+            self.SRV.DB.register(msg['service'], msg['addr'], msg['local'])
+            msg['local'] = False
         elif msg['message'] == messages.WORKER_LEAVE:
             # odłączenie serwisu
             self.SRV.DB.unregister(msg['addr'])
@@ -74,7 +78,11 @@ class SyncWorker(object):
             if msg in (
                 messages.WORKER_JOIN,
                 messages.WORKER_LEAVE):
-                self.worker_change_state(msgdata)
+                try:
+                    self.worker_change_state(msgdata)
+                except:
+                    print "State change fail"
+                    pass
 
 
     def run_query_loop(self):
@@ -103,8 +111,48 @@ class SyncWorker(object):
 
 
     def run_hearbeat_loop(self):
-        print time.time()
+        pinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT )
+
         while True:
+            msg = {"message":messages.PING}
+            lworkers = self.SRV.DB.get_local_workers()
+            print "."
+            for worker in lworkers:
+                now = datetime.now()
+
+                # is last heartbeat fresh enough?
+                lhb = self.SRV.DB.get_last_heartbeat(worker)
+                delta = now-lhb
+                if delta<=pinglife:
+                    continue
+
+                # ping with timeout
+                try:
+                    with gevent.Timeout(settings.PING_TIMEOUT, TooLong):
+                        self.ping_worker(worker)
+                    self.SRV.DB.set_last_heartbeat(worker, now)
+                    continue
+                except TooLong:
+                    pass
+
+                # worker died
+                print worker, "died"
+                self.SRV.DB.unregister(worker)
+                msg = {"message":messages.WORKER_LEAVE, "addr":worker}
+                self.SRV.BC.broadcast_message(msg)
+
             gevent.sleep(1)
+
+
+    def ping_worker(self, addr):
+        context = zmq.Context()
+        PINGER = context.socket(zmq.REQ)
+        PINGER.connect(addr)
+
+        msg = {"message":messages.PING}
+        PINGER.send( serialize(msg) )
+        res = PINGER.recv()
+
+        res = deserialize(res)
 
 

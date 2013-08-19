@@ -18,6 +18,7 @@ class SyncClient(object):
         msg = {"message":messages.WORKER_JOIN}
         msg['addr'] = self.addr
         msg['service'] = self.srvname
+        msg['local'] = True
         self.sync_sender.send( serialize(msg) )
 
     def notify_stop(self):

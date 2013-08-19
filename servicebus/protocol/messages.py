@@ -10,4 +10,5 @@ WORKER_ADDR = "waddr"
 SYNC_CALL = "sync"
 RESULT = "result"
 ERROR = "error"
-
+PING = "ping"
+PONG = "pong"

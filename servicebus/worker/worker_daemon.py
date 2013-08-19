@@ -37,6 +37,12 @@ class WorkerDaemon(object):
                         kwargs = msgdata['kwargs']
                 )
                 self.WORKER.send( serialize(result) )
+
+            elif msg==messages.PING:
+                # ping
+                result = {"message":messages.PONG}
+                self.WORKER.send( serialize(result) )
+
             else:
                 # zawsze trzeba odpowiedzieć na zapytanie
                 self.WORKER.send("")
@@ -80,6 +86,7 @@ class WorkerDaemon(object):
                 gevent.spawn(self.loop),
             ])
         finally:
+            return
             self.WORKER.close()
             self.SYNC.notify_stop()
             self.SYNC.close()

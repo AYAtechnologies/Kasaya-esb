@@ -6,6 +6,7 @@ Database which keep information abut all workers nameservers in all network
 
 """
 import random
+from datetime import datetime
 
 
 class DictDB(object):
@@ -18,23 +19,29 @@ class DictDB(object):
     def __init__(self, server):
         self.SRV = server
         self.services = {}
+        self.local_workers = {}
 
 
     def close(self):
         pass
 
 
-    def register(self, name, addr):
+    def register(self, name, addr, localservice):
         """
         Zarejestrowanie workera w bazie.
           name - nazwa serwisu
           addr - adres ip:port workera
+          localservice - worker jest na lokalnym hoście
         """
+        # nowy serwis w sieci
         if not name in self.services:
-            self.services[name] = set()
-        self.services[name].add(addr)
-        print "registered service [%s] addr [%s]" % (name,addr)
-        print ">>>",  self.services
+            self.services[name] = []
+        # nowy worker dla serwisu
+        if not addr in self.services[name]:
+            self.services[name].append(addr)
+        # worker na localhoście
+        if localservice:
+            self.set_last_heartbeat(addr)
 
 
     def unregister(self, addr):
@@ -44,17 +51,13 @@ class DictDB(object):
           False jeśli nie znaleziono workera w bazie
         """
         status = False
-        #print "pre",self.services
         for i in self.services.values():
             if addr in i:
-                i.discard(addr)
+                i.remove(addr)
                 status = True
-        print "unregistered server [%s]" % addr
-        #print "post",self.services
-        #print "status",status
-        print "Aktualnie zarejestrowane workery", self.services
+        if addr in self.local_workers:
+            del self.local_workers[addr]
         return status
-        #BC.send_broadcast("broadcast from ns")
 
 
     def get_worker_for_service(self, name):
@@ -67,4 +70,21 @@ class DictDB(object):
             return None
         if len(servers)==0:
             return None
-        return random.choice( list(servers) )
+        return random.choice( servers )
+
+
+    def get_local_workers(self):
+        return self.local_workers.keys()
+
+
+    def set_last_heartbeat(self, addr, htime=None):
+        if htime is None:
+            htime = datetime.now()
+        self.local_workers[addr] = htime
+
+
+    def get_last_heartbeat(self, addr):
+        try:
+            return self.local_workers[addr]
+        except AttributeError:
+            return None
