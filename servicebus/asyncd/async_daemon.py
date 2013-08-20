@@ -19,7 +19,6 @@ from gevent.coros import Semaphore
 import uuid
 
 class AsyncDeamon(WorkerDaemon):
-
     def __init__(self):
         super(AsyncDeamon, self).__init__("async_daemon")
         self.backend = Backend()
@@ -36,10 +35,9 @@ class AsyncDeamon(WorkerDaemon):
                 name = msgdata['service']
                 result = self.run_task(
                         funcname = msgdata['method'],
-                        args = self + msgdata['args'],
+                        args = [self] + msgdata['args'],
                         kwargs = msgdata['kwargs']
                 )
-
             elif msg == messages.ASYNC_CALL:
                 result = self.run_task(
                         funcname = msgdata['method'],
@@ -75,7 +73,7 @@ class AsyncDeamon(WorkerDaemon):
         task["kwargs"] = kwargs["kwargs"]
         task_id = self.backend.add_task(task)
         worker = find_worker(kwargs["original_method"])
-        self.backend.start_execution(task_id, worker)
+        self.backend.start_execution(task_id, self.proc_id, worker)
         g = Greenlet(execute_sync_task, kwargs["original_method"], kwargs["authinfo"], 0, kwargs["args"], kwargs["kwargs"])
         self.greenlets_semaphore.acquire()
         self.greenlets[g] = task_id
@@ -85,9 +83,14 @@ class AsyncDeamon(WorkerDaemon):
         return task_id
 
     @Task(name="get_result")
-    def get_result(self, *args, **kwargs):
-        print "get result:", args, kwargs
-        return self.backend.get_result()
+    def get_result(self, task_id):
+        print "get result:", task_id
+        return self.backend.get_result(task_id)
+
+    @Task(name="kill")
+    def get_result(self, task_id):
+        print "get result:", task_id
+        return self.backend.get_result(task_id)
 
 
 

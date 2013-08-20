@@ -6,9 +6,7 @@ sys.path.append( esbpath )
 
 
 from servicebus import client, conf
-from servicebus.client import sync, async, register_auth_processor
-
-
+from servicebus.client import sync, async, register_auth_processor, get_async_result
 
 if __name__=="__main__":
     conf.load_config_from_file("../config.txt")
@@ -25,13 +23,21 @@ if __name__=="__main__":
     # wywołanie asynchroniczne,
     # user o nazwie "stefan"
     print "async"
-    tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False )
-    print async.get_result(tid)
-    print async.get_result(tid)
+    tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False)
+    print get_async_result(tid, "stefan")
+    print sync("stefan").async_daemon.get_result(tid)
     # wywołanie asynchroniczne, anonimowe
     # rezultatem jest jakiś ID zadania
     #async.messages.mail.send_heavy_spam("ksiegowy@buziaczek.pl", howmany=5000 )
-    async.fikumiku.wyjebka(234)
+    tid = async.fikumiku.wyjebka(234)
+    print sync.async_daemon.get_result(tid)
+    print "long"
+    tid = async.fikumiku.long_task(1)
+    print "res", tid
+    print sync.async_daemon.get_result(tid)
+    import time
+    time.sleep(1)
+    print sync.async_daemon.get_result(tid)
 
     sync.fikumiku.wyjebka(234)
 

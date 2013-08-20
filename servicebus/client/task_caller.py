@@ -5,7 +5,7 @@ from servicebus.client.queries import SyncDQuery
 from servicebus.binder import get_bind_address, bind_socket_to_port_range
 from servicebus.conf import settings
 from servicebus import exceptions
-import zmq
+from gevent_zeromq import zmq
 
 
 class WorkerCaller(object):
@@ -70,7 +70,6 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
         raise Exception("Wrong worker response")
 
 
-
 def register_async_task(method, authinfo, timeout, args, kwargs):
     """
     Wywołanie asynchroniczne powinno zostać zapisane w bazie i zostać wykonane
@@ -105,13 +104,9 @@ def register_async_task(method, authinfo, timeout, args, kwargs):
         raise e
     else:
         raise Exception("Wrong worker response")
-#
-#     print "ASYNCHRONOUS",
-#     print "AUTHINFO:", authinfo, "TIMEOUT:", timeout,
-#     print "method:", method
-#     worker = SyncDQuery.query( method[0] )
-# #    print "Worker:",worker
-#     print "ARGS:",args,
-#     print "KWARGS:",kwargs
-#     print
-# #    return "fake-id"
+
+
+def get_async_result(task_id, authinfo, timeout=0):
+    #execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None)
+    m = ["async_daemon", "get_result"]
+    return execute_sync_task(m, authinfo, timeout, [task_id], {})

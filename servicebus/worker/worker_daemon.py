@@ -8,7 +8,7 @@ from servicebus.protocol import serialize, deserialize, messages
 from syncclient import SyncClient
 from worker_reg import worker_methods_db
 import traceback
-
+import uuid
 
 
 class WorkerDaemon(object):
@@ -20,6 +20,7 @@ class WorkerDaemon(object):
         # syncd client
         self.servicename = servicename
         self.SYNC = SyncClient(servicename, self.address)
+        self.proc_id = str(uuid.uuid4())
 
 
     def loop(self):
