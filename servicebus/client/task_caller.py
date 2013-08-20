@@ -36,12 +36,13 @@ def find_worker(method):
 
 
 
-def execute_sync_task(method, authinfo, timeout, args, kwargs):
+def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
     """
     Wywołanie synchroniczne jest wykonywane natychmiast.
     """
     # odpytanie o worker który wykona zadanie
-    addr = find_worker(method)
+    if addr is None:
+        addr = find_worker(method)
     # zbudowanie komunikatu
     msg = {
         "message" : messages.SYNC_CALL,

@@ -25,11 +25,13 @@ if __name__=="__main__":
     # wywołanie asynchroniczne,
     # user o nazwie "stefan"
     print "async"
-    print async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False )
-
+    tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False )
+    print async.get_result(tid)
+    print async.get_result(tid)
     # wywołanie asynchroniczne, anonimowe
     # rezultatem jest jakiś ID zadania
     #async.messages.mail.send_heavy_spam("ksiegowy@buziaczek.pl", howmany=5000 )
+    async.fikumiku.wyjebka(234)
 
     sync.fikumiku.wyjebka(234)
 
