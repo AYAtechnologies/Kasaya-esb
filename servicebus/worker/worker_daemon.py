@@ -43,6 +43,9 @@ class WorkerDaemon(WorkerBase):
             }
         # try to run function and catch exceptions
         try:
+            #print ">  ",func
+            #print ">  ",args
+            #print ">  ",kwargs
             result = func(*args, **kwargs)
         except Exception as e:
             msg = {

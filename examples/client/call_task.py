@@ -25,11 +25,13 @@ if __name__=="__main__":
     print "async"
     tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False)
     print get_async_result(tid, "stefan")
-    print sync("stefan").async_daemon.get_result(tid)
-    # wywołanie asynchroniczne, anonimowe
-    # rezultatem jest jakiś ID zadania
-    #async.messages.mail.send_heavy_spam("ksiegowy@buziaczek.pl", howmany=5000 )
-    tid = async.fikumiku.wyjebka(234)
+    #print sync("stefan").async_daemon.get_result(tid)
+
+
+    #with async("zyga") as A:
+    #    A.fikumiku.wyjebka(234)
+
+    '''
     print sync.async_daemon.get_result(tid)
     print "long"
     tid = async.fikumiku.long_task(1)
@@ -42,3 +44,4 @@ if __name__=="__main__":
     #sync.fikumiku.wyjebka(234)
 
 
+    '''

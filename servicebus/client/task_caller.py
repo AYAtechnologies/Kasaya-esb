@@ -56,7 +56,6 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
     }
     # wysłanie żądania
     print "Sync task: ", addr, msg
-    #worker_caller = WorkerCaller()
     msg = worker_caller.send_request_to_worker(addr, msg)
     if msg['message']==messages.RESULT:
         return msg['result']
@@ -67,6 +66,9 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
         # error during task execution
         e = Exception(msg['info'])
         e.traceback = msg['traceback']
+        print "-"*10
+        print msg['traceback']
+
         raise e
     else:
         raise Exception("Wrong worker response")
@@ -79,12 +81,12 @@ def register_async_task(method, authinfo, timeout, args, kwargs):
     sprawdzić jego status.
     """
     # odpytanie o worker który wykona zadanie
-    addr = find_worker(["async_daemon", "register"])
+    addr = find_worker([settings.ASYNC_DAEMON_SERVICE, "register_task"])
     # zbudowanie komunikatu
     msg = {
         "message" : messages.ASYNC_CALL,
-        "service" : "async_daemon",
-        "method" : ["register"],
+        "service" : settings.ASYNC_DAEMON_SERVICE,
+        "method" : ["register_task"],
         "original_method": method,
         "authinfo" : authinfo,
         "args" : args,
@@ -110,5 +112,5 @@ def register_async_task(method, authinfo, timeout, args, kwargs):
 
 def get_async_result(task_id, authinfo, timeout=0):
     #execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None)
-    m = ["async_daemon", "get_result"]
+    m = [settings.ASYNC_DAEMON_SERVICE, "get_task_result"]
     return execute_sync_task(m, authinfo, timeout, [task_id], {})

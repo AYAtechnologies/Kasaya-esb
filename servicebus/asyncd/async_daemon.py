@@ -28,7 +28,7 @@ class AsyncDeamon(WorkerDaemon):
     def handle_async_call(self, msgdata):
         result = self.run_task(
             funcname = msgdata['method'],
-            args = [self],
+            args = [self],  # <<< ??????????
             kwargs = msgdata,
         )
         return result
@@ -46,7 +46,7 @@ class AsyncDeamon(WorkerDaemon):
         #print self.backend.store
 
 
-    @Task(name="register")
+    @Task(name="register_task")
     def register(self, *args, **kwargs):
         print "register:", args, kwargs
         task = {}
@@ -65,15 +65,15 @@ class AsyncDeamon(WorkerDaemon):
         g.start()
         return task_id
 
-    @Task(name="get_result")
+    @Task(name="getr_esult")
     def get_result(self, task_id):
         print "get result:", task_id
         return self.backend.get_result(task_id)
 
-    @Task(name="kill")
-    def get_result(self, task_id):
-        print "get result:", task_id
-        return self.backend.get_result(task_id)
+    #@Task(name="kill")
+    #def get_result(self, task_id):
+    #    print "get result:", task_id
+    #    return self.backend.get_result(task_id)
 
 
 
