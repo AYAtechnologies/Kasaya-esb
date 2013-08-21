@@ -65,7 +65,7 @@ class AsyncDeamon(WorkerDaemon):
         g.start()
         return task_id
 
-    @Task(name="get_result")
+    @Task(name="get_task_result")
     def get_result(self, task_id):
         print "get result:", task_id
         return self.backend.get_result(task_id)
