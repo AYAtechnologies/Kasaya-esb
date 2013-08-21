@@ -8,6 +8,8 @@ sys.path.append( esbpath )
 from servicebus.conf import load_config_from_file
 load_config_from_file("../config.txt")
 
+import time
+
 
 from servicebus.worker.decorators import Task
 
@@ -33,6 +35,12 @@ def fiku(a,b=None,foo=None, baz=None):
 def sendspam(a,b):
     print "sendspam"
     print a,b
+
+@Task(name="long_task")
+def long_task(a):
+    print "sleeping:", a
+    time.sleep(float(a))
+    return "hurra"
 
 
 @Task(name="wyjebka")

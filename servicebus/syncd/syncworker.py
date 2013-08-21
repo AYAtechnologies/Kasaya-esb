@@ -116,7 +116,6 @@ class SyncWorker(object):
         while True:
             msg = {"message":messages.PING}
             lworkers = self.SRV.DB.get_local_workers()
-            print "."
             for worker in lworkers:
                 now = datetime.now()
 

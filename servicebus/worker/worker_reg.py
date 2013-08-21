@@ -7,6 +7,7 @@ class WorkerMethodsDB(object):
         self.db = {}
 
     def register_method(self, name, func):
+        # print "method registered:", name, " - " ,func
         self.db[name] = func
 
     def __getitem__(self, name):
