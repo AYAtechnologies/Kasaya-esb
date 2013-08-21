@@ -1,53 +1,31 @@
 #!/usr/bin/env python
 #coding: utf-8
-from servicebus.conf import settings
-from servicebus.binder import bind_socket_to_port_range
-from gevent_zeromq import zmq
-import gevent
-from servicebus.protocol import serialize, deserialize, messages
-from syncclient import SyncClient
+from servicebus.worker.worker_base import WorkerBase
+from servicebus.protocol import messages
 from worker_reg import worker_methods_db
 import traceback
-import uuid
 
 
-class WorkerDaemon(object):
+class WorkerDaemon(WorkerBase):
 
     def __init__(self, servicename):
-        self.context = zmq.Context()
-        self.WORKER = self.context.socket(zmq.REP)
-        self.address = bind_socket_to_port_range(self.WORKER, settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
-        # syncd client
-        self.servicename = servicename
-        self.SYNC = SyncClient(servicename, self.address)
-        self.proc_id = str(uuid.uuid4())
+        super(WorkerDaemon, self).__init__(servicename)
+        self.register_message( messages.SYNC_CALL, self.handle_sync_call )
+        self.register_message( messages.PING, self.handle_ping )
 
 
-    def loop(self):
-        while True:
-            msgdata = self.WORKER.recv()
-            msgdata = deserialize(msgdata)
-            msg = msgdata['message']
+    def handle_sync_call(self, msgdata):
+        name = msgdata['service']
+        result = self.run_task(
+            funcname = msgdata['method'],
+            args = msgdata['args'],
+            kwargs = msgdata['kwargs']
+        )
+        return result
 
-            if msg==messages.SYNC_CALL:
-                # żądanie wykonania zadania
-                name = msgdata['service']
-                result = self.run_task(
-                        funcname = msgdata['method'],
-                        args = msgdata['args'],
-                        kwargs = msgdata['kwargs']
-                )
-                self.WORKER.send( serialize(result) )
 
-            elif msg==messages.PING:
-                # ping
-                result = {"message":messages.PONG}
-                self.WORKER.send( serialize(result) )
-
-            else:
-                # zawsze trzeba odpowiedzieć na zapytanie
-                self.WORKER.send("")
-                #result = func(*args, **kwargs)
+    def handle_ping(self, message):
+        return {"message":messages.PONG}
 
 
     def run_task(self, funcname, args, kwargs):
@@ -79,17 +57,5 @@ class WorkerDaemon(object):
             'message' : messages.RESULT,
             'result' : result
         }
-
-
-    def run(self):
-        self.SYNC.notify_start()
-        try:
-            gevent.joinall([
-                gevent.spawn(self.loop),
-            ])
-        finally:
-            self.WORKER.close()
-            self.SYNC.notify_stop()
-            self.SYNC.close()
 
 

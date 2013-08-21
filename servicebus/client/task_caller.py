@@ -12,10 +12,10 @@ class WorkerCaller(object):
 
     def __init__(self):
         self.context = zmq.Context()
-        self.REQUESTER = self.context.socket(zmq.REQ)
 
 
     def send_request_to_worker(self, target, msg):
+        self.REQUESTER = self.context.socket(zmq.REQ)
         self.REQUESTER.connect(target)
         self.REQUESTER.send( serialize(msg) )
         res = self.REQUESTER.recv()
@@ -23,7 +23,9 @@ class WorkerCaller(object):
         self.REQUESTER.close()
         return res
 
-#worker_caller = WorkerCaller()
+
+worker_caller = WorkerCaller()
+
 
 def find_worker(method):
     srvce = method[0]
@@ -54,7 +56,7 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
     }
     # wysłanie żądania
     print "Sync task: ", addr, msg
-    worker_caller = WorkerCaller()
+    #worker_caller = WorkerCaller()
     msg = worker_caller.send_request_to_worker(addr, msg)
     if msg['message']==messages.RESULT:
         return msg['result']

@@ -41,14 +41,14 @@ class UDPBroadcast(object):
                 messages.WORKER_LEAVE):
                 self.SRV.WORKER.worker_change_state(msg, frombroadcast=True)
 
-            print "Received broadcast >>>",msg, addr
+            #print "Received broadcast >>>",msg, addr
 
 
     def broadcast_message(self, msg):
         """
         Wysłanie komunikatu do wszystkich workerów w sieci
         """
-        print "sending broadcast", msg
+        #print "sending broadcast", msg
         msg = serialize(msg)
         self.sock.sendto(msg, ('<broadcast>', self.port) )
 

@@ -19,9 +19,9 @@ SOCK_LOCALWORKERS = "/tmp/esb_local_workers.sock"
 BIND_TO = "AUTO"
 
 # hearbeat
-WORKER_HEARTBEAT = 3
+WORKER_HEARTBEAT = 1 #3
 PING_TIMEOUT = 2
-HEARTBEAT_TIMEOUT = 15
+HEARTBEAT_TIMEOUT = 1 #15
 
 # zakres portów do automatycznej alokacji dla workerów
 WORKER_MIN_PORT = 5000
@@ -40,4 +40,5 @@ BROADCAST_PORT = 4040
 ## przemyśleć to
 DB_BACKEND = "dict"
 
-
+# nazwa workera odpowiedzialnego za wywołania asynchroniczne
+ASYNC_DAEMON_SERVICE = "async_daemon"

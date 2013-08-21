@@ -133,7 +133,8 @@ class SyncWorker(object):
                         self.SRV.DB.set_last_heartbeat(worker, now)
                         continue
                 except TooLong:
-                    pass
+                    self.PINGER.close()
+                    self.PINGER = None
 
                 # worker died
                 print "worker", worker, "died or broken"
@@ -145,15 +146,16 @@ class SyncWorker(object):
 
 
     def ping_worker(self, addr):
-        context = zmq.Context()
-        PINGER = context.socket(zmq.REQ)
-        PINGER.connect(addr)
+        #context = zmq.Context()
+        self.PINGER = self.context.socket(zmq.REQ)
+        self.PINGER.connect(addr)
         # send ping
         msg = {"message":messages.PING}
-        PINGER.send( serialize(msg) )
+        self.PINGER.send( serialize(msg) )
         # result of ping
         try:
-            res = PINGER.recv()
+            res = self.PINGER.recv()
+            self.PINGER.close()
             res = deserialize(res)
             if res["message"] != messages.PONG:
                 return False
