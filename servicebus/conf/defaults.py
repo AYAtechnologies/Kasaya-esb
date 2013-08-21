@@ -19,9 +19,9 @@ SOCK_LOCALWORKERS = "/tmp/esb_local_workers.sock"
 BIND_TO = "AUTO"
 
 # hearbeat
-WORKER_HEARTBEAT = 1
+WORKER_HEARTBEAT = 3
 PING_TIMEOUT = 2
-HEARTBEAT_TIMEOUT = 3
+HEARTBEAT_TIMEOUT = 15
 
 # zakres portów do automatycznej alokacji dla workerów
 WORKER_MIN_PORT = 5000

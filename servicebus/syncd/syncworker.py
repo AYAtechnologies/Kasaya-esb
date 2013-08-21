@@ -129,30 +129,38 @@ class SyncWorker(object):
                 # ping with timeout
                 try:
                     with gevent.Timeout(settings.PING_TIMEOUT, TooLong):
-                        self.ping_worker(worker)
-                    self.SRV.DB.set_last_heartbeat(worker, now)
-                    continue
+                        pingres = self.ping_worker(worker)
+                    if pingres:
+                        self.SRV.DB.set_last_heartbeat(worker, now)
+                        continue
                 except TooLong:
                     pass
 
                 # worker died
-                print worker, "died"
+                print "worker", worker, "died or broken"
                 self.SRV.DB.unregister(worker)
                 msg = {"message":messages.WORKER_LEAVE, "addr":worker}
                 self.SRV.BC.broadcast_message(msg)
 
-            gevent.sleep(1)
+            gevent.sleep(settings.WORKER_HEARTBEAT)
 
 
     def ping_worker(self, addr):
         context = zmq.Context()
         PINGER = context.socket(zmq.REQ)
         PINGER.connect(addr)
-
+        # send ping
         msg = {"message":messages.PING}
         PINGER.send( serialize(msg) )
-        res = PINGER.recv()
+        # result of ping
+        try:
+            res = PINGER.recv()
+            res = deserialize(res)
+            if res["message"] != messages.PONG:
+                return False
+        except:
+            return False
+        return True
 
-        res = deserialize(res)
 
 

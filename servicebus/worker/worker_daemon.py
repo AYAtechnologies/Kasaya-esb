@@ -86,7 +86,6 @@ class WorkerDaemon(object):
                 gevent.spawn(self.loop),
             ])
         finally:
-            return
             self.WORKER.close()
             self.SYNC.notify_stop()
             self.SYNC.close()
