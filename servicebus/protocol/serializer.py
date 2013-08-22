@@ -4,6 +4,7 @@ from servicebus import exceptions
 import msgpack
 import datetime
 import encryption
+from decimal import Decimal
 
 
 __all__ = ("serialize", "deserialize")
@@ -36,6 +37,11 @@ def encode_ext_types(obj):
         datetime.timedelta: (
             'timedelta',
             lambda obj: "%i:%i:%i" % (obj.days, obj.seconds, obj.microseconds)
+        ),
+
+        Decimal: (
+            'decimal',
+            lambda obj: str(obj)
         )
     }
 
@@ -61,6 +67,9 @@ def decode_obj_types(obj):
             lambda S : datetime.datetime.strptime( S, "%H:%M:%S.%f").time(),
         'timedelta':
             lambda S : datetime.timedelta(  **dict( [ (n,int(v)) for n, v in zip(("days","seconds","microseconds"), S.split(":")) ])  ),
+
+        'decimal':
+            lambda S : Decimal(S),
     }
     try:
         key = obj['__customtype__']
