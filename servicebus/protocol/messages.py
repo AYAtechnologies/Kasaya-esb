@@ -15,6 +15,7 @@ PONG = "wrkr/pong"
 QUERY = "sync/query"
 WORKER_ADDR = "wrkr/addr"
 WORKER_REREG = "wrkr/rereg" # requet worker to register again
+CTL_CALL = "wrkr/ctrl" # internal service bus control request
 # normal client <--> worker messages
 SYNC_CALL = "call/sync" # synchronously call worker taks
 ASYNC_CALL = "async" # PROBABLY UNNECCESSARY

@@ -14,6 +14,7 @@ class WorkerDaemon(WorkerBase):
         self.register_message( messages.SYNC_CALL, self.handle_sync_call )
         self.register_message( messages.PING, self.handle_ping )
         self.register_message( messages.WORKER_REREG, self.handle_request_register )
+        self.register_message( messages.CTL_CALL, self.handle_control_request )
 
 
     def handle_sync_call(self, msgdata):
@@ -35,6 +36,13 @@ class WorkerDaemon(WorkerBase):
         return {"message":messages.NOOP}
 
 
+    def handle_control_request(self, message):
+        method = ".".join( message['method'] )
+        print "WORKER CONTROL REQUEST", method
+        #if message['method']=="stop_all_workers":
+        #    self.stop()
+
+
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )
         # find task in worker db
@@ -42,7 +50,7 @@ class WorkerDaemon(WorkerBase):
         try:
             func = worker_methods_db[funcname]
         except KeyError:
-            # we dont know tish task
+            # we dont know this task
             return {
                 'message' : messages.ERROR,
                 'internal' : True,  # internal service bus problem
@@ -67,5 +75,4 @@ class WorkerDaemon(WorkerBase):
             'message' : messages.RESULT,
             'result' : result
         }
-
 

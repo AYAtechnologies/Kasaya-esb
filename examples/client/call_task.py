@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 #coding: utf-8
+from __future__ import unicode_literals
+
 import sys,os
 esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append( esbpath )
 
 
 from servicebus import client, conf
-from servicebus.client import sync, async, register_auth_processor, get_async_result
+from servicebus.client import sync, async, register_auth_processor, async_result, busctl
 
 if __name__=="__main__":
     conf.load_config_from_file("../config.txt")
@@ -24,9 +26,10 @@ if __name__=="__main__":
     # user o nazwie "stefan"
     print "async"
     tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False)
-    print get_async_result(tid, "stefan")
+    #print async_result(tid, "stefan")
     #print sync("stefan").async_daemon.get_result(tid)
 
+    busctl.jajo()
 
     #with async("zyga") as A:
     #    A.fikumiku.wyjebka(234)

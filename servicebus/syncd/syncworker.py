@@ -1,12 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
-#from __future__ import unicode_literals
-
-"""
-
-Core service of nameserver
-
-"""
+from __future__ import unicode_literals
 from servicebus.conf import settings
 from servicebus import exceptions
 import gevent
@@ -94,11 +88,24 @@ class SyncWorker(object):
                 # pytanie o worker
                 name = msgdata['service']
                 res = self.SRV.DB.get_worker_for_service(name)
-                reply = {'message':messages.WORKER_ADDR, 'service':name, 'addr':res}
-                self.queries.send( serialize(reply) )
+                result = {
+                    'message':messages.WORKER_ADDR,
+                    'service':name,
+                    'addr':res
+                }
+
+            elif msg==messages.CTL_CALL:
+                print "CONTROL REQUEST"
+                print msgdata
+                result = {
+                    "message":messages.NOOP
+                }
+
             else:
-                # zawsze trzeba odpowiedzieć na zapytanie
-                self.queries.send("")
+                result = {
+                    "message":messages.NOOP
+                }
+            self.queries.send( serialize(result) )
 
 
     def run_hearbeat_loop(self):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
-from .task_caller import execute_sync_task, register_async_task
+from __future__ import unicode_literals
+from .task_caller import execute_sync_task, register_async_task, execute_control_task
 
 
 AUTHPROC = None
@@ -51,6 +52,13 @@ class FuncProxy(object):
                 kwargs)
         elif m=="async":
             return register_async_task(
+                top._names,
+                top._authinfo,
+                top._timeout,
+                args,
+                kwargs)
+        elif m=="ctl":
+            return execute_control_task(
                 top._names,
                 top._authinfo,
                 top._timeout,
@@ -130,3 +138,8 @@ class AsyncExec(ExecAndContext):
     call_type = "async"
 
 
+class ControlExec(ExecAndContext):
+    """
+    Wywołania kontrolne servicebus
+    """
+    call_type = "ctl"

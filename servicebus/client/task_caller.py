@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
+from __future__ import unicode_literals
 from servicebus.protocol import messages, serialize, deserialize
 from servicebus.client.queries import SyncDQuery
 from servicebus.binder import get_bind_address, bind_socket_to_port_range
@@ -68,10 +69,30 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
         e.traceback = msg['traceback']
         print "-"*10
         print msg['traceback']
-
         raise e
     else:
         raise Exception("Wrong worker response")
+
+
+
+def execute_control_task(method, authinfo, timeout, args, kwargs, addr = None):
+    """
+    Wywołanie zadania kontrolnego wysyłane jest do syncd a nie workerów!
+    """
+    # zbudowanie komunikatu
+    msg = {
+        "message" : messages.CTL_CALL,
+        "method" : method,
+        "authinfo" : authinfo,
+        "args" : args,
+        "kwargs" : kwargs
+    }
+    # wysłanie żądania
+    print "Control task: ", msg
+
+    msg = SyncDQuery.control_task( msg)
+    return msg
+
 
 
 def register_async_task(method, authinfo, timeout, args, kwargs):
@@ -110,7 +131,7 @@ def register_async_task(method, authinfo, timeout, args, kwargs):
         raise Exception("Wrong worker response")
 
 
-def get_async_result(task_id, authinfo, timeout=0):
+def async_result(task_id, authinfo, timeout=0):
     #execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None)
     m = [settings.ASYNC_DAEMON_SERVICE, "get_task_result"]
     return execute_sync_task(m, authinfo, timeout, [task_id], {})

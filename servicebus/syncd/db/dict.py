@@ -74,6 +74,9 @@ class DictDB(object):
 
 
     def get_local_workers(self):
+        """
+        Return list of live workers on local host
+        """
         return self.local_workers.keys()
 
 

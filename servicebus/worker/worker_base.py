@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
+from __future__ import unicode_literals
 from servicebus.conf import settings
 from servicebus.binder import bind_socket_to_port_range
 from gevent_zeromq import zmq
@@ -23,6 +24,7 @@ class WorkerBase(object):
         # syncd client
         self.servicename = servicename
         self.SYNC = SyncClient(servicename, self.address)
+        self.__running = True
 
 
     def register_message(self, message, func):
@@ -30,7 +32,7 @@ class WorkerBase(object):
 
 
     def loop(self):
-        while True:
+        while self.__running:
             msgdata = self.WORKER.recv()
             msgdata = deserialize(msgdata)
 
@@ -42,6 +44,8 @@ class WorkerBase(object):
                 self.WORKER.send("")
                 continue
             result = handler(msgdata)
+            if result is None:
+                result = {"message":messages.NOOP}
             self.WORKER.send( serialize(result) )
 
 
@@ -57,3 +61,9 @@ class WorkerBase(object):
             self.SYNC.close()
 
 
+    def stop(self):
+        """
+        Request warm stop of worker.
+        After finishing current task event loop will exit.
+        """
+        self.__running = False

@@ -34,8 +34,11 @@ class UDPBroadcast(object):
         """
         while True:
             msgdata, addr = self.sock.recvfrom(4096)
-            msgdata = deserialize(msgdata)
-            msg = msgdata['message']
+            try:
+                msgdata = deserialize(msgdata)
+                msg = msgdata['message']
+            except:
+                continue
             #print "incoming broadcast", msgdata
 
             if msg==messages.WORKER_JOIN:

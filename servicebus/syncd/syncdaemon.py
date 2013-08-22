@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 #coding: utf-8
+from __future__ import unicode_literals
 from servicebus.conf import settings
-import gevent
+import gevent#, uuid
 from syncworker import SyncWorker
 
 
@@ -19,6 +20,7 @@ class SyncDaemon(object):
             self.BC = FakeBroadcast()
         # uruchomienie workera
         self.WORKER = self.setup_worker()
+        #self.ID = str( uuid.uuid4() )
 
 
     def close(self):
@@ -26,6 +28,7 @@ class SyncDaemon(object):
         Notifies network about shutting down, closes database
         and all used sockets.
         """
+        print "stopping..."
         self.notify_host_stop(local=True)
         self.DB.close()
         self.WORKER.close()
@@ -82,6 +85,12 @@ class SyncDaemon(object):
         pass
 
 
+    # global network control tasks
+
+
+
+
+    # main loop
 
 
     def run(self):
@@ -95,4 +104,3 @@ class SyncDaemon(object):
             ])
         finally:
             self.close()
-            print "Gently finished..."
