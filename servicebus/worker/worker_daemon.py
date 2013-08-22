@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
+from __future__ import unicode_literals
 from servicebus.worker.worker_base import WorkerBase
 from servicebus.protocol import messages
 from worker_reg import worker_methods_db
@@ -12,6 +13,7 @@ class WorkerDaemon(WorkerBase):
         super(WorkerDaemon, self).__init__(servicename)
         self.register_message( messages.SYNC_CALL, self.handle_sync_call )
         self.register_message( messages.PING, self.handle_ping )
+        self.register_message( messages.WORKER_REREG, self.handle_request_register )
 
 
     def handle_sync_call(self, msgdata):
@@ -26,6 +28,11 @@ class WorkerDaemon(WorkerBase):
 
     def handle_ping(self, message):
         return {"message":messages.PONG}
+
+
+    def handle_request_register(self, message):
+        self.SYNC.notify_start()
+        return {"message":messages.NOOP}
 
 
     def run_task(self, funcname, args, kwargs):

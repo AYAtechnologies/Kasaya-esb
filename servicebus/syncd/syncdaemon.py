@@ -21,6 +21,20 @@ class SyncDaemon(object):
         self.WORKER = self.setup_worker()
 
 
+    def close(self):
+        """
+        Notifies network about shutting down, closes database
+        and all used sockets.
+        """
+        self.notify_host_stop(local=True)
+        self.DB.close()
+        self.WORKER.close()
+        self.BC.close()
+
+
+    # setting up daemon
+
+
     def setup_db(self):
         """
         konfiguracja bazy danych
@@ -33,10 +47,16 @@ class SyncDaemon(object):
 
 
     def setup_worker(self):
+        """
+        This worker loop is for communication between syncd and local workers.
+        """
         return SyncWorker(server=self)
 
 
     def setup_broadcaster(self):
+        """
+        Broadcaster is used to synchronise information between all syncd servers in network.
+        """
         backend = settings.SYNC_BACKEND
         if backend=="udp-broadcast":
             from broadcast.udp import UDPBroadcast
@@ -44,7 +64,28 @@ class SyncDaemon(object):
         raise Exception("Unknown broadcast backend: %s" % backend)
 
 
+    # global network changes
+
+
+    def notify_host_start(self, local=False):
+        """
+        Send information about startup to all hosts in network
+        """
+        self.WORKER.request_workers_register()
+        if local:
+            self.BC.send_host_start()
+
+    def notify_host_stop(self, local=False):
+        """
+        Send information about shutdown to all hosts in network
+        """
+        pass
+
+
+
+
     def run(self):
+        self.notify_host_start(local=True)
         try:
             gevent.joinall([
                 gevent.spawn(self.WORKER.run_local_loop),
@@ -53,9 +94,5 @@ class SyncDaemon(object):
                 gevent.spawn(self.BC.run_listener),
             ])
         finally:
-            self.DB.close()
-            self.WORKER.close()
-            self.BC.close()
-
-
-
+            self.close()
+            print "Gently finished..."

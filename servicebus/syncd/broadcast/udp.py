@@ -33,15 +33,19 @@ class UDPBroadcast(object):
         Pętla odbierająca i rozsyłająca informacje o zmianach stanu workerów w sieci
         """
         while True:
-            msg, addr = self.sock.recvfrom(2048)
-            msg = deserialize(msg)
+            msgdata, addr = self.sock.recvfrom(4096)
+            msgdata = deserialize(msgdata)
+            msg = msgdata['message']
+            #print "incoming broadcast", msgdata
 
-            if msg['message'] in (
-                messages.WORKER_JOIN,
-                messages.WORKER_LEAVE):
-                self.SRV.WORKER.worker_change_state(msg, frombroadcast=True)
+            if msg==messages.WORKER_JOIN:
+                self.SRV.WORKER.worker_start(msgdata['service'], msgdata['addr'], False )
 
-            #print "Received broadcast >>>",msg, addr
+            elif msg==messages.WORKER_LEAVE:
+                self.SRV.WORKER.worker_stop( msgdata['addr'], False )
+
+            elif msg== messages.HOST_JOIN:
+                self.SRV.notify_host_start()
 
 
     def broadcast_message(self, msg):
@@ -52,3 +56,37 @@ class UDPBroadcast(object):
         msg = serialize(msg)
         self.sock.sendto(msg, ('<broadcast>', self.port) )
 
+
+    # broadcast specific messages
+
+    def send_worker_start(self, service, address):
+        """
+        Send information to other hosts about new worker
+        """
+        msg = {
+            "message" : messages.WORKER_JOIN,
+            "addr" : address,
+            "service" : service,
+            }
+        self.broadcast_message(msg)
+
+    def send_worker_stop(self, address):
+        """
+        Send information to other hosts about shutting down worker
+        """
+        msg = {
+            "message" : messages.WORKER_LEAVE,
+            "addr" : address,
+            }
+        self.broadcast_message(msg)
+
+
+    def send_host_start(self):
+        msg = {
+            "message" : messages.HOST_JOIN,
+            #"addr" : address,
+            }
+        self.broadcast_message(msg)
+
+    def send_host_stop(self):
+        pass

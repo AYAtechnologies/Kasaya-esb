@@ -26,7 +26,7 @@ class DictDB(object):
         pass
 
 
-    def register(self, name, addr, localservice):
+    def worker_register(self, name, addr, localservice):
         """
         Zarejestrowanie workera w bazie.
           name - nazwa serwisu
@@ -41,10 +41,10 @@ class DictDB(object):
             self.services[name].append(addr)
         # worker na localhoście
         if localservice:
-            self.set_last_heartbeat(addr)
+            self.set_last_worker_heartbeat(addr)
 
 
-    def unregister(self, addr):
+    def worker_unregister(self, addr):
         """
         Wyrejestrowanie workera z bazy.
           Zwraca True jeśli wyrejestrowano workera,
@@ -69,7 +69,7 @@ class DictDB(object):
         except KeyError:
             return None
         if len(servers)==0:
-            return None
+            return None2
         return random.choice( servers )
 
 
@@ -77,14 +77,24 @@ class DictDB(object):
         return self.local_workers.keys()
 
 
-    def set_last_heartbeat(self, addr, htime=None):
+    def set_last_worker_heartbeat(self, addr, htime=None):
         if htime is None:
             htime = datetime.now()
         self.local_workers[addr] = htime
 
 
-    def get_last_heartbeat(self, addr):
+    def get_last_worker_heartbeat(self, addr):
         try:
             return self.local_workers[addr]
         except AttributeError:
             return None
+
+
+    # global network state
+
+    def host_register(self, addr):
+        pass
+
+    def host_unregister(self, addr):
+        pass
+

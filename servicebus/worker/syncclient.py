@@ -15,15 +15,18 @@ class SyncClient(object):
         self.sync_sender.connect('ipc://'+settings.SOCK_LOCALWORKERS)
 
     def notify_start(self):
-        msg = {"message":messages.WORKER_JOIN}
-        msg['addr'] = self.addr
-        msg['service'] = self.srvname
-        msg['local'] = True
+        msg = {
+            "message" : messages.WORKER_JOIN,
+            "addr" : self.addr,
+            "service" : self.srvname,
+            }
         self.sync_sender.send( serialize(msg) )
 
     def notify_stop(self):
-        msg = {"message":messages.WORKER_LEAVE}
-        msg['addr'] = self.addr
+        msg = {
+            "message" : messages.WORKER_LEAVE,
+            "addr" : self.addr,
+            }
         self.sync_sender.send( serialize(msg) )
 
     def close(self):

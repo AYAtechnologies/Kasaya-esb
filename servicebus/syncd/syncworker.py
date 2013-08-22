@@ -16,6 +16,7 @@ from gevent import socket
 from servicebus.protocol import serialize, deserialize, messages
 
 from pprint import pprint
+import random
 import sys
 
 
@@ -44,21 +45,15 @@ class SyncWorker(object):
         self.local_input.close()
         self.queries.close()
 
+    def worker_start(self, service, address, local):
+        self.SRV.DB.worker_register(service, address, local)
+        if local:
+            self.SRV.BC.send_worker_start(service, address)
 
-    def worker_change_state(self, msg, frombroadcast=False):
-        """
-        Register and broadcast worker state change
-        """
-        if msg['message'] == messages.WORKER_JOIN:
-            # przyłączenie serwisu
-            self.SRV.DB.register(msg['service'], msg['addr'], msg['local'])
-            msg['local'] = False
-        elif msg['message'] == messages.WORKER_LEAVE:
-            # odłączenie serwisu
-            self.SRV.DB.unregister(msg['addr'])
-        # rozesłanie w sieci
-        if not frombroadcast:
-            self.SRV.BC.broadcast_message(msg)
+    def worker_stop(self, address, local):
+        self.SRV.DB.worker_unregister(address)
+        if local:
+            self.SRV.BC.send_worker_stop(address)
 
 
     def run_local_loop(self):
@@ -74,15 +69,11 @@ class SyncWorker(object):
 
             msg = msgdata['message']
 
-            # join / leave net by network
-            if msg in (
-                messages.WORKER_JOIN,
-                messages.WORKER_LEAVE):
-                try:
-                    self.worker_change_state(msgdata)
-                except:
-                    print "State change fail"
-                    pass
+            # join network
+            if msg==messages.WORKER_JOIN:
+                self.worker_start(msgdata['service'], msgdata['addr'], True )
+            elif msg==messages.WORKER_LEAVE:
+                self.worker_stop( msgdata['addr'], True )
 
 
     def run_query_loop(self):
@@ -120,7 +111,7 @@ class SyncWorker(object):
                 now = datetime.now()
 
                 # is last heartbeat fresh enough?
-                lhb = self.SRV.DB.get_last_heartbeat(worker)
+                lhb = self.SRV.DB.get_last_worker_heartbeat(worker)
                 delta = now-lhb
                 if delta<=pinglife:
                     continue
@@ -130,7 +121,7 @@ class SyncWorker(object):
                     with gevent.Timeout(settings.PING_TIMEOUT, TooLong):
                         pingres = self.ping_worker(worker)
                     if pingres:
-                        self.SRV.DB.set_last_heartbeat(worker, now)
+                        self.SRV.DB.set_last_worker_heartbeat(worker, now)
                         continue
                 except TooLong:
                     self.PINGER.close()
@@ -163,5 +154,20 @@ class SyncWorker(object):
             return False
         return True
 
+
+    def request_workers_register(self):
+        """
+        Send to all local workers request for registering in network.
+        Its used after new host start.
+        """
+        msg = {"message":messages.WORKER_REREG}
+        for worker in self.SRV.DB.get_local_workers():
+            sck = self.context.socket(zmq.REQ)
+            try:
+                sck.connect(worker)
+                sck.send( serialize(msg) )
+                res = sck.recv()
+            finally:
+                sck.close()
 
 

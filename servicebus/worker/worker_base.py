@@ -35,7 +35,8 @@ class WorkerBase(object):
             msgdata = deserialize(msgdata)
 
             try:
-                handler = self._msgdb[ msgdata['message'] ]
+                m = msgdata['message']
+                handler = self._msgdb[ m ]
             except KeyError:
                 # unknown messages are ignored silently
                 self.WORKER.send("")
