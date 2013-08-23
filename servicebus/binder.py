@@ -40,11 +40,12 @@ def all_interfaces():
     return res
 
 
-def get_bind_address():
+def get_bind_address(bindto=None):
     """
     Returns address to bind socket as specified in configuration
     """
-    bindto = settings.BIND_TO
+    if bindto is None:
+        bindto = settings.BIND_WORKER_TO
     avail = all_interfaces()
     # network interface name
     if bindto in avail:

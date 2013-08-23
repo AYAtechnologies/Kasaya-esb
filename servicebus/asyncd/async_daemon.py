@@ -19,7 +19,7 @@ class AsyncDeamon(WorkerDaemon):
 
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
-        self.register_message(messages.ASYNC_CALL, self.handle_async_call)
+        self.loop.register_message(messages.ASYNC_CALL, self.handle_async_call)
         self.backend = Backend()
         self.greenlets_semaphore = Semaphore()
         self.greenlets = {}

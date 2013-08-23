@@ -77,7 +77,7 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
 
 def execute_control_task(method, authinfo, timeout, args, kwargs, addr = None):
     """
-    Wywołanie zadania kontrolnego wysyłane jest do syncd a nie workerów!
+    Wywołanie zadania kontrolnego wysyłane jest do syncd a nie do workerów!
     """
     # zbudowanie komunikatu
     msg = {

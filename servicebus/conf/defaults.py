@@ -17,7 +17,7 @@ SOCK_LOCALWORKERS = "/tmp/esb_local_workers.sock"
 #  nazwa interfejsu - "eth0", "eth1", ...
 #  "LOCAL" - podpięty do lokalnego IP (127.0.0.1)
 #  "AUTO" - podpięty do pierwszego interfejsu nie-lokalnego (zwykle eth0)
-BIND_TO = "AUTO"
+BIND_WORKER_TO = "AUTO"
 
 # HEARBEAT
 
@@ -43,6 +43,9 @@ SYNC_BACKEND = "udp-broadcast"
 # jeśli serwer ma synchronizować się z innymi hostami poprzez rozsyłanie broadcastów,
 # należy podać numer portu na którym nasłuchuje serwer
 BROADCAST_PORT = 4040
+# port na którym prowadzona jest synchronizacja pomiędzy serwerami syncd i zarządzanie siecią
+SYNCD_CONTROL_PORT = 4041
+SYNCD_CONTROL_BIND = "AUTO"
 
 # stan sieci może być przechowywany w lokalnej bazie danych, jeśli
 ## przemyśleć to

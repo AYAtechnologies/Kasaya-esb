@@ -9,6 +9,7 @@ Broadcasting service for synchronising state of all sync servers in network
 """
 from servicebus.conf import settings
 from gevent import socket
+from gevent_zeromq import zmq
 from servicebus.protocol import serialize, deserialize, messages
 
 
@@ -17,10 +18,15 @@ class UDPBroadcast(object):
 
     def __init__(self, server):
         self.SRV = server
+        # broadcast send/receive
         self.port = settings.BROADCAST_PORT
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(('',settings.BROADCAST_PORT))
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        ## syncd dialog
+        #self.sync = socket
+        #self.queries = self.context.socket(zmq.REP)
+        #self.queries.bind('ipc://'+settings.SOCK_QUERIES)
 
 
     def close(self):
@@ -49,6 +55,10 @@ class UDPBroadcast(object):
 
             elif msg== messages.HOST_JOIN:
                 self.SRV.notify_host_start()
+
+
+    def run_syncchannel(self):
+        pass
 
 
     def broadcast_message(self, msg):

@@ -10,6 +10,9 @@ class FakeBroadcast(object):
     def run_listener(self):
         pass
 
+    def run_syncchannel(self):
+        pass
+
     def broadcast_message(self, msg):
         pass
 

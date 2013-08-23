@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from gevent_zeromq import zmq
 from gevent import socket
 from servicebus.protocol import serialize, deserialize, messages
+from servicebus.binder import get_bind_address
 
 from pprint import pprint
 import random
@@ -33,6 +34,8 @@ class SyncWorker(object):
         # drugi kanał służy do odpytywania nameserwera przez klientów
         self.queries = self.context.socket(zmq.REP)
         self.queries.bind('ipc://'+settings.SOCK_QUERIES)
+        # kanał dialogowy pomiędzy serwerami syncd
+        print get_bind_address(settings.SYNCD_CONTROL_BIND)
 
 
     def close(self):
