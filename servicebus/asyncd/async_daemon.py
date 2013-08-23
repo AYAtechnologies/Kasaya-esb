@@ -23,12 +23,13 @@ class AsyncDeamon(WorkerDaemon):
         self.backend = Backend()
         self.greenlets_semaphore = Semaphore()
         self.greenlets = {}
+        self.exposed_methods = ["register_task", "get_task_result"]
 
 
     def handle_async_call(self, msgdata):
         result = self.run_task(
             funcname = msgdata['method'],
-            args = [self],  # <<< ??????????
+            args = [],  # <<< ??????????
             kwargs = msgdata,
         )
         return result
@@ -45,9 +46,7 @@ class AsyncDeamon(WorkerDaemon):
             # ponawiać ?
         #print self.backend.store
 
-
-    @Task(name="register_task")
-    def register(self, *args, **kwargs):
+    def register_task(self, *args, **kwargs):
         print "register:", args, kwargs
         task = {}
         task["method"] = kwargs["original_method"]
@@ -65,8 +64,7 @@ class AsyncDeamon(WorkerDaemon):
         g.start()
         return task_id
 
-    @Task(name="get_task_result")
-    def get_result(self, task_id):
+    def get_task_result(self, task_id):
         print "get result:", task_id
         return self.backend.get_result(task_id)
 

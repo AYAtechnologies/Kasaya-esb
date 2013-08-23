@@ -26,7 +26,7 @@ if __name__=="__main__":
     # user o nazwie "stefan"
     print "async"
     tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False)
-    #print async_result(tid, "stefan")
+    print async_result(tid, "stefan")
     #print sync("stefan").async_daemon.get_result(tid)
 
     busctl.jajo()
