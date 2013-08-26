@@ -136,7 +136,7 @@ class SyncWorker(object):
 
                 # worker died
                 print "worker", worker, "died or broken"
-                self.SRV.DB.unregister(worker)
+                self.SRV.DB.worker_unregister(worker)
                 msg = {"message":messages.WORKER_LEAVE, "addr":worker}
                 self.SRV.BC.broadcast_message(msg)
 

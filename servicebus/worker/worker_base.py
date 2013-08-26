@@ -6,7 +6,7 @@ from servicebus.binder import bind_socket_to_port_range
 from gevent_zeromq import zmq
 import gevent
 from syncclient import SyncClient
-from servicebus.protocol import serialize, deserialize
+from servicebus.protocol import serialize, deserialize, messages
 import uuid
 
 
@@ -45,7 +45,7 @@ class WorkerBase(object):
                 continue
             result = handler(msgdata)
             if result is None:
-                result = {"message":messages.NOOP}
+                result = {"message": messages.NOOP}
             self.WORKER.send( serialize(result) )
 
 

@@ -10,9 +10,7 @@ load_config_from_file("../config.txt")
 
 import time
 
-
 from servicebus.worker.decorators import Task
-
 
 @Task(name="print_foo")
 def print_foo(param):
@@ -37,10 +35,10 @@ def sendspam(a,b):
     print a,b
 
 @Task(name="long_task")
-def long_task(a):
-    print "sleeping:", a
+def long_task(a, x):
+    print x, "sleeping:", a
     time.sleep(float(a))
-    return "hurra"
+    return "hurra " + str(x)
 
 
 @Task(name="wyjebka")

@@ -16,12 +16,12 @@ class WorkerCaller(object):
 
 
     def send_request_to_worker(self, target, msg):
-        self.REQUESTER = self.context.socket(zmq.REQ)
-        self.REQUESTER.connect(target)
-        self.REQUESTER.send( serialize(msg) )
-        res = self.REQUESTER.recv()
+        REQUESTER = self.context.socket(zmq.REQ)
+        REQUESTER.connect(target)
+        REQUESTER.send(serialize(msg))
+        res = REQUESTER.recv()
         res = deserialize(res)
-        self.REQUESTER.close()
+        REQUESTER.close()
         return res
 
 

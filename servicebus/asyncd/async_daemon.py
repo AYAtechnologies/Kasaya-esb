@@ -5,7 +5,7 @@ esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append( esbpath )
 
 from servicebus.conf import settings
-from backend import DictBackend as Backend
+from backend import RedisBackend as Backend
 from servicebus.worker import WorkerDaemon
 from servicebus.worker.decorators import Task
 from servicebus.protocol import serialize, deserialize, messages
@@ -13,7 +13,7 @@ from servicebus.client.task_caller import execute_sync_task, find_worker
 
 from gevent import *
 from gevent.coros import Semaphore
-
+from gevent.pool import Pool
 
 class AsyncDeamon(WorkerDaemon):
 
@@ -23,13 +23,14 @@ class AsyncDeamon(WorkerDaemon):
         self.backend = Backend()
         self.greenlets_semaphore = Semaphore()
         self.greenlets = {}
+        self.pool = Pool(size=10)
         self.exposed_methods = ["register_task", "get_task_result"]
 
 
     def handle_async_call(self, msgdata):
         result = self.run_task(
             funcname = msgdata['method'],
-            args = [],  # <<< ??????????
+            args = [],
             kwargs = msgdata,
         )
         return result
@@ -61,7 +62,7 @@ class AsyncDeamon(WorkerDaemon):
         self.greenlets[g] = task_id
         self.greenlets_semaphore.release()
         g.link(self.handle_async_result)
-        g.start()
+        self.pool.start(g)
         return task_id
 
     def get_task_result(self, task_id):
