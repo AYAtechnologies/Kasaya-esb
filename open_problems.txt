@@ -34,5 +34,17 @@
  - pad lacza w kazdej chwili
 pad czegokolwiek powinien zwrocic blad wszystkim a nie moze to przejsc dalej
 
+WALIDACJA ASYNC TASKOW:
+- async zleca task do workera i async pada:
+    - wynik wraca zanim async wstanie
+        - worker musi miec timeout
+        - wynik jest tracony
+    - wynik wraca jak nowy async wstanie
+        - co sie dzieje? nowy dostanie wynik czy bedzie jakis fail?
+
+- async pada zanim task wyjdzie do workera (dluga kolejla)
+    - nowy async dodaje te taski do swojej kolejki
+
+
 # Globalna konfiguracja utrzymywana przez synncD
 - API do czytania i zmiany tej konfiguracji

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
 from servicebus.conf import settings
-import zmq
+from gevent_zeromq import zmq
 from servicebus.protocol import serialize, deserialize, messages
 
 

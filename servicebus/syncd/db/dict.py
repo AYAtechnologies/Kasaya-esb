@@ -69,7 +69,7 @@ class DictDB(object):
         except KeyError:
             return None
         if len(servers)==0:
-            return None2
+            return None
         return random.choice( servers )
 
 

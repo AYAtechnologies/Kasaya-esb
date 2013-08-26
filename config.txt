@@ -4,7 +4,7 @@ ENCRYPTION = yes
 # COMPRESSION = no
 
 # zamiast plain password można wczytać zawartość jakiegoś tajmeniczego pliku z /etc/esb/secret.txt
-PASSWORD = hop sasa fiku miku
+PASSWORD = hop sasa fiku
 
 # konfiguracja name(?) serwera
 # możliwe:

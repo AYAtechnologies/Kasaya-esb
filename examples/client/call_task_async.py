@@ -28,23 +28,17 @@ if __name__=="__main__":
     tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False)
     print async_result(tid, "stefan")
     #print sync("stefan").async_daemon.get_result(tid)
-
-    busctl.jajo()
-
-    #with async("zyga") as A:
-    #    A.fikumiku.wyjebka(234)
-
-    '''
-    print sync.async_daemon.get_result(tid)
+    tasks = []
     print "long"
-    tid = async.fikumiku.long_task(1)
-    print "res", tid
-    print sync.async_daemon.get_result(tid)
+    for i in range(50):
+        tid = async.fikumiku.long_task(1, i)
+        print "res", tid
+        print sync.async_daemon.get_task_result(tid)
+        tasks.append(tid)
     import time
-    time.sleep(1)
-    print sync.async_daemon.get_result(tid)
+    time.sleep(5)
+    print len(tasks)
+    for t in tasks:
+        print sync.async_daemon.get_task_result(t)
 
     #sync.fikumiku.wyjebka(234)
-
-
-    '''

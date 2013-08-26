@@ -26,3 +26,6 @@ class BackendBase(object):
 
     def set_result_fail(self, task_id, error_code, error):
         pass
+
+    def start_execution(self, task_id, daemon_id, worker):
+        pass

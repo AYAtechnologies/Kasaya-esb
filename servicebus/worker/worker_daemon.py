@@ -12,6 +12,7 @@ import gevent
 from servicebus.lib.loops import RepLoop
 from syncclient import SyncClient
 import uuid
+import inspect
 
 
 class WorkerDaemon(object):
@@ -53,6 +54,18 @@ class WorkerDaemon(object):
     # --------------------
 
 
+    def expose_method(self, method_name):
+        if getattr(self, method_name):
+            # this must be a defined method - attribute error raises when trying to expose method that doesnt exist
+            self.exposed_methods.append(method_name)
+
+    def expose_all(self):
+        exposed = []
+        for name, val in inspect.getmembers(self):
+            if inspect.ismethod(val) and not name.startswith("_"):
+                exposed.append(name)
+        self.exposed_methods += exposed
+
     def handle_sync_call(self, msgdata):
         name = msgdata['service']
         result = self.run_task(
@@ -83,15 +96,19 @@ class WorkerDaemon(object):
         funcname = ".".join( funcname )
         # find task in worker db
         print self.servicename, ":", funcname
-        try:
-            func = worker_methods_db[funcname]
-        except KeyError:
-            # we dont know this task
-            return {
-                'message' : messages.ERROR,
-                'internal' : True,  # internal service bus problem
-                'info' : 'Method %s not found' % funcname,
-            }
+        self_func = getattr(self, funcname, None)
+        if self_func is not None and funcname in self.exposed_methods:
+            func = self_func
+        else:
+            try:
+                func = worker_methods_db[funcname]
+            except KeyError:
+                # we dont know this task
+                return {
+                    'message' : messages.ERROR,
+                    'internal' : True,  # internal service bus problem
+                    'info' : 'Method %s not found' % funcname,
+                }
         # try to run function and catch exceptions
         try:
             #print ">  ",func
