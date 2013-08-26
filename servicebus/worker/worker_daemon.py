@@ -20,7 +20,7 @@ class WorkerDaemon(object):
         self.proc_id = str(uuid.uuid4())
         self.servicename = servicename
         self.loop = RepLoop(self.connect)
-        self.SYNC = SyncClient(servicename, self.address)
+        self.SYNC = SyncClient(servicename, self.loop.address)
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call )
         self.loop.register_message( messages.PING, self.handle_ping )
@@ -30,8 +30,8 @@ class WorkerDaemon(object):
 
     def connect(self, context):
         sock = context.socket(zmq.REP)
-        self.address = bind_socket_to_port_range(sock, settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
-        return sock
+        addr = bind_socket_to_port_range(sock, settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
+        return sock, addr
 
 
     def run(self):

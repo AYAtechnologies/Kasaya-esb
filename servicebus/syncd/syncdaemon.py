@@ -82,12 +82,14 @@ class SyncDaemon(object):
         """
         Send information about shutdown to all hosts in network
         """
-        pass
+        if local:
+            self.BC.send_host_stop()
 
 
     # global network control tasks
 
 
+    # TODO
 
 
     # main loop
@@ -96,11 +98,9 @@ class SyncDaemon(object):
     def run(self):
         self.notify_host_start(local=True)
         try:
-            gevent.joinall([
-                gevent.spawn(self.WORKER.run_local_loop),
-                gevent.spawn(self.WORKER.run_query_loop),
-                gevent.spawn(self.WORKER.run_hearbeat_loop),
-                gevent.spawn(self.BC.run_listener),
-            ])
+            loops = self.WORKER.get_loops()
+            loops.append(self.BC.run_listener)
+            loops = [ gevent.spawn(loop) for loop in loops ]
+            gevent.joinall(loops)
         finally:
             self.close()

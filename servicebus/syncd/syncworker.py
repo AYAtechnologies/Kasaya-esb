@@ -6,9 +6,10 @@ from servicebus import exceptions
 import gevent
 from datetime import datetime, timedelta
 from gevent_zeromq import zmq
-from gevent import socket
+#from gevent import socket
 from servicebus.protocol import serialize, deserialize, messages
 from servicebus.binder import get_bind_address
+from servicebus.lib.loops import RepLoop, PullLoop
 
 from pprint import pprint
 import random
@@ -20,27 +21,88 @@ class TooLong(Exception): pass
 
 class SyncWorker(object):
     """
-    Główna klasa nameservera która nasłuchuje na lokalnych socketach i od lokalnych workerów i klientów.
+    Główna klasa syncd która nasłuchuje na lokalnych socketach i od lokalnych workerów i klientów.
     """
 
     def __init__(self, server):
         self.SRV = server
         self.context = zmq.Context()
+
         # kanał wejściowy ipc dla workerów tylko z tego localhosta
         # tym kanałem workery wysyłają informacje o uruchomieniu i zatrzymaniu
         # Tylko zmiany otrzymane tędy są propagowane przez broadcast do pozostałych nameserwerów.
-        self.local_input = self.context.socket(zmq.PULL)
-        self.local_input.bind('ipc://'+settings.SOCK_LOCALWORKERS)
-        # drugi kanał służy do odpytywania nameserwera przez klientów
-        self.queries = self.context.socket(zmq.REP)
-        self.queries.bind('ipc://'+settings.SOCK_QUERIES)
-        # kanał dialogowy pomiędzy serwerami syncd
-        print get_bind_address(settings.SYNCD_CONTROL_BIND)
+        #self.local_input = self.context.socket(zmq.PULL)
+        #self.local_input.bind('ipc://'+settings.SOCK_LOCALWORKERS)
 
+        # drugi kanał służy do odpytywania nameserwera przez klientów
+        #self.queries = self.context.socket(zmq.REP)
+        #self.queries.bind('ipc://'+settings.SOCK_QUERIES)
+
+        # kanał dialogowy pomiędzy serwerami syncd
+        #print get_bind_address(settings.SYNCD_CONTROL_BIND)
+
+
+        self.local_input = PullLoop(self._connect_input_loop, context=self.context)
+        self.local_input.register_message(messages.WORKER_JOIN,  self.handle_worker_join)
+        self.local_input.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
+
+        self.queries = RepLoop(self._connect_queries_loop, context=self.context)
+        self.queries.register_message(messages.QUERY,  self.handle_name_query)
+        self.queries.register_message(messages.CTL_CALL, self.handle_control_request)
+        #self.sync = PullLoop(self._connect_syncd_dialog_loop, context=self.context)
+
+
+    # connecting sockets
+
+    def _connect_input_loop(self, context):
+        """
+        connect local input loop
+        """
+        sock = context.socket(zmq.PULL)
+        addr = 'ipc://'+settings.SOCK_LOCALWORKERS
+        sock.bind(addr)
+        return sock, addr
+
+    def _connect_queries_loop(self, context):
+        """
+        connect local queries loop
+        """
+        sock = context.socket(zmq.REP)
+        addr = 'ipc://'+settings.SOCK_QUERIES
+        sock.bind(addr)
+        return sock, addr
+
+    def _connect_syncd_dialog_loop(self, context):
+        """
+        connext global network syncd dialog
+        """
+        sock = context.socket(zmq.REP)
+        addr = get_bind_address(settings.SYNCD_CONTROL_BIND)
+        sock.bind(addr)
+        return sock, addr
+
+    # closing and quitting
+
+    def stop(self):
+        self.local_input.stop()
+        self.queries.stop()
 
     def close(self):
         self.local_input.close()
         self.queries.close()
+
+
+    # starting loops
+
+    def get_loops(self):
+        #print self.local_input.spawn()
+        #print self.queries.spawn()
+        #import sys
+        #sys.exit()
+        return [self.local_input.loop, self.queries.loop, self.hearbeat_loop]
+
+
+    # queries
 
     def worker_start(self, service, address, local):
         self.SRV.DB.worker_register(service, address, local)
@@ -53,65 +115,44 @@ class SyncWorker(object):
             self.SRV.BC.send_worker_stop(address)
 
 
-    def run_local_loop(self):
+    # message handlers
+
+    def handle_worker_join(self, msg):
         """
-        Pętla nasłuchująca na lokalnym sockecie o pojawiających się i znikających workerach na własnym localhoście
+        New worker started
         """
-        while True:
-            msgdata = self.local_input.recv()
-            try:
-                msgdata = deserialize(msgdata)
-            except exceptions.ServiceBusException:
-                continue
+        self.worker_start(msg['service'], msg['addr'], True )
 
-            msg = msgdata['message']
-
-            # join network
-            if msg==messages.WORKER_JOIN:
-                self.worker_start(msgdata['service'], msgdata['addr'], True )
-            elif msg==messages.WORKER_LEAVE:
-                self.worker_stop( msgdata['addr'], True )
-
-
-    def run_query_loop(self):
+    def handle_worker_leave(self, msg):
         """
-        Pętla nasłuchująca na lokalnym sockecie i odpowiadająca klientom na zapytania o workery
+        Worker is going down
         """
-        while True:
-            msgdata = self.queries.recv()
-            try:
-                msgdata = deserialize(msgdata)
-            except exceptions.ServiceBusException:
-                self.queries.send("")
-                continue
+        self.worker_stop( msg['addr'], True )
 
-            msg = msgdata['message']
+    def handle_name_query(self, msg):
+        """
+        Odpowiedź na pytanie o adres workera
+        """
+        name = msg['service']
+        res = self.SRV.DB.get_worker_for_service(name)
+        return {
+            'message':messages.WORKER_ADDR,
+            'service':name,
+            'addr':res
+        }
 
-            if msg==messages.QUERY:
-                # pytanie o worker
-                name = msgdata['service']
-                res = self.SRV.DB.get_worker_for_service(name)
-                result = {
-                    'message':messages.WORKER_ADDR,
-                    'service':name,
-                    'addr':res
-                }
-
-            elif msg==messages.CTL_CALL:
-                print "CONTROL REQUEST"
-                print msgdata
-                result = {
-                    "message":messages.NOOP
-                }
-
-            else:
-                result = {
-                    "message":messages.NOOP
-                }
-            self.queries.send( serialize(result) )
+    def handle_control_request(self, msg):
+        """
+        wywołanie specjalne servicebus, nie workera
+        """
+        print "CONTROL REQUEST"
+        print msg
 
 
-    def run_hearbeat_loop(self):
+    # heartbeat
+
+
+    def hearbeat_loop(self):
         pinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT )
 
         while True:
@@ -144,6 +185,7 @@ class SyncWorker(object):
                 self.SRV.BC.broadcast_message(msg)
 
             gevent.sleep(settings.WORKER_HEARTBEAT)
+
 
 
     def ping_worker(self, addr):

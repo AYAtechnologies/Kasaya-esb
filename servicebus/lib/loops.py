@@ -6,25 +6,73 @@ from __future__ import unicode_literals
 from gevent_zeromq import zmq
 import gevent
 #from syncclient import SyncClient
-from servicebus.protocol import serialize, deserialize
+from servicebus.protocol import serialize, deserialize, messages
 
 
 
-class RepLoop(object):
+class BaseLoop(object):
+
+    def __init__(self, connector, context=None):
+        self.is_running = True
+        self._msgdb = {}
+        if context is None:
+            self.__context = zmq.Context()
+        else:
+            self.__context = context
+        self.SOCK, self.address = connector(self.__context)
+
+    def stop(self):
+        """
+        Request warm stop, exits loop after finishing current task
+        """
+        self.is_running = False
+
+    def close(self):
+        self.SOCK.close()
+
+    def register_message(self, message, func):
+        self._msgdb[message]=func
+
+    def loop(self):
+        raise NotImplemented("loop method must be implemented when BaseLoop is inherited")
+
+
+
+class PullLoop(BaseLoop):
+
+    def loop(self):
+        while self.is_running:
+            # receive data
+            msgdata = self.SOCK.recv()
+
+            # deserialize
+            try:
+                msgdata = deserialize(msgdata)
+                msg = msgdata['message']
+            except Exception as e:
+                continue
+
+            # find handler
+            try:
+                handler = self._msgdb[ msg ]
+            except KeyError:
+                # unknown messages are ignored silently
+                print "unknown message ", msg
+                continue
+
+            # run handler
+            try:
+                handler(msgdata)
+            except Exception as e:
+                # ignore exceptions
+                continue
+
+
+
+class RepLoop(BaseLoop):
     """
     pętla nasłuchująca na sockecie typu REP (odpowiedzi na REQ).
     """
-
-    def __init__(self, connector):
-        self.__running = True
-        self.__msgdb = {}
-        self.__context = zmq.Context()
-        self.SOCK = connector(self.__context)
-
-
-    def register_message(self, message, func):
-        self.__msgdb[message]=func
-
 
     def send_noop(self):
         noop = {"message":messages.NOOP}
@@ -35,9 +83,11 @@ class RepLoop(object):
 
 
     def loop(self):
-        while self.__running:
+        while self.is_running:
             # receive data
             msgdata = self.SOCK.recv()
+
+            # deserialize
             try:
                 msgdata = deserialize(msgdata)
                 msg = msgdata['message']
@@ -47,7 +97,7 @@ class RepLoop(object):
 
             # find handler
             try:
-                handler = self.__msgdb[ msg ]
+                handler = self._msgdb[ msg ]
             except KeyError:
                 # unknown messages are ignored silently
                 self.send_noop()
@@ -59,21 +109,10 @@ class RepLoop(object):
             except Exception as e:
                 result = None
 
+            # send result
             if result is None:
                 self.send_noop()
             else:
                 self.send(result)
-
-
-    def stop(self):
-        """
-        Request warm stop, exits loop after finishing current task
-        """
-        self.__running = False
-
-
-    def close(self):
-        self.SOCK.close()
-
 
 
