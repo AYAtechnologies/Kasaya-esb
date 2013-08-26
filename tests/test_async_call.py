@@ -11,11 +11,25 @@ sys.path.append( esbpath )
 
 from servicebus import client, conf
 from servicebus.client import sync, async, register_auth_processor, async_result, busctl
+import datetime
 import time
+import subprocess
+
 
 class TestAsync(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        conf.load_config_from_file("../config.txt")
+        PYTHON = "~/PycharmProjects/django-env/bin/python" #PYTHON_INTERPRETER
+        # subprocess.call(PYTHON + " ../examples/syncserver/run_syncd.py", shell=True)
+        # subprocess.call(PYTHON + " ../examples/syncserver/run_async_worker.py", shell=True)
+        # subprocess.call(PYTHON + " ../examples/workers/simple_worker.py", shell=True)
+
+
     def test_register(self):
-        pass
+        tid = async.fikumiku.long_task(1, 1)
+        print "res", tid
 
     def test_in_progress(self):
         print "start"
@@ -25,6 +39,7 @@ class TestAsync(TestCase):
         assert res == ['in_progress', None]
         time.sleep(2)
         res = async_result(tid, "stefan")
+        print res
         assert res == ['ok', "hurra 1"]
 
     def test_worker_error(self):
@@ -33,7 +48,7 @@ class TestAsync(TestCase):
     def test_long_wait_with_large_group(self):
         tasks = []
         print "long"
-        TASK_COUNT = 50
+        TASK_COUNT = 10 # Docelowo ta liczba powinna byc duzo wieksza - narazie jest mala
         for i in range(TASK_COUNT):
             tid = async.fikumiku.long_task(1, i)
             print "res", tid
@@ -48,7 +63,8 @@ class TestAsync(TestCase):
 
     def test_large_group(self):
         tasks = []
-        print time.now()
+        t0 = datetime.datetime.now()
+        print t0
         print "long"
         TASK_COUNT = 50
         for i in range(TASK_COUNT):
@@ -61,6 +77,8 @@ class TestAsync(TestCase):
         for t in tasks:
             res = sync.async_daemon.get_task_result(t)
             assert res[0] == "ok"
+        print datetime.datetime.now() - t0
+
 
     def test_performance(self):
         pass

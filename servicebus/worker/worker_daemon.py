@@ -5,6 +5,7 @@ from servicebus.worker.worker_base import WorkerBase
 from servicebus.protocol import messages
 from worker_reg import worker_methods_db
 import traceback
+import inspect
 
 
 class WorkerDaemon(WorkerBase):
@@ -21,6 +22,13 @@ class WorkerDaemon(WorkerBase):
         if getattr(self, method_name):
             # this must be a defined method - attribute error raises when trying to expose method that doesnt exist
             self.exposed_methods.append(method_name)
+
+    def expose_all(self):
+        exposed = []
+        for name, val in inspect.getmembers(self):
+            if inspect.ismethod(val) and not name.startswith("_"):
+                exposed.append(name)
+        self.exposed_methods += exposed
 
     def handle_sync_call(self, msgdata):
         name = msgdata['service']

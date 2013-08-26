@@ -11,7 +11,7 @@ from servicebus import client, conf
 from servicebus.client import sync, async, register_auth_processor, async_result, busctl
 
 if __name__=="__main__":
-    conf.load_config_from_file("../config.txt")
+    conf.load_config_from_file("../../config.txt")
 
     # wywołanie synchroniczne, anonimowe
     res = sync.fikumiku.do_work("parameter", 1, foo=123, baz=True )

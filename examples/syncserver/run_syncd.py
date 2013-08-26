@@ -10,6 +10,6 @@ from servicebus.syncd import SyncDaemon
 
 
 if __name__=="__main__":
-    load_config_from_file("../config.txt")
+    load_config_from_file("../../config.txt")
     daemon = SyncDaemon()
     daemon.run()

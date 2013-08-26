@@ -9,7 +9,7 @@ from backend import RedisBackend as Backend
 from servicebus.worker import WorkerDaemon
 from servicebus.worker.decorators import Task
 from servicebus.protocol import serialize, deserialize, messages
-from servicebus.client.task_caller import execute_sync_task, find_worker
+from servicebus.client.task_caller import execute_sync_task, find_worker, register_async_task
 
 from gevent import *
 from gevent.coros import Semaphore
@@ -20,7 +20,7 @@ class AsyncDeamon(WorkerDaemon):
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
         self.register_message(messages.ASYNC_CALL, self.handle_async_call)
-        self.backend = Backend()
+        self.backend = Backend(self.proc_id, "1111")
         self.greenlets_semaphore = Semaphore()
         self.greenlets = {}
         self.pool = Pool(size=10)
@@ -47,6 +47,27 @@ class AsyncDeamon(WorkerDaemon):
             # ponawiać ?
         #print self.backend.store
 
+    def sanitize_loose_task(self, task_id):
+        task = self.backend.get_task(task_id)
+        #register_async_task(task["method"], task["authinfo"], 0, task["args"], task["kwargs"])
+        if task["status"] == self.backend.TASK_WAITING:
+            print "SANITIZING", task
+            self.execute_task(task_id, task["method"], task["authinfo"], 0, task["args"], task["kwargs"])
+        else:
+            print "TASK ERROR:", task
+
+    def execute_task(self, task_id, method, authinfo, timeout, args, kwargs):
+        worker = find_worker(method)
+        self.backend.start_execution(task_id, worker)
+        return execute_sync_task(method, authinfo, timeout, args, kwargs)
+
+    def start_greenlet(self, g, task_id):
+        self.greenlets_semaphore.acquire()
+        self.greenlets[g] = task_id
+        self.greenlets_semaphore.release()
+        g.link(self.handle_async_result)
+        self.pool.start(g)
+
     def register_task(self, *args, **kwargs):
         print "register:", args, kwargs
         task = {}
@@ -54,25 +75,18 @@ class AsyncDeamon(WorkerDaemon):
         task["authinfo"] = kwargs["authinfo"]
         task["args"] = kwargs["args"]
         task["kwargs"] = kwargs["kwargs"]
-        task_id = self.backend.add_task(task)
-        worker = find_worker(kwargs["original_method"])
-        self.backend.start_execution(task_id, self.proc_id, worker)
-        g = Greenlet(execute_sync_task, kwargs["original_method"], kwargs["authinfo"], 0, kwargs["args"], kwargs["kwargs"])
-        self.greenlets_semaphore.acquire()
-        self.greenlets[g] = task_id
-        self.greenlets_semaphore.release()
-        g.link(self.handle_async_result)
-        self.pool.start(g)
+        task_id, loose_tasks = self.backend.add_task(task)
+        g = Greenlet(self.execute_task, task_id, kwargs["original_method"], kwargs["authinfo"], 0, kwargs["args"], kwargs["kwargs"])
+        self.start_greenlet(g, task_id)
+        for t in loose_tasks:
+            g = Greenlet(self.sanitize_loose_task, t)
+            self.start_greenlet(g, t)
         return task_id
 
     def get_task_result(self, task_id):
         print "get result:", task_id
         return self.backend.get_result(task_id)
 
-    #@Task(name="kill")
-    #def get_result(self, task_id):
-    #    print "get result:", task_id
-    #    return self.backend.get_result(task_id)
 
 
 
