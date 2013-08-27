@@ -79,9 +79,7 @@ class WorkerDaemon(object):
         }
         while self.__hbloop:
             self.SYNC.send_raw(msg)
-            print ".",
-            sys.stdout.flush()
-            gevent.sleep(1)#settings.WORKER_HEARTBEAT)
+            gevent.sleep(settings.WORKER_HEARTBEAT)
 
 
     # --------------------

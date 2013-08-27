@@ -28,23 +28,6 @@ class SyncWorker(object):
         self.SRV = server
         self.context = zmq.Context()
         self.__pingdb = {}
-        # kanał wejściowy ipc dla workerów tylko z tego localhosta
-        # tym kanałem workery wysyłają informacje o uruchomieniu i zatrzymaniu
-        # Tylko zmiany otrzymane tędy są propagowane przez broadcast do pozostałych nameserwerów.
-        #self.local_input = self.context.socket(zmq.PULL)
-        #self.local_input.bind('ipc://'+settings.SOCK_LOCALWORKERS)
-
-        # drugi kanał służy do odpytywania nameserwera przez klientów
-        #self.queries = self.context.socket(zmq.REP)
-        #self.queries.bind('ipc://'+settings.SOCK_QUERIES)
-
-        # kanał dialogowy pomiędzy serwerami syncd
-        #print get_bind_address(settings.SYNCD_CONTROL_BIND)
-
-
-        #self.local_input = PullLoop(self._connect_input_loop, context=self.context)
-        #self.local_input.register_message(messages.WORKER_JOIN,  self.handle_worker_join)
-        #self.local_input.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
 
         self.queries = RepLoop(self._connect_queries_loop, context=self.context)
         self.queries.register_message(messages.WORKER_JOIN,  self.handle_worker_join)
@@ -52,19 +35,7 @@ class SyncWorker(object):
         self.queries.register_message(messages.PING, self.handle_ping)
         self.queries.register_message(messages.QUERY,  self.handle_name_query)
         self.queries.register_message(messages.CTL_CALL, self.handle_control_request)
-        #self.sync = PullLoop(self._connect_syncd_dialog_loop, context=self.context)
 
-
-    # connecting sockets
-
-    #def _connect_input_loop(self, context):
-    #    """
-    #    connect local input loop
-    #    """
-    #    sock = context.socket(zmq.PULL)
-    #    addr = 'ipc://'+settings.SOCK_LOCALWORKERS
-    #    sock.bind(addr)
-    #    return sock, addr
 
     def _connect_queries_loop(self, context):
         """
@@ -98,13 +69,10 @@ class SyncWorker(object):
     # starting loops
 
     def get_loops(self):
-        #print self.local_input.spawn()
-        #print self.queries.spawn()
-        #import sys
-        #sys.exit()
-        return [self.queries.loop, self.hearbeat_loop]
+        return [self.queries.loop]#, self.hearbeat_loop]
 
     # message handlers
+    # -----------------------------------
 
     def handle_worker_join(self, msg):
         """
@@ -163,8 +131,8 @@ class SyncWorker(object):
 
 
 
-
-    # worker changes
+    # worker state changes
+    # ------------------------------
 
     def worker_start(self, service, address, local):
         print "new worker",service, "on", address
@@ -192,8 +160,7 @@ class SyncWorker(object):
 
 
     # heartbeat
-
-
+    '''
     def hearbeat_loop(self):
         pinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT )
 
@@ -248,7 +215,7 @@ class SyncWorker(object):
             return False
         return True
 
-
+    '''
     def request_workers_register(self):
         """
         Send to all local workers request for registering in network.
