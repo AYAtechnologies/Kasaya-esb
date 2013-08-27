@@ -46,22 +46,19 @@ class FuncProxy(object):
         if m=="sync":
             return execute_sync_task(
                 top._names,
-                top._authinfo,
-                top._timeout,
+                top._context,
                 args,
                 kwargs)
         elif m=="async":
             return register_async_task(
                 top._names,
-                top._authinfo,
-                top._timeout,
+                top._context,
                 args,
                 kwargs)
         elif m=="ctl":
             return execute_control_task(
                 top._names,
-                top._authinfo,
-                top._timeout,
+                top._context,
                 args,
                 kwargs)
         else:
@@ -75,15 +72,15 @@ class ExecAndContext(object):
     Uruchamia zadania i tworzy context.
     """
 
-    def __init__(self, authoinfo=None, timeout=None):
-        self._authinfo = authoinfo
+    def __init__(self, context=None, timeout=None):
+        self._context = context
         self._timeout = timeout
 
     def _make_proxy(self):
         proxy = FuncProxy()
         proxy._method = self.__class__.call_type
         proxy._top = proxy # << zrobić tutaj weakref aby zlikwidować cykliczne odwołanie do samego siebie
-        proxy._authinfo = self._authinfo
+        proxy._context = self._context
         proxy._timeout = self._timeout
         return proxy
 
@@ -95,17 +92,17 @@ class ExecAndContext(object):
         return proxy
 
     @classmethod
-    def __call__(cls, authinfo):
+    def __call__(cls, context):
         """
-        To wywołanie używane jest przy tworzeniu context managera lub wywołaniu z określonymi authinfo.
+        To wywołanie używane jest przy tworzeniu context managera lub wywołaniu z określonymi context.
         W takim przypadku należy utworzyć nową instancję tej klasy z ustawionym podanym parametrem authoinfo.
 
-        Wynikiem jest nowa instancja własnej klasy z ustawionym authinfo.
+        Wynikiem jest nowa instancja własnej klasy z ustawionym context.
         """
         global AUTHPROC
         if not AUTHPROC is None:
-            authinfo = AUTHPROC(authinfo)
-        authexec = cls( authinfo )
+            context = AUTHPROC(context)
+        authexec = cls( context )
         return authexec
 
     def __enter__(self):

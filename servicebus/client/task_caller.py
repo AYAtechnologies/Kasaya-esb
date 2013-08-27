@@ -13,15 +13,33 @@ class WorkerCaller(object):
 
     def __init__(self):
         self.context = zmq.Context()
+        self.load_middleware()
 
+    def load_middleware(self):
+        pass
+
+    def prepare_message(self, message):
+        """
+        client part of the middleware handling - hook before sending the message
+        """
+        return message
+
+    def prepare_result(self, result):
+        """
+        client part of the middleware handling - hook after getting result
+        """
+        return result
 
     def send_request_to_worker(self, target, msg):
+        msg = self.prepare_message(msg) # middleware hook
         REQUESTER = self.context.socket(zmq.REQ)
+
         REQUESTER.connect(target)
         REQUESTER.send(serialize(msg))
         res = REQUESTER.recv()
         res = deserialize(res)
         REQUESTER.close()
+        res = self.prepare_result(res) # middleware hook
         return res
 
 
@@ -39,7 +57,7 @@ def find_worker(method):
 
 
 
-def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
+def execute_sync_task(method, context, args, kwargs, addr = None):
     """
     Wywołanie synchroniczne jest wykonywane natychmiast.
     """
@@ -51,7 +69,7 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
         "message" : messages.SYNC_CALL,
         "service" : method[0],
         "method" : method[1:],
-        "authinfo" : authinfo,
+        "context" : context,
         "args" : args,
         "kwargs" : kwargs
     }
@@ -75,7 +93,7 @@ def execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None):
 
 
 
-def execute_control_task(method, authinfo, timeout, args, kwargs, addr = None):
+def execute_control_task(method, context, args, kwargs, addr = None):
     """
     Wywołanie zadania kontrolnego wysyłane jest do syncd a nie do workerów!
     """
@@ -83,7 +101,7 @@ def execute_control_task(method, authinfo, timeout, args, kwargs, addr = None):
     msg = {
         "message" : messages.CTL_CALL,
         "method" : method,
-        "authinfo" : authinfo,
+        "context" : context,
         "args" : args,
         "kwargs" : kwargs
     }
@@ -95,7 +113,7 @@ def execute_control_task(method, authinfo, timeout, args, kwargs, addr = None):
 
 
 
-def register_async_task(method, authinfo, timeout, args, kwargs):
+def register_async_task(method, context, args, kwargs):
     """
     Wywołanie asynchroniczne powinno zostać zapisane w bazie i zostać wykonane
     w tle. Wynikiem funkcji powinien być identyfikator zadania wg którego można
@@ -105,17 +123,16 @@ def register_async_task(method, authinfo, timeout, args, kwargs):
     addr = find_worker([settings.ASYNC_DAEMON_SERVICE, "register_task"])
     # zbudowanie komunikatu
     msg = {
-        "message" : messages.ASYNC_CALL,
+        "message" : messages.SYSTEM_CALL,
         "service" : settings.ASYNC_DAEMON_SERVICE,
         "method" : ["register_task"],
         "original_method": method,
-        "authinfo" : authinfo,
+        "context" : context,
         "args" : args,
         "kwargs" : kwargs
     }
     # wysłanie żądania
     print "Async task: ", addr, msg
-    worker_caller = WorkerCaller()
     msg = worker_caller.send_request_to_worker(addr, msg)
     if msg['message']==messages.RESULT:
         return msg['result']
@@ -128,10 +145,10 @@ def register_async_task(method, authinfo, timeout, args, kwargs):
         e.traceback = msg['traceback']
         raise e
     else:
-        raise Exception("Wrong worker response")
+        raise Exception("Wrong worker response", str(msg))
 
 
-def async_result(task_id, authinfo, timeout=0):
-    #execute_sync_task(method, authinfo, timeout, args, kwargs, addr = None)
+def async_result(task_id, context):
+    #execute_sync_task(method, context, args, kwargs, addr = None)
     m = [settings.ASYNC_DAEMON_SERVICE, "get_task_result"]
-    return execute_sync_task(m, authinfo, timeout, [task_id], {})
+    return execute_sync_task(m, context, [task_id], {})

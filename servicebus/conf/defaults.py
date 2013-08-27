@@ -30,7 +30,6 @@ PING_TIMEOUT = 3
 # (powinien być większy niż WORKER_HEARTBEAT )
 HEARTBEAT_TIMEOUT = 10
 
-
 # zakres portów do automatycznej alokacji dla workerów
 WORKER_MIN_PORT = 5000
 WORKER_MAX_PORT = 6000
@@ -53,3 +52,5 @@ DB_BACKEND = "dict"
 
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
 ASYNC_DAEMON_SERVICE = "async_daemon"
+
+MIDDLEWARE_CLASSES = ["auth"]

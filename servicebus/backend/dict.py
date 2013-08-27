@@ -2,7 +2,7 @@ __author__ = 'wektor'
 
 import uuid
 import datetime
-from base import BackendBase, TaskNotFound
+from servicebus.backend.base import BackendBase, TaskNotFound
 
 class DictBackend(BackendBase):
     store = {}

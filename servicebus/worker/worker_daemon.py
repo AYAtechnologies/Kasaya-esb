@@ -7,7 +7,7 @@ from worker_reg import worker_methods_db
 from servicebus.binder import bind_socket_to_port_range
 from gevent_zeromq import zmq
 import traceback
-import gevent, gevent.threadpool
+import gevent
 from servicebus.lib.loops import RepLoop
 from syncclient import SyncClient
 import uuid
@@ -27,6 +27,7 @@ class WorkerDaemon(object):
     def __init__(self, servicename):
         self.proc_id = str(uuid.uuid4())
         self.servicename = servicename
+        self.address = None
         self.loop = RepLoop(self.connect)
         self.SYNC = SyncClient(servicename, self.loop.address)
         # registering handlers
@@ -36,11 +37,14 @@ class WorkerDaemon(object):
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )
         # heartbeat
         self.__hbloop=True
+        #exposing methods
+        self.exposed_methods = []
 
 
     def connect(self, context):
         sock = context.socket(zmq.REP)
         addr = bind_socket_to_port_range(sock, settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
+        self.address = addr
         return sock, addr
 
 
@@ -130,6 +134,9 @@ class WorkerDaemon(object):
         self_func = getattr(self, funcname, None)
         if self_func is not None and funcname in self.exposed_methods:
             func = self_func
+            # doesnt work - dont know why
+            # if funcname in worker_methods_db:
+            #     print "Warning ", funcname, "in self.exposed_methods and in worker_functions"
         else:
             try:
                 func = worker_methods_db[funcname]

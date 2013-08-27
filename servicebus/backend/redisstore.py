@@ -1,8 +1,11 @@
 __author__ = 'wektor'
-from base import BackendBase, TaskNotFound
-import redis
 import uuid
 import datetime
+
+import redis
+
+from servicebus.backend.base import BackendBase, TaskNotFound
+
 
 class RedisBackend(BackendBase):
     TASK_LINK = "t:" # link to current state of the task

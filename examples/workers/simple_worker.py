@@ -39,7 +39,6 @@ def long_task(a, x):
     time.sleep(float(a))
     return "hurra " + str(x)
 
-
 @Task(name="wyjebka")
 def wyjebka(param):
     return param / 0
