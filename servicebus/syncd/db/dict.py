@@ -39,9 +39,6 @@ class DictDB(object):
         # nowy worker dla serwisu
         if not addr in self.services[name]:
             self.services[name].append(addr)
-        # worker na localhoście
-        if localservice:
-            self.set_last_worker_heartbeat(addr)
 
 
     def worker_unregister(self, addr):
@@ -78,19 +75,6 @@ class DictDB(object):
         Return list of live workers on local host
         """
         return self.local_workers.keys()
-
-
-    def set_last_worker_heartbeat(self, addr, htime=None):
-        if htime is None:
-            htime = datetime.now()
-        self.local_workers[addr] = htime
-
-
-    def get_last_worker_heartbeat(self, addr):
-        try:
-            return self.local_workers[addr]
-        except AttributeError:
-            return None
 
 
     # global network state

@@ -93,6 +93,7 @@ class RepLoop(BaseLoop):
                 msg = msgdata['message']
             except Exception as e:
                 self.send_noop()
+                print "unknown message ", msg
                 continue
 
             # find handler

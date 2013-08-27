@@ -1,18 +1,25 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-#from servicebus.worker.worker_base import WorkerBase
 from servicebus.conf import settings
 from servicebus.protocol import messages
 from worker_reg import worker_methods_db
 from servicebus.binder import bind_socket_to_port_range
 from gevent_zeromq import zmq
 import traceback
-import gevent
+import gevent, gevent.threadpool
 from servicebus.lib.loops import RepLoop
 from syncclient import SyncClient
 import uuid
 import inspect
+
+
+__all__=("WorkerDaemon",)
+
+
+#import gevent.monkey;
+#gevent.monkey.patch_all()
+
 
 
 class WorkerDaemon(object):
@@ -24,9 +31,11 @@ class WorkerDaemon(object):
         self.SYNC = SyncClient(servicename, self.loop.address)
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call )
-        self.loop.register_message( messages.PING, self.handle_ping )
+        #self.loop.register_message( messages.PING, self.handle_ping )
         self.loop.register_message( messages.WORKER_REREG, self.handle_request_register )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )
+        # heartbeat
+        self.__hbloop=True
 
 
     def connect(self, context):
@@ -37,9 +46,15 @@ class WorkerDaemon(object):
 
     def run(self):
         self.SYNC.notify_start()
+        # runs worker heartbeat and main loop in separeted threads
+        # to avoid heartbeat disruption when doing heavy worker tasks
+        #pool = gevent.threadpool.ThreadPool(2)
+        wloop = gevent.spawn(self.loop.loop)
+        hbeat = gevent.spawn(self.heartbeat_loop)
         try:
             gevent.joinall([
-                gevent.spawn(self.loop.loop),
+                wloop,
+                hbeat,
             ])
         finally:
             self.loop.close()
@@ -49,6 +64,24 @@ class WorkerDaemon(object):
 
     def stop(self):
         self.loop.stop()
+        self.__hbloop = False
+
+
+    # --------------------
+    # Hearbeat
+
+    def heartbeat_loop(self):
+        import sys
+        msg = {
+            "message" : messages.PING,
+            "addr" : self.loop.address,
+            "service":self.servicename
+        }
+        while self.__hbloop:
+            self.SYNC.send_raw(msg)
+            print ".",
+            sys.stdout.flush()
+            gevent.sleep(1)#settings.WORKER_HEARTBEAT)
 
 
     # --------------------

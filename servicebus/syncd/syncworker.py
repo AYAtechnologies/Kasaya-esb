@@ -27,7 +27,7 @@ class SyncWorker(object):
     def __init__(self, server):
         self.SRV = server
         self.context = zmq.Context()
-
+        self.__pingdb = {}
         # kanał wejściowy ipc dla workerów tylko z tego localhosta
         # tym kanałem workery wysyłają informacje o uruchomieniu i zatrzymaniu
         # Tylko zmiany otrzymane tędy są propagowane przez broadcast do pozostałych nameserwerów.
@@ -42,11 +42,14 @@ class SyncWorker(object):
         #print get_bind_address(settings.SYNCD_CONTROL_BIND)
 
 
-        self.local_input = PullLoop(self._connect_input_loop, context=self.context)
-        self.local_input.register_message(messages.WORKER_JOIN,  self.handle_worker_join)
-        self.local_input.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
+        #self.local_input = PullLoop(self._connect_input_loop, context=self.context)
+        #self.local_input.register_message(messages.WORKER_JOIN,  self.handle_worker_join)
+        #self.local_input.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
 
         self.queries = RepLoop(self._connect_queries_loop, context=self.context)
+        self.queries.register_message(messages.WORKER_JOIN,  self.handle_worker_join)
+        self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
+        self.queries.register_message(messages.PING, self.handle_ping)
         self.queries.register_message(messages.QUERY,  self.handle_name_query)
         self.queries.register_message(messages.CTL_CALL, self.handle_control_request)
         #self.sync = PullLoop(self._connect_syncd_dialog_loop, context=self.context)
@@ -54,14 +57,14 @@ class SyncWorker(object):
 
     # connecting sockets
 
-    def _connect_input_loop(self, context):
-        """
-        connect local input loop
-        """
-        sock = context.socket(zmq.PULL)
-        addr = 'ipc://'+settings.SOCK_LOCALWORKERS
-        sock.bind(addr)
-        return sock, addr
+    #def _connect_input_loop(self, context):
+    #    """
+    #    connect local input loop
+    #    """
+    #    sock = context.socket(zmq.PULL)
+    #    addr = 'ipc://'+settings.SOCK_LOCALWORKERS
+    #    sock.bind(addr)
+    #    return sock, addr
 
     def _connect_queries_loop(self, context):
         """
@@ -84,11 +87,11 @@ class SyncWorker(object):
     # closing and quitting
 
     def stop(self):
-        self.local_input.stop()
+        #self.local_input.stop()
         self.queries.stop()
 
     def close(self):
-        self.local_input.close()
+        #self.local_input.close()
         self.queries.close()
 
 
@@ -99,21 +102,7 @@ class SyncWorker(object):
         #print self.queries.spawn()
         #import sys
         #sys.exit()
-        return [self.local_input.loop, self.queries.loop, self.hearbeat_loop]
-
-
-    # queries
-
-    def worker_start(self, service, address, local):
-        self.SRV.DB.worker_register(service, address, local)
-        if local:
-            self.SRV.BC.send_worker_start(service, address)
-
-    def worker_stop(self, address, local):
-        self.SRV.DB.worker_unregister(address)
-        if local:
-            self.SRV.BC.send_worker_stop(address)
-
+        return [self.queries.loop, self.hearbeat_loop]
 
     # message handlers
 
@@ -128,6 +117,30 @@ class SyncWorker(object):
         Worker is going down
         """
         self.worker_stop( msg['addr'], True )
+
+    def handle_ping(self, msg):
+        """
+        Worker notify about himself
+        """
+        now = datetime.now()
+        addr = msg['addr']
+        svce = msg['service']
+        try:
+            png = self.__pingdb[addr]
+        except KeyError:
+            # service is already unknown
+            self.worker_start(svce, addr, True)
+            return
+
+        if png['s']!=svce:
+            # different service under same address!
+            self.worker_stop(addr, True)
+            self.worker_start(svce, addr, True)
+            return
+        # update heartbeats
+        png['t'] = now
+        self.__pingdb[addr] = png
+
 
     def handle_name_query(self, msg):
         """
@@ -147,6 +160,35 @@ class SyncWorker(object):
         """
         print "CONTROL REQUEST"
         print msg
+
+
+
+
+    # worker changes
+
+    def worker_start(self, service, address, local):
+        print "new worker",service, "on", address
+        self.SRV.DB.worker_register(service, address, local)
+        if local:
+            # dodanie serwisu do bazy z czasami pingów
+            self.__pingdb[address] =  {
+                's' : service,
+                't' : datetime.now(),
+            }
+            # rozesłanie informacji w sieci
+            self.SRV.BC.send_worker_start(service, address)
+
+    def worker_stop(self, address, local):
+        print "worker leave", service, "on", address
+        self.SRV.DB.worker_unregister(address)
+        if local:
+            # dodanie serwisu do bazy z czasami pingów
+            try:
+                del self.__pingdb[address]
+            except KeyError:
+                pass
+            self.SRV.BC.send_worker_stop(address)
+
 
 
     # heartbeat

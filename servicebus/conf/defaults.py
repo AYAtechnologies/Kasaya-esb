@@ -10,7 +10,7 @@ PASSWORD = ""
 
 # nazwy plików z socketami
 SOCK_QUERIES = "/tmp/esb_queries.sock"
-SOCK_LOCALWORKERS = "/tmp/esb_local_workers.sock"
+#SOCK_LOCALWORKERS = "/tmp/esb_local_workers.sock"
 
 # adres do jakiego zostaną podłączona sockety tcp
 # dopuszczalne są:

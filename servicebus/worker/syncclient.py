@@ -11,8 +11,10 @@ class SyncClient(object):
         self.addr = address
         # connect to zmq
         self.ctx = zmq.Context()
-        self.sync_sender = self.ctx.socket(zmq.PUSH)
-        self.sync_sender.connect('ipc://'+settings.SOCK_LOCALWORKERS)
+        self.sync_sender = self.ctx.socket(zmq.REQ)
+        #self.sync_sender.setsockopt(zmq.LINGER, 1000) # two seconds
+        #self.sync_sender.setsockopt(zmq.HWM, 8) # how many messages buffer
+        self.sync_sender.connect('ipc://'+settings.SOCK_QUERIES)
 
     def notify_start(self):
         msg = {
@@ -21,6 +23,7 @@ class SyncClient(object):
             "service" : self.srvname,
             }
         self.sync_sender.send( serialize(msg) )
+        self.sync_sender.recv()
 
     def notify_stop(self):
         msg = {
@@ -28,6 +31,11 @@ class SyncClient(object):
             "addr" : self.addr,
             }
         self.sync_sender.send( serialize(msg) )
+        self.sync_sender.recv()
+
+    def send_raw(self, msg):
+        self.sync_sender.send( serialize(msg) )
+        self.sync_sender.recv()
 
     def close(self):
         self.sync_sender.close()

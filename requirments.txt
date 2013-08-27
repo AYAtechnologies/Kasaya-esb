@@ -9,8 +9,8 @@ python-dev
 #a to pipem
 netifaces
 zerorpc
-gevent
 gevent-zmq
+git+https://github.com/surfly/gevent
 
 # jeśli ma działać szyfrowanie, to jeszcze to
 pycrypto
