@@ -12,7 +12,7 @@ class SyncDaemon(object):
     def __init__(self):
         self.hostname = system.get_hostname()
         self.uuid = str( uuid.uuid4() )
-        LOG.info("Starting sync daemon on host: %s" % self.hostname)
+        LOG.info("Starting local sync daemon with uuid: [%s]" % self.uuid)
         # uruchomienie bazy danych
         self.DB = self.setup_db()
         # broadcaster is not used with distributed database backend
@@ -31,8 +31,8 @@ class SyncDaemon(object):
         Notifies network about shutting down, closes database
         and all used sockets.
         """
-        print "stopping..."
-        self.notify_syncd_stop(local=True)
+        LOG.info("Stopping local sync daemon")
+        self.notify_syncd_stop(self.uuid, local=True)
         self.DB.close()
         self.WORKER.close()
         self.BC.close()
@@ -83,20 +83,22 @@ class SyncDaemon(object):
             self.BC.send_host_start(uuid, hostname, addr)
         else:
             if succ:
-                LOG.info("Remote sync host [%s] started, address " % hostname + str(addr) )
+                a = str(addr)
+                LOG.info("Remote sync host [%s] started, address [%s], uuid [%s]" % (hostname, a, uuid) )
 
 
-    def notify_syncd_stop(self, uuid, hostname, addr, local=False):
+    def notify_syncd_stop(self, uuid, local=False):
         """
         Send information about shutdown to all hosts in network
         """
-        succ = self.DB.host_unregister(uuid, hostname, addr)
+        res = self.DB.host_unregister(uuid)
 
         if local:
-            self.BC.send_host_stop(uuid, hostname, addr)
+            self.BC.send_host_stop(uuid)
         else:
-            if succ:
-                LOG.info("Remote sync host [%s] stopped, address " % hostname + str(addr) )
+            if not res is None:
+                a,h = str(res['addr']), res['hostname']
+                LOG.info("Remote sync host [%s] stopped, addres [%s], uuid [%s]" % (h, a, uuid))
 
 
     # global network control tasks
@@ -116,5 +118,4 @@ class SyncDaemon(object):
             loops = [ gevent.spawn(loop) for loop in loops ]
             gevent.joinall(loops)
         finally:
-            self.notify_syncd_stop(self.uuid, self.hostname, None, local=True)
             self.close()

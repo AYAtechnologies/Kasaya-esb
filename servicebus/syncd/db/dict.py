@@ -50,15 +50,14 @@ class DictDB(object):
           Zwraca True jeśli wyrejestrowano workera,
           False jeśli workera nie było w bazie
         """
-        status = False
-        for i in self.services.values():
+        res = None
+        for svce, i in self.services.items():
             if addr in i:
+                res = svce
                 i.remove(addr)
-                status = True
         if addr in self.local_workers:
             del self.local_workers[addr]
-            status = True
-        return status
+        return res
 
 
     def get_worker_for_service(self, name):
@@ -92,9 +91,10 @@ class DictDB(object):
         }
         return True
 
-    def host_unregister(self, uuid, hostname, addr):
+    def host_unregister(self, uuid):
         if not uuid in self.hosts:
-            return False
+            return None
+        res = self.hosts[uuid]
         del self.hosts[uuid]
-        return True
+        return res
 

@@ -57,11 +57,7 @@ class UDPBroadcast(object):
                 self.SRV.notify_syncd_start(msgdata['uuid'], msgdata['hostname'], msgdata['addr'])
 
             elif msg== messages.HOST_LEAVE:
-                self.SRV.notify_syncd_stop(msgdata['uuid'], msgdata['hostname'], msgdata['addr'])
-
-
-    def run_syncchannel(self):
-        pass
+                self.SRV.notify_syncd_stop(msgdata['uuid'])
 
 
     def broadcast_message(self, msg):
@@ -106,11 +102,9 @@ class UDPBroadcast(object):
             }
         self.broadcast_message(msg)
 
-    def send_host_stop(self, uuid, hostname, address=None):
+    def send_host_stop(self, uuid):
         msg = {
             "message" : messages.HOST_LEAVE,
-            "hostname" : hostname,
-            "addr" : address,
             "uuid" : uuid
             }
         self.broadcast_message(msg)
