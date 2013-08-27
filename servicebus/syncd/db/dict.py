@@ -19,6 +19,7 @@ class DictDB(object):
     def __init__(self, server):
         self.SRV = server
         self.services = {}
+        self.hosts = {}
         self.local_workers = {}
 
 
@@ -39,13 +40,15 @@ class DictDB(object):
         # nowy worker dla serwisu
         if not addr in self.services[name]:
             self.services[name].append(addr)
+            return True
+        return False
 
 
     def worker_unregister(self, addr):
         """
         Wyrejestrowanie workera z bazy.
           Zwraca True jeśli wyrejestrowano workera,
-          False jeśli nie znaleziono workera w bazie
+          False jeśli workera nie było w bazie
         """
         status = False
         for i in self.services.values():
@@ -54,6 +57,7 @@ class DictDB(object):
                 status = True
         if addr in self.local_workers:
             del self.local_workers[addr]
+            status = True
         return status
 
 
@@ -79,9 +83,18 @@ class DictDB(object):
 
     # global network state
 
-    def host_register(self, addr):
-        pass
+    def host_register(self, uuid, hostname, addr):
+        if uuid in self.hosts:
+            return False
+        self.hosts[uuid] = {
+            'hostname' : hostname,
+            'addr' : addr,
+        }
+        return True
 
-    def host_unregister(self, addr):
-        pass
+    def host_unregister(self, uuid, hostname, addr):
+        if not uuid in self.hosts:
+            return False
+        del self.hosts[uuid]
+        return True
 

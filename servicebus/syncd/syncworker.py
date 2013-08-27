@@ -3,17 +3,14 @@
 from __future__ import unicode_literals
 from servicebus.conf import settings
 from servicebus import exceptions
-import gevent
-from datetime import datetime, timedelta
-from gevent_zeromq import zmq
-#from gevent import socket
 from servicebus.protocol import serialize, deserialize, messages
 from servicebus.binder import get_bind_address
-from servicebus.lib.loops import RepLoop, PullLoop
-
-from pprint import pprint
+from servicebus.lib.loops import RepLoop
+from servicebus.lib import LOG
+from datetime import datetime, timedelta
+from gevent_zeromq import zmq
+import gevent
 import random
-import sys
 
 
 class TooLong(Exception): pass
@@ -44,6 +41,7 @@ class SyncWorker(object):
         sock = context.socket(zmq.REP)
         addr = 'ipc://'+settings.SOCK_QUERIES
         sock.bind(addr)
+        LOG.debug("Connected query socket %s" % addr)
         return sock, addr
 
     def _connect_syncd_dialog_loop(self, context):
@@ -53,6 +51,7 @@ class SyncWorker(object):
         sock = context.socket(zmq.REP)
         addr = get_bind_address(settings.SYNCD_CONTROL_BIND)
         sock.bind(addr)
+        LOG.debug("Connected inter-sync dialog socket %s" % addr)
         return sock, addr
 
     # closing and quitting
@@ -135,8 +134,15 @@ class SyncWorker(object):
     # ------------------------------
 
     def worker_start(self, service, address, local):
-        print "new worker",service, "on", address
-        self.SRV.DB.worker_register(service, address, local)
+        """
+        Handle joining to network by worker (local or blobal)
+        """
+        succ = self.SRV.DB.worker_register(service, address, local)
+        if succ:
+            if local:
+                LOG.info("Local worker [%s] started, address %s" % (service, address) )
+            else:
+                LOG.info("Remote worker [%s] started, address %s" % (service, address) )
         if local:
             # dodanie serwisu do bazy z czasami pingów
             self.__pingdb[address] =  {
@@ -146,9 +152,17 @@ class SyncWorker(object):
             # rozesłanie informacji w sieci
             self.SRV.BC.send_worker_start(service, address)
 
+
     def worker_stop(self, address, local):
-        print "worker leave", service, "on", address
-        self.SRV.DB.worker_unregister(address)
+        """
+        Handle worker leaving network (local or global)
+        """
+        succ = self.SRV.DB.worker_unregister(address)
+        if succ:
+            if local:
+                LOG.info("Local worker [%s] stopped" % (service, address) )
+            else:
+                LOG.info("Remote worker [%s] stopped" % (service, address) )
         if local:
             # dodanie serwisu do bazy z czasami pingów
             try:
@@ -158,9 +172,26 @@ class SyncWorker(object):
             self.SRV.BC.send_worker_stop(address)
 
 
+    def request_workers_register(self):
+        """
+        Send to all local workers request for registering in network.
+        Its used after new host start.
+        """
+        msg = {"message":messages.WORKER_REREG}
+        for worker in self.SRV.DB.get_local_workers():
+            sck = self.context.socket(zmq.REQ)
+            try:
+                sck.connect(worker)
+                sck.send( serialize(msg) )
+                res = sck.recv()
+            finally:
+                sck.close()
 
-    # heartbeat
+
+
+
     '''
+    # heartbeat
     def hearbeat_loop(self):
         pinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT )
 
@@ -216,19 +247,3 @@ class SyncWorker(object):
         return True
 
     '''
-    def request_workers_register(self):
-        """
-        Send to all local workers request for registering in network.
-        Its used after new host start.
-        """
-        msg = {"message":messages.WORKER_REREG}
-        for worker in self.SRV.DB.get_local_workers():
-            sck = self.context.socket(zmq.REQ)
-            try:
-                sck.connect(worker)
-                sck.send( serialize(msg) )
-                res = sck.recv()
-            finally:
-                sck.close()
-
-

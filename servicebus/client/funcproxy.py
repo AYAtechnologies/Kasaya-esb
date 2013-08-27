@@ -40,8 +40,8 @@ class FuncProxy(object):
         return True
 
     def __call__(self, *args, **kwargs):
-        m = self._top._method
         top = self._top
+        m = top._method
         del self._top   # pomagamy garbage collectorowi
         if m=="sync":
             return execute_sync_task(
@@ -143,3 +143,19 @@ class ControlExec(ExecAndContext):
     Wywołania kontrolne servicebus
     """
     call_type = "ctl"
+
+
+#with Context(....) as C:
+#    C.sync.serv.metoda(...)
+#    C.async.serv.metoda(...)
+#
+#self.C = Context(...)
+#self.C.sync.serv.metoda(...)
+#self.C.async.serv.metoda(...)
+#
+#sync(C).fiku.metoda
+#
+#sync.fiku.metoda
+#async.fiku.metoda
+
+

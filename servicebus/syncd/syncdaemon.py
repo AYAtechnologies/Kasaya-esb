@@ -2,14 +2,17 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from servicebus.conf import settings
-import gevent#, uuid
+from servicebus.lib import LOG, system
+import gevent, uuid
 from syncworker import SyncWorker
-
 
 
 class SyncDaemon(object):
 
     def __init__(self):
+        self.hostname = system.get_hostname()
+        self.uuid = str( uuid.uuid4() )
+        LOG.info("Starting sync daemon on host: %s" % self.hostname)
         # uruchomienie bazy danych
         self.DB = self.setup_db()
         # broadcaster is not used with distributed database backend
@@ -20,7 +23,7 @@ class SyncDaemon(object):
             self.BC = FakeBroadcast()
         # uruchomienie workera
         self.WORKER = self.setup_worker()
-        #self.ID = str( uuid.uuid4() )
+
 
 
     def close(self):
@@ -29,7 +32,7 @@ class SyncDaemon(object):
         and all used sockets.
         """
         print "stopping..."
-        self.notify_host_stop(local=True)
+        self.notify_syncd_stop(local=True)
         self.DB.close()
         self.WORKER.close()
         self.BC.close()
@@ -70,20 +73,30 @@ class SyncDaemon(object):
     # global network changes
 
 
-    def notify_host_start(self, local=False):
+    def notify_syncd_start(self, uuid, hostname, addr, local=False):
         """
         Send information about startup to all hosts in network
         """
+        succ = self.DB.host_register(uuid, hostname, addr)
         self.WORKER.request_workers_register()
         if local:
-            self.BC.send_host_start()
+            self.BC.send_host_start(uuid, hostname, addr)
+        else:
+            if succ:
+                LOG.info("Remote sync host [%s] started, address " % hostname + str(addr) )
 
-    def notify_host_stop(self, local=False):
+
+    def notify_syncd_stop(self, uuid, hostname, addr, local=False):
         """
         Send information about shutdown to all hosts in network
         """
+        succ = self.DB.host_unregister(uuid, hostname, addr)
+
         if local:
-            self.BC.send_host_stop()
+            self.BC.send_host_stop(uuid, hostname, addr)
+        else:
+            if succ:
+                LOG.info("Remote sync host [%s] stopped, address " % hostname + str(addr) )
 
 
     # global network control tasks
@@ -96,11 +109,12 @@ class SyncDaemon(object):
 
 
     def run(self):
-        self.notify_host_start(local=True)
+        self.notify_syncd_start(self.uuid, self.hostname, None, local=True)
         try:
             loops = self.WORKER.get_loops()
             loops.append(self.BC.run_listener)
             loops = [ gevent.spawn(loop) for loop in loops ]
             gevent.joinall(loops)
         finally:
+            self.notify_syncd_stop(self.uuid, self.hostname, None, local=True)
             self.close()

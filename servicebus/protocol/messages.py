@@ -6,8 +6,8 @@ from __future__ import unicode_literals
 WORKER_JOIN = "wrkr/up"
 WORKER_LEAVE = "wrkr/stop"
 # join and leave network by syncd
-HOST_JOIN = "sync/up"
-#HOST_LEAVE = "sync/stop"
+HOST_JOIN = "host/up"
+HOST_LEAVE = "host/stop"
 # local heartbeat messages
 PING = "wrkr/ping"
 PONG = "wrkr/pong"

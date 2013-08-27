@@ -46,9 +46,8 @@ class WorkerDaemon(object):
 
     def run(self):
         self.SYNC.notify_start()
-        # runs worker heartbeat and main loop in separeted threads
-        # to avoid heartbeat disruption when doing heavy worker tasks
-        #pool = gevent.threadpool.ThreadPool(2)
+        #pool = gevent.pool.Pool(settings.WORKER_POOL_SIZE)
+        #self.pool = Pool(size=settings.WORKER_POOL_SIZE)
         wloop = gevent.spawn(self.loop.loop)
         hbeat = gevent.spawn(self.heartbeat_loop)
         try:
@@ -108,6 +107,7 @@ class WorkerDaemon(object):
 
 
     def handle_ping(self, message):
+        print "."
         return {"message":messages.PONG}
 
 

@@ -51,10 +51,13 @@ class UDPBroadcast(object):
                 self.SRV.WORKER.worker_start(msgdata['service'], msgdata['addr'], False )
 
             elif msg==messages.WORKER_LEAVE:
-                self.SRV.WORKER.worker_stop( msgdata['addr'], False )
+                self.SRV.WORKER.worker_stop(msgdata['addr'], False )
 
             elif msg== messages.HOST_JOIN:
-                self.SRV.notify_host_start()
+                self.SRV.notify_syncd_start(msgdata['uuid'], msgdata['hostname'], msgdata['addr'])
+
+            elif msg== messages.HOST_LEAVE:
+                self.SRV.notify_syncd_stop(msgdata['uuid'], msgdata['hostname'], msgdata['addr'])
 
 
     def run_syncchannel(self):
@@ -94,12 +97,20 @@ class UDPBroadcast(object):
         self.broadcast_message(msg)
 
 
-    def send_host_start(self):
+    def send_host_start(self, uuid, hostname, address=None):
         msg = {
             "message" : messages.HOST_JOIN,
-            #"addr" : address,
+            "hostname" : hostname,
+            "addr" : address,
+            "uuid" : uuid
             }
         self.broadcast_message(msg)
 
-    def send_host_stop(self):
-        pass
+    def send_host_stop(self, uuid, hostname, address=None):
+        msg = {
+            "message" : messages.HOST_LEAVE,
+            "hostname" : hostname,
+            "addr" : address,
+            "uuid" : uuid
+            }
+        self.broadcast_message(msg)

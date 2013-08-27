@@ -19,6 +19,8 @@ SOCK_QUERIES = "/tmp/esb_queries.sock"
 #  "AUTO" - podpięty do pierwszego interfejsu nie-lokalnego (zwykle eth0)
 BIND_WORKER_TO = "AUTO"
 
+WORKER_POOL_SIZE = 10
+
 # HEARBEAT
 
 # co ile sekund wykonywany jest cykl heartbeat
@@ -53,3 +55,18 @@ DB_BACKEND = "dict"
 
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
 ASYNC_DAEMON_SERVICE = "async_daemon"
+
+# logowanie do pliku
+LOG_TO_FILE = False
+LOG_FILE_NAME = "/tmp/syncd.log"
+# rotowanie plików logu
+# LOG_ROTATE = 0
+
+# poziom logowania
+# DEBUG - 10, INFO - 20, WARNING - 30, ERROR - 40, CRITICAL - 50
+# im niższy tym więcej informacji w logu
+LOG_LEVEL = "DEBUG"
+
+# jeśli True to standardowe wyjście zostanie również przekierowane do logu
+# LOG_STDOUT = True
+
