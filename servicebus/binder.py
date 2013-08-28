@@ -36,7 +36,6 @@ def all_interfaces():
         except KeyError:
             #interface is not supporting IP address
             pass
-    print res
     return res
 
 
@@ -82,13 +81,10 @@ def bind_socket_to_port_range(zsock, p1, p2):
     port = minport
     while True:
         addr = "tcp://%s:%i" % (myip, port)
-        print "connecting: ",addr,
         try:
             zsock.bind(addr)
-            print "success"
             break
         except ZMQError:
-            print "fail"
             pass
         port += 1
         if port>maxport:

@@ -21,7 +21,7 @@ class AsyncDeamon(WorkerDaemon):
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
         self.loop.register_message(messages.ASYNC_CALL, self.handle_async_call)
-        self.backend = Backend(self.proc_id, "1111")
+        self.backend = Backend(self.uuid, "1111")
         self.greenlets_semaphore = Semaphore()
         self.greenlets = {}
         self.pool = Pool(size=settings.WORKER_POOL_SIZE)

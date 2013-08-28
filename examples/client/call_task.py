@@ -30,7 +30,7 @@ if __name__=="__main__":
     #print sync("stefan").async_daemon.get_result(tid)
 
     busctl.jajo()
-
+    sync.fikumiku.wyjebka(234)
     #with async("zyga") as A:
     #    A.fikumiku.wyjebka(234)
 
@@ -44,7 +44,7 @@ if __name__=="__main__":
     time.sleep(1)
     print sync.async_daemon.get_result(tid)
 
-    #sync.fikumiku.wyjebka(234)
+    #
 
 
     '''

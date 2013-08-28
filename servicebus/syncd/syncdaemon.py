@@ -114,7 +114,7 @@ class SyncDaemon(object):
         self.notify_syncd_start(self.uuid, self.hostname, None, local=True)
         try:
             loops = self.WORKER.get_loops()
-            loops.append(self.BC.run_listener)
+            loops.append(self.BC.loop)
             loops = [ gevent.spawn(loop) for loop in loops ]
             gevent.joinall(loops)
         finally:

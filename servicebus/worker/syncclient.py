@@ -3,6 +3,7 @@
 from servicebus.conf import settings
 from gevent_zeromq import zmq
 from servicebus.protocol import serialize, deserialize, messages
+from servicebus.lib import LOG
 
 
 class SyncClient(object):
@@ -17,6 +18,7 @@ class SyncClient(object):
         self.sync_sender.connect('ipc://'+settings.SOCK_QUERIES)
 
     def notify_start(self):
+        LOG.debug("Sending notification on start to sync daemon. Service [%s] on address [%s]" % (self.srvname, self.addr))
         msg = {
             "message" : messages.WORKER_JOIN,
             "addr" : self.addr,
@@ -26,6 +28,7 @@ class SyncClient(object):
         self.sync_sender.recv()
 
     def notify_stop(self):
+        LOG.debug("Sending notification on stop. Address [%s]" % self.addr)
         msg = {
             "message" : messages.WORKER_LEAVE,
             "addr" : self.addr,

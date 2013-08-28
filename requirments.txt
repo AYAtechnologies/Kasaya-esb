@@ -10,7 +10,7 @@ python-dev
 netifaces
 zerorpc
 gevent-zmq
-git+https://github.com/surfly/gevent
+gevent
 
 # jeśli ma działać szyfrowanie, to jeszcze to
 pycrypto

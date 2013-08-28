@@ -2,14 +2,15 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from servicebus.conf import settings
-from servicebus.protocol import messages
-from worker_reg import worker_methods_db
 from servicebus.binder import bind_socket_to_port_range
+from servicebus.protocol import messages
+from servicebus.lib.loops import RepLoop
+from servicebus.lib import LOG
+from worker_reg import worker_methods_db
 from gevent_zeromq import zmq
+from syncclient import SyncClient
 import traceback
 import gevent, gevent.threadpool
-from servicebus.lib.loops import RepLoop
-from syncclient import SyncClient
 import uuid
 import inspect
 
@@ -25,13 +26,14 @@ __all__=("WorkerDaemon",)
 class WorkerDaemon(object):
 
     def __init__(self, servicename):
-        self.proc_id = str(uuid.uuid4())
+        self.uuid = str(uuid.uuid4())
         self.servicename = servicename
+        LOG.info("Starting worker daemon, service [%s], uuid: [%s]" % (self.servicename, self.uuid) )
         self.loop = RepLoop(self.connect)
+        LOG.debug("Connected to socket [%s]" % (self.loop.address) )
         self.SYNC = SyncClient(servicename, self.loop.address)
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call )
-        #self.loop.register_message( messages.PING, self.handle_ping )
         self.loop.register_message( messages.WORKER_REREG, self.handle_request_register )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )
         # heartbeat
@@ -74,7 +76,7 @@ class WorkerDaemon(object):
         msg = {
             "message" : messages.PING,
             "addr" : self.loop.address,
-            "service":self.servicename
+            "service" : self.servicename
         }
         while self.__hbloop:
             self.SYNC.send_raw(msg)
@@ -89,6 +91,7 @@ class WorkerDaemon(object):
             # this must be a defined method - attribute error raises when trying to expose method that doesnt exist
             self.exposed_methods.append(method_name)
 
+    # This method is pure evil! Die die die!
     def expose_all(self):
         exposed = []
         for name, val in inspect.getmembers(self):
@@ -106,11 +109,6 @@ class WorkerDaemon(object):
         return result
 
 
-    def handle_ping(self, message):
-        print "."
-        return {"message":messages.PONG}
-
-
     def handle_request_register(self, message):
         self.SYNC.notify_start()
         return {"message":messages.NOOP}
@@ -125,8 +123,8 @@ class WorkerDaemon(object):
 
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )
+
         # find task in worker db
-        print self.servicename, ":", funcname
         self_func = getattr(self, funcname, None)
         if self_func is not None and funcname in self.exposed_methods:
             func = self_func
@@ -134,12 +132,14 @@ class WorkerDaemon(object):
             try:
                 func = worker_methods_db[funcname]
             except KeyError:
+                LOG.info("Unknown worker task called [%s]" % funcname)
                 # we dont know this task
                 return {
                     'message' : messages.ERROR,
                     'internal' : True,  # internal service bus problem
                     'info' : 'Method %s not found' % funcname,
                 }
+
         # try to run function and catch exceptions
         try:
             #print ">  ",func
@@ -147,10 +147,26 @@ class WorkerDaemon(object):
             #print ">  ",kwargs
             result = func(*args, **kwargs)
         except Exception as e:
+            excname = e.__class__.__name__
+            # error message
+            errmsg = e.message
+            try:
+                errmsg = unicode(errmsg, "utf-8")
+            except:
+                errmsg = repr(errmsg)
+            # traceback
+            tback = traceback.format_exc()
+            try:
+                tback = unicode(tback, "utf-8")
+            except:
+                tback = repr(tback)
+            LOG.info("Worker function [%s] throws exception [%s]. Message: %s" % (funcname, excname, errmsg) )
+            LOG.debug(tback)
+
             msg = {
                 'message' : messages.ERROR,
                 'internal' : False, # means that error is not internal bus error
-                'traceback' : traceback.format_exc(),
+                'traceback' : tback,
                 'info' : e.message,
                 }
             return msg
