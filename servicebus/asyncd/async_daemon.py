@@ -5,8 +5,7 @@ esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append( esbpath )
 
 from servicebus.conf import settings
-from backend import RedisBackend as Backend
-# from backend import DictBackend as Backend
+from backend import get_backend_class
 from servicebus.worker import WorkerDaemon
 from servicebus.worker.decorators import Task
 from servicebus.protocol import serialize, deserialize, messages
@@ -21,7 +20,8 @@ class AsyncDeamon(WorkerDaemon):
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
         self.loop.register_message(messages.ASYNC_CALL, self.handle_async_call)
-        self.backend = Backend(self.uuid, "1111")
+        backend = get_backend_class(settings.ASYNC_DAEMON_DB_BACKEND)
+        self.backend = backend(self.uuid)
         self.greenlets_semaphore = Semaphore()
         self.greenlets = {}
         self.pool = Pool(size=settings.WORKER_POOL_SIZE)

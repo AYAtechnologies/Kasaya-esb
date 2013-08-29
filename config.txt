@@ -19,3 +19,4 @@ BROADCAST_PORT = 4040
 ## przemyśleć to
 DB_BACKEND = dict
 
+ASYNC_DAEMON_DB_BACKEND = redis

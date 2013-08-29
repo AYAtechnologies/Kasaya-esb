@@ -9,7 +9,7 @@ python-dev
 #a to pipem
 netifaces
 zerorpc
-gevent-zmq
+gevent-zeromq
 gevent
 
 # jeśli ma działać szyfrowanie, to jeszcze to

@@ -10,7 +10,7 @@ from worker_reg import worker_methods_db
 from gevent_zeromq import zmq
 from syncclient import SyncClient
 import traceback
-import gevent, gevent.threadpool
+import gevent
 import uuid
 import inspect
 

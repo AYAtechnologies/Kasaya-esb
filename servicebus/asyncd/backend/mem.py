@@ -1,11 +1,15 @@
+#coding: utf-8
 __author__ = 'wektor'
 
-import uuid
-import datetime
+import datetime, uuid
 from base import BackendBase, TaskNotFound
 
-class DictBackend(BackendBase):
+class MemoryBackend(BackendBase):
     store = {}
+
+    def __init__(self, uuid):
+        pass
+
     def add_task(self, task):
         task_id = str(uuid.uuid4())
         self.store[task_id] = {}

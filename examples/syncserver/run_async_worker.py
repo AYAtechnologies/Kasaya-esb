@@ -4,8 +4,6 @@ import sys,os
 esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append(esbpath)
 
-from servicebus.worker import WorkerDaemon
-from servicebus.asyncd.backend import DictBackend as Backend
 from servicebus.conf import load_config_from_file
 from servicebus.asyncd import AsyncDeamon
 
