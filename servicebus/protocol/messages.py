@@ -18,6 +18,7 @@ WORKER_REREG = "wrkr/rereg" # requet worker to register again
 CTL_CALL = "wrkr/ctrl" # internal service bus control request
 # normal client <--> worker messages
 SYNC_CALL = "call/sync" # synchronously call worker taks
+ASYNC_CALL = "call/async" # asynchronously call worker taks
 MIDDLEWARE_CALL = "call/mdl" # call wich allows to process middleware part of the message
 SYSTEM_CALL = "call/sys" # call wich allows to process all of the message used in async
 RESULT = "call/result" # result of synchronous task
