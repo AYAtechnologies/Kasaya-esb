@@ -13,6 +13,7 @@ import traceback
 import gevent
 import uuid
 import inspect
+import sys
 
 
 __all__=("WorkerDaemon",)
@@ -37,6 +38,9 @@ class WorkerDaemon(object):
         self.__hbloop=True
         #exposing methods
         self.exposed_methods = []
+        #middleware
+        self.middleware_classes = []
+        self.middleware = []
 
 
     def connect(self, context):
@@ -45,8 +49,30 @@ class WorkerDaemon(object):
         self.address = addr
         return sock, addr
 
+    def middleware_setup(self):
+        # this is hard and causes possible problems - will do it later
+        # print sys.modules.keys()
+        # #load middleware from configuration
+        # print settings.MIDDLEWARE
+        # for m_module_name in settings.MIDDLEWARE:
+        #     for sys_module_k in sys.modules.keys():
+        #         if sys_module_k.endswith("middleware."+m_module_name):
+        #             print sys_module_k
+        #             try:
+        #                 worker_module = getattr(sys.modules[sys_module_k], "worker")
+        #                 worker_class = worker_module.WorkerMiddleware
+        #                 self.middleware_classes.append(worker_class)
+        #             except AttributeError:
+        #                 pass
+        #initialize middleware (from configuration and explicitly defined)
+        for mo in self.middleware_classes:
+            o = mo(self)
+            print o
+            self.middleware.append(o)
+
 
     def run(self):
+        self.middleware_setup()
         self.SYNC.notify_start()
         #pool = gevent.pool.Pool(settings.WORKER_POOL_SIZE)
         #self.pool = Pool(size=settings.WORKER_POOL_SIZE)
@@ -101,11 +127,13 @@ class WorkerDaemon(object):
 
     def handle_sync_call(self, msgdata):
         name = msgdata['service']
+        msgdata = self.prepare_message(msgdata)
         result = self.run_task(
             funcname = msgdata['method'],
             args = msgdata['args'],
             kwargs = msgdata['kwargs']
         )
+        result = self.postprocess_message(result)
         return result
 
 
@@ -120,6 +148,33 @@ class WorkerDaemon(object):
         #if message['method']=="stop_all_workers":
         #    self.stop()
 
+    def load_middleware(self):
+        """
+        Load middleware based on configuration
+        """
+        pass
+
+    def prepare_message(self, message):
+        """
+        Run middleware on message before executing
+        """
+        for m in self.middleware:
+            mp = getattr(m, "prepare_message", None)
+            if mp is not None:
+                msg = mp(message)
+                message = msg
+        return message
+
+    def postprocess_message(self, message):
+        """
+        Run middleware on message after executing
+        """
+        for m in reversed(self.middleware):
+            mp = getattr(m, "postprocess_message", None)
+            if mp is not None:
+                msg = mp(message)
+                message = msg
+        return message
 
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )

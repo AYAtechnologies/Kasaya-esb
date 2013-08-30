@@ -46,11 +46,14 @@ def wyjebka(param):
 
 
 from servicebus.worker import WorkerDaemon
+from middleware.auth.worker import WorkerMiddleware
 
 if __name__=="__main__":
     load_config_from_file("../config.txt")
-    daemon = WorkerDaemon("fikumiku")
-    daemon.run()
+    demon = WorkerDaemon("fikumiku")
+    demon.middleware_classes = [WorkerMiddleware]
+    demon.run()
+
 
 
 
