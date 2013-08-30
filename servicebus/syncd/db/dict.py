@@ -100,6 +100,14 @@ class DictDB(object):
 
     # raportowanie stanu sieci
 
-    def get_worker_list(self, hostfilter=None):
-        for host in self.services.iteritems():
-            print host
+    #def get_worker_list(self, hostfilter=None):
+    #    for host in self.services.iteritems():
+    #        print host
+
+
+    def host_list(self):
+        """
+        Return list of all hosts in network
+        """
+        for uuid, nfo in self.hosts.iteritems():
+            yield (uuid, nfo['hostname'], nfo['addr'])

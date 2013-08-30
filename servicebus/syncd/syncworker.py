@@ -25,8 +25,10 @@ class SyncWorker(object):
     Główna klasa syncd która nasłuchuje na lokalnych socketach i od lokalnych workerów i klientów.
     """
 
-    def __init__(self, server):
-        self.SRV = server
+    def __init__(self, server, database, broadcaster):
+        self.DAEMON = server
+        self.DB = database
+        self.BC = broadcaster
         self.context = zmq.Context()
         self.__pingdb = {}
         # local workers <--> local sync communication
@@ -40,11 +42,20 @@ class SyncWorker(object):
         self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
         self.intersync.register_message(messages.CTL_CALL, self.handle_inter_sync)
         # service control tasks
-        #self.sbusmanager = ServiceBusManager(self.SRV, self.intersync.address)
+        self.__ctltasks = {}
+        self.register_ctltask("host.list", self.ctl_host_list)
+
+
+    def register_ctltask(self, method, func):
+        """
+        Register control method
+        """
+        self.__ctltasks[method] = func
 
 
     def get_sync_address(self, addr):
         return "tcp://%s:%i" % (addr, settings.SYNCD_CONTROL_PORT)
+
 
     # socket connectors
 
@@ -134,7 +145,7 @@ class SyncWorker(object):
         Odpowiedź na pytanie o adres workera
         """
         name = msg['service']
-        res = self.SRV.DB.get_worker_for_service(name)
+        res = self.DB.get_worker_for_service(name)
         return {
             'message':messages.WORKER_ADDR,
             'service':name,
@@ -145,13 +156,7 @@ class SyncWorker(object):
         """
         wywołanie specjalne servicebus, nie workera.
         """
-        #print msg['method']
-        print "CONTROL REQUEST\n",msg
-
-        mthd = msg['method']
-        #mthlist = {
-        #    #"host.list" : self.SRV.
-        #}
+        return self.handle_inter_sync(msg, local=True)
 
 
 
@@ -162,7 +167,7 @@ class SyncWorker(object):
         """
         Handle joining to network by worker (local or blobal)
         """
-        succ = self.SRV.DB.worker_register(service, address, local)
+        succ = self.DB.worker_register(service, address, local)
         if succ:
             if local:
                 LOG.info("Local worker [%s] started, address [%s]" % (service, address) )
@@ -175,14 +180,14 @@ class SyncWorker(object):
                 't' : datetime.now(),
             }
             # rozesłanie informacji w sieci
-            self.SRV.BC.send_worker_start(service, address)
+            self.BC.send_worker_start(service, address)
 
 
     def worker_stop(self, address, local):
         """
         Handle worker leaving network (local or global)
         """
-        service = self.SRV.DB.worker_unregister(address)
+        service = self.DB.worker_unregister(address)
         if service:
             if local:
                 LOG.info("Local worker [%s] stopped, address [%s]" % (service, address) )
@@ -194,7 +199,7 @@ class SyncWorker(object):
                 del self.__pingdb[address]
             except KeyError:
                 pass
-            self.SRV.BC.send_worker_stop(address)
+            self.BC.send_worker_stop(address)
 
 
     def request_workers_register(self):
@@ -203,7 +208,7 @@ class SyncWorker(object):
         Its used after new host start.
         """
         msg = {"message":messages.WORKER_REREG}
-        for worker in self.SRV.DB.get_local_workers():
+        for worker in self.DB.get_local_workers():
             sck = self.context.socket(zmq.REQ)
             try:
                 sck.connect(worker)
@@ -236,10 +241,11 @@ class SyncWorker(object):
     # inter sync communication and global management
     # -------------------------------------------------
 
-    def handle_inter_sync(self, message):
-        print "MESSAGA", message
 
     def send_to_another_sync(self, addr, message):
+        """
+        Send request to another syncd server
+        """
         sock = self.context.socket(zmq.REQ)
         sock.connect( self.get_sync_address(addr) )
         sock.send( serialize(msg) )
@@ -248,3 +254,25 @@ class SyncWorker(object):
         sock.close()
         return res
 
+
+
+    def handle_inter_sync(self, message, local=False):
+        """
+        All control requests are realised here,
+        """
+        #print "CONTROL REQUEST, local:",local, "\n",message
+        mthd = ".".join(message['method'])
+        LOG.debug("Management call [%s]" % mthd)
+        func = self.__ctltasks[mthd]
+        result = func(message, local)
+        return {"message":messages.RESULT, "result":result }
+
+
+    def ctl_host_list(self, message, local):
+        """
+        List of all hosts in service bus
+        """
+        lst = []
+        for u,h,a in self.DB.host_list():
+            lst.append( {'addr':a.rsplit(":",1)[0], 'uuid':u, 'hostname':h} )
+        return lst

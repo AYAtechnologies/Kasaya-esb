@@ -13,11 +13,19 @@ class Jobs(object):
     def __init__(self):
         load_config_from_file("config.txt")
 
-    #@plac.annotations(
-    #    w=("Workers summary only", "flag")
-    #)
-    def list(self, w=False):
-        control.host.list()
+    @plac.annotations(
+        u=("Show UUID identifiers", "flag")
+    )
+    def list(self, u=False):
+        if u:
+            hostline = "HOST [%(addr)s]\thostname [%(hostname)s],\tuuid [%(uuid)s]"
+        else:
+            hostline = "HOST [%(addr)s]\thostname [%(hostname)s]"
+        hcnt = 0
+        for host in control.host.list():
+            hcnt += 1
+            print hostline % host
+        print "Number of costs in servicebus: %i" % hcnt
 
 
     #def kill(self):

@@ -107,8 +107,11 @@ def execute_control_task(method, context, args, kwargs, addr = None):
     }
     # wysłanie żądania
     #print "Control task: ", msg
-    msg = SyncDQuery.control_task(msg)
-    return msg
+    msgbody = SyncDQuery.control_task(msg)
+    msg = msgbody['message']
+    if msg==messages.RESULT:
+        return msgbody['result']
+
 
 
 
