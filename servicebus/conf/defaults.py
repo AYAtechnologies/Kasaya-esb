@@ -71,3 +71,9 @@ LOG_LEVEL = "DEBUG"
 
 # jeśli True to standardowe wyjście zostanie również przekierowane do logu
 # LOG_STDOUT = True
+
+
+# Select database backend for async daemon
+# possible values: memory, redis
+ASYNC_DAEMON_DB_BACKEND = "memory"
+

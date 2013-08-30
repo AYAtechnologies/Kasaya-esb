@@ -1,3 +1,4 @@
+#coding: utf-8
 __author__ = 'wektor'
 import uuid
 import datetime
@@ -15,7 +16,7 @@ class RedisBackend(BackendBase):
     DEMON_LIST = "demons:"
     DEMON_TASK_LIST = "dl:" # open tasks for demon
 
-    def __init__(self, async_id, async_connection):
+    def __init__(self, async_id, async_connection="1111"):
         pool = redis.ConnectionPool(host='localhost', port=6379, db=0)
         self.store = redis.Redis(connection_pool=pool)
         self.async_id = async_id

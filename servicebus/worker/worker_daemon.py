@@ -11,8 +11,6 @@ from gevent_zeromq import zmq
 from syncclient import SyncClient
 import traceback
 import gevent
-from servicebus.lib.loops import RepLoop
-from syncclient import SyncClient
 import uuid
 import inspect
 
