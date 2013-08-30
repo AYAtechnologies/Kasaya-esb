@@ -19,7 +19,7 @@ from gevent.pool import Pool
 class AsyncDeamon(WorkerDaemon):
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
-        self.loop.register_message(messages.ASYNC_CALL, self.handle_async_call)
+        self.loop.register_message(messages.SYSTEM_CALL, self.handle_async_call)
         backend = get_backend_class(settings.ASYNC_DAEMON_DB_BACKEND)
         self.backend = backend(self.uuid)
         self.greenlets_semaphore = Semaphore()
