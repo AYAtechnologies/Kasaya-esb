@@ -111,3 +111,11 @@ class DictDB(object):
         """
         for uuid, nfo in self.hosts.iteritems():
             yield (uuid, nfo['hostname'], nfo['addr'])
+
+    def workers_on_host(self, host_uuid):
+        haddr = self.hosts[host_uuid]
+        haddr = haddr['addr'].rsplit(":",1)[0]
+        for svce, addrlist in self.services.iteritems():
+            for addr in addrlist:
+                if addr.rsplit(":",1)[0]==haddr:
+                    yield svce, addr

@@ -272,7 +272,16 @@ class SyncWorker(object):
         """
         List of all hosts in service bus
         """
+        #import pprint
+        #pprint.pprint( self.DB.services )
         lst = []
         for u,h,a in self.DB.host_list():
             lst.append( {'addr':a.rsplit(":",1)[0], 'uuid':u, 'hostname':h} )
+            #for a,s in
+            print "-"*40
+            print h
+            for a in self.DB.workers_on_host(u):
+                print a
+            #    print a,s
+
         return lst
