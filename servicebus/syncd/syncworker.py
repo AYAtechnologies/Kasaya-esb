@@ -3,17 +3,14 @@
 from __future__ import unicode_literals
 from servicebus.conf import settings
 from servicebus import exceptions
-import gevent
-from datetime import datetime, timedelta
-from gevent_zeromq import zmq
-#from gevent import socket
 from servicebus.protocol import serialize, deserialize, messages
 from servicebus.binder import get_bind_address
-from servicebus.lib.loops import RepLoop, PullLoop
-
-from pprint import pprint
+from servicebus.lib.loops import RepLoop
+from servicebus.lib import LOG
+from datetime import datetime, timedelta
+from gevent_zeromq import zmq
+import gevent
 import random
-import sys
 
 
 class TooLong(Exception): pass
@@ -44,6 +41,7 @@ class SyncWorker(object):
         sock = context.socket(zmq.REP)
         addr = 'ipc://'+settings.SOCK_QUERIES
         sock.bind(addr)
+        LOG.debug("Connected query socket %s" % addr)
         return sock, addr
 
     def _connect_syncd_dialog_loop(self, context):
@@ -53,6 +51,7 @@ class SyncWorker(object):
         sock = context.socket(zmq.REP)
         addr = get_bind_address(settings.SYNCD_CONTROL_BIND)
         sock.bind(addr)
+        LOG.debug("Connected inter-sync dialog socket %s" % addr)
         return sock, addr
 
     # closing and quitting
@@ -69,7 +68,7 @@ class SyncWorker(object):
     # starting loops
 
     def get_loops(self):
-        return [self.queries.loop]#, self.hearbeat_loop]
+        return [self.queries.loop, self.hearbeat_loop]
 
     # message handlers
     # -----------------------------------
@@ -102,9 +101,11 @@ class SyncWorker(object):
 
         if png['s']!=svce:
             # different service under same address!
+            LOG.error("Service [%s] expected on address [%s], but [%s] appeared. Removing old, registering new." % (png['s'], addr, svce))
             self.worker_stop(addr, True)
             self.worker_start(svce, addr, True)
             return
+
         # update heartbeats
         png['t'] = now
         self.__pingdb[addr] = png
@@ -135,8 +136,15 @@ class SyncWorker(object):
     # ------------------------------
 
     def worker_start(self, service, address, local):
-        print "new worker",service, "on", address
-        self.SRV.DB.worker_register(service, address, local)
+        """
+        Handle joining to network by worker (local or blobal)
+        """
+        succ = self.SRV.DB.worker_register(service, address, local)
+        if succ:
+            if local:
+                LOG.info("Local worker [%s] started, address [%s]" % (service, address) )
+            else:
+                LOG.info("Remote worker [%s] started, address [%s]" % (service, address) )
         if local:
             # dodanie serwisu do bazy z czasami pingów
             self.__pingdb[address] =  {
@@ -146,9 +154,17 @@ class SyncWorker(object):
             # rozesłanie informacji w sieci
             self.SRV.BC.send_worker_start(service, address)
 
+
     def worker_stop(self, address, local):
-        print "worker leave", service, "on", address
-        self.SRV.DB.worker_unregister(address)
+        """
+        Handle worker leaving network (local or global)
+        """
+        service = self.SRV.DB.worker_unregister(address)
+        if service:
+            if local:
+                LOG.info("Local worker [%s] stopped, address [%s]" % (service, address) )
+            else:
+                LOG.info("Remote worker [%s] stopped, address [%s]" % (service, address) )
         if local:
             # dodanie serwisu do bazy z czasami pingów
             try:
@@ -158,64 +174,6 @@ class SyncWorker(object):
             self.SRV.BC.send_worker_stop(address)
 
 
-
-    # heartbeat
-    '''
-    def hearbeat_loop(self):
-        pinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT )
-
-        while True:
-            msg = {"message":messages.PING}
-            lworkers = self.SRV.DB.get_local_workers()
-            for worker in lworkers:
-                now = datetime.now()
-
-                # is last heartbeat fresh enough?
-                lhb = self.SRV.DB.get_last_worker_heartbeat(worker)
-                delta = now-lhb
-                if delta<=pinglife:
-                    continue
-
-                # ping with timeout
-                try:
-                    with gevent.Timeout(settings.PING_TIMEOUT, TooLong):
-                        pingres = self.ping_worker(worker)
-                    if pingres:
-                        self.SRV.DB.set_last_worker_heartbeat(worker, now)
-                        continue
-                except TooLong:
-                    self.PINGER.close()
-                    self.PINGER = None
-
-                # worker died
-                print "worker", worker, "died or broken"
-                self.SRV.DB.worker_unregister(worker)
-                msg = {"message":messages.WORKER_LEAVE, "addr":worker}
-                self.SRV.BC.broadcast_message(msg)
-
-            gevent.sleep(settings.WORKER_HEARTBEAT)
-
-
-
-    def ping_worker(self, addr):
-        #context = zmq.Context()
-        self.PINGER = self.context.socket(zmq.REQ)
-        self.PINGER.connect(addr)
-        # send ping
-        msg = {"message":messages.PING}
-        self.PINGER.send( serialize(msg) )
-        # result of ping
-        try:
-            res = self.PINGER.recv()
-            self.PINGER.close()
-            res = deserialize(res)
-            if res["message"] != messages.PONG:
-                return False
-        except:
-            return False
-        return True
-
-    '''
     def request_workers_register(self):
         """
         Send to all local workers request for registering in network.
@@ -232,3 +190,20 @@ class SyncWorker(object):
                 sck.close()
 
 
+    # heartbeat
+    def hearbeat_loop(self):
+        maxpinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT + settings.WORKER_HEARTBEAT )
+        unreglist = []
+        while True:
+            now = datetime.now()
+            for addr, nfo in self.__pingdb.iteritems():
+                # find outdated timeouts
+                to = nfo['t'] + maxpinglife
+                if to<now:
+                    LOG.warning("Worker [%s] died on address [%s]. Unregistering." % (nfo['s'], addr) )
+                    unreglist.append(addr)
+            # deregister all died workers
+            while len(unreglist)>0:
+                self.worker_stop(unreglist.pop(), True)
+
+            gevent.sleep(settings.WORKER_HEARTBEAT)

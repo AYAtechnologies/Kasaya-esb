@@ -2,14 +2,17 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from servicebus.conf import settings
-import gevent#, uuid
+from servicebus.lib import LOG, system
+import gevent, uuid
 from syncworker import SyncWorker
-
 
 
 class SyncDaemon(object):
 
     def __init__(self):
+        self.hostname = system.get_hostname()
+        self.uuid = str( uuid.uuid4() )
+        LOG.info("Starting local sync daemon with uuid: [%s]" % self.uuid)
         # uruchomienie bazy danych
         self.DB = self.setup_db()
         # broadcaster is not used with distributed database backend
@@ -20,7 +23,7 @@ class SyncDaemon(object):
             self.BC = FakeBroadcast()
         # uruchomienie workera
         self.WORKER = self.setup_worker()
-        #self.ID = str( uuid.uuid4() )
+
 
 
     def close(self):
@@ -28,8 +31,8 @@ class SyncDaemon(object):
         Notifies network about shutting down, closes database
         and all used sockets.
         """
-        print "stopping..."
-        self.notify_host_stop(local=True)
+        LOG.info("Stopping local sync daemon")
+        self.notify_syncd_stop(self.uuid, local=True)
         self.DB.close()
         self.WORKER.close()
         self.BC.close()
@@ -70,20 +73,32 @@ class SyncDaemon(object):
     # global network changes
 
 
-    def notify_host_start(self, local=False):
+    def notify_syncd_start(self, uuid, hostname, addr, local=False):
         """
         Send information about startup to all hosts in network
         """
+        succ = self.DB.host_register(uuid, hostname, addr)
         self.WORKER.request_workers_register()
         if local:
-            self.BC.send_host_start()
+            self.BC.send_host_start(uuid, hostname, addr)
+        else:
+            if succ:
+                a = str(addr)
+                LOG.info("Remote sync host [%s] started, address [%s], uuid [%s]" % (hostname, a, uuid) )
 
-    def notify_host_stop(self, local=False):
+
+    def notify_syncd_stop(self, uuid, local=False):
         """
         Send information about shutdown to all hosts in network
         """
+        res = self.DB.host_unregister(uuid)
+
         if local:
-            self.BC.send_host_stop()
+            self.BC.send_host_stop(uuid)
+        else:
+            if not res is None:
+                a,h = str(res['addr']), res['hostname']
+                LOG.info("Remote sync host [%s] stopped, addres [%s], uuid [%s]" % (h, a, uuid))
 
 
     # global network control tasks
@@ -96,10 +111,10 @@ class SyncDaemon(object):
 
 
     def run(self):
-        self.notify_host_start(local=True)
+        self.notify_syncd_start(self.uuid, self.hostname, None, local=True)
         try:
             loops = self.WORKER.get_loops()
-            loops.append(self.BC.run_listener)
+            loops.append(self.BC.loop)
             loops = [ gevent.spawn(loop) for loop in loops ]
             gevent.joinall(loops)
         finally:

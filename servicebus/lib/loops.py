@@ -7,6 +7,8 @@ from gevent_zeromq import zmq
 import gevent
 #from syncclient import SyncClient
 from servicebus.protocol import serialize, deserialize, messages
+from servicebus.lib import LOG
+import traceback,sys
 
 
 
@@ -39,6 +41,9 @@ class BaseLoop(object):
 
 
 class PullLoop(BaseLoop):
+    """
+    PullLoop is receiving only loop for messages.
+    """
 
     def loop(self):
         while self.is_running:
@@ -69,6 +74,7 @@ class PullLoop(BaseLoop):
 
 
 
+
 class RepLoop(BaseLoop):
     """
     pętla nasłuchująca na sockecie typu REP (odpowiedzi na REQ).
@@ -90,24 +96,51 @@ class RepLoop(BaseLoop):
             # deserialize
             try:
                 msgdata = deserialize(msgdata)
-                msg = msgdata['message']
             except Exception as e:
                 self.send_noop()
-                print "unknown message ", msg
+                LOG.warning("Message deserialisation error")
+                LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % msgdata[:1024].encode("hex"))
+                continue
+
+            try:
+                msg = msgdata['message']
+            except KeyError:
+                LOG.debug("Decoded message is incomplete. Message dump: %s" % repr(msgdata) )
                 continue
 
             # find handler
             try:
                 handler = self._msgdb[ msg ]
             except KeyError:
-                # unknown messages are ignored silently
+                # unknown messages are ignored
                 self.send_noop()
+                LOG.warning("Unknown message received [%s]" % msg)
+                LOG.debug("Message body dump:\n%s" % repr(msgdata) )
                 continue
 
             # run handler
             try:
                 result = handler(msgdata)
             except Exception as e:
+                # log exception details
+                excname = e.__class__.__name__
+                # traceback
+                tback = traceback.format_exc()
+                try:
+                    tback = unicode(tback, "utf-8")
+                except:
+                    tback = repr(tback)
+                # error message
+                errmsg = e.message
+                try:
+                    errmsg = unicode(errmsg, "utf-8")
+                except:
+                    errmsg = repr(errmsg)
+                # log & clean
+                LOG.error("Exception [%s] when processing message [%s]. Message: %s." % (excname, msg, errmsg) )
+                LOG.debug("Message dump: %s" % repr(msgdata) )
+                LOG.debug(tback)
+                del excname, tback, errmsg
                 result = None
 
             # send result
@@ -115,5 +148,3 @@ class RepLoop(BaseLoop):
                 self.send_noop()
             else:
                 self.send(result)
-
-

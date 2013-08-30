@@ -25,7 +25,7 @@ class AsyncDeamon(WorkerDaemon):
         self.backend = Backend(self.proc_id, self.address)
         self.greenlets_semaphore = Semaphore()
         self.greenlets = {}
-        self.pool = Pool(size=10)
+        self.pool = Pool(size=settings.WORKER_POOL_SIZE)
         self.exposed_methods = ["register_task", "get_task_result"]
 
 

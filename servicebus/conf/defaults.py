@@ -19,16 +19,18 @@ SOCK_QUERIES = "/tmp/esb_queries.sock"
 #  "AUTO" - podpięty do pierwszego interfejsu nie-lokalnego (zwykle eth0)
 BIND_WORKER_TO = "AUTO"
 
+WORKER_POOL_SIZE = 10
+
 # HEARBEAT
 
 # co ile sekund wykonywany jest cykl heartbeat
-WORKER_HEARTBEAT = 5
+WORKER_HEARTBEAT = 2
 # czas oczekiwania na odpowiedź od workera po wysłaniu pinga do niego
-PING_TIMEOUT = 3
+#PING_TIMEOUT = 3
 # czas przez jaki worke traktowany jest jako działający
 # od ostatniej aktywności lub odpowiedzi na ping
 # (powinien być większy niż WORKER_HEARTBEAT )
-HEARTBEAT_TIMEOUT = 10
+HEARTBEAT_TIMEOUT = 2
 
 # zakres portów do automatycznej alokacji dla workerów
 WORKER_MIN_PORT = 5000
@@ -53,4 +55,19 @@ DB_BACKEND = "dict"
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
 ASYNC_DAEMON_SERVICE = "async_daemon"
 
+
 MIDDLEWARE_CLASSES = ["auth"]
+
+# logowanie do pliku
+LOG_TO_FILE = False
+LOG_FILE_NAME = "/tmp/syncd.log"
+# rotowanie plików logu
+# LOG_ROTATE = 0
+
+# poziom logowania
+# DEBUG - 10, INFO - 20, WARNING - 30, ERROR - 40, CRITICAL - 50
+# im niższy tym więcej informacji w logu
+LOG_LEVEL = "DEBUG"
+
+# jeśli True to standardowe wyjście zostanie również przekierowane do logu
+# LOG_STDOUT = True
