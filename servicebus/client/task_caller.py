@@ -3,7 +3,7 @@
 from __future__ import unicode_literals
 from servicebus.protocol import messages, serialize, deserialize
 from servicebus.client.queries import SyncDQuery
-from servicebus.binder import get_bind_address, bind_socket_to_port_range
+#from servicebus.lib.binder import get_bind_address, bind_socket_to_port_range
 from servicebus.conf import settings
 from servicebus import exceptions
 from gevent_zeromq import zmq
@@ -106,9 +106,8 @@ def execute_control_task(method, context, args, kwargs, addr = None):
         "kwargs" : kwargs
     }
     # wysłanie żądania
-    print "Control task: ", msg
-
-    msg = SyncDQuery.control_task( msg)
+    #print "Control task: ", msg
+    msg = SyncDQuery.control_task(msg)
     return msg
 
 

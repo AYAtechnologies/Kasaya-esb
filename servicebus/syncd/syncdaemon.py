@@ -45,7 +45,7 @@ class SyncDaemon(object):
         """
         konfiguracja bazy danych
         """
-        backend = settings.DB_BACKEND
+        backend = settings.SYNC_DB_BACKEND
         if backend=="dict":
             from db.dict import DictDB
             return DictDB(server=self)
@@ -100,18 +100,14 @@ class SyncDaemon(object):
                 a,h = str(res['addr']), res['hostname']
                 LOG.info("Remote sync host [%s] stopped, addres [%s], uuid [%s]" % (h, a, uuid))
 
-
-    # global network control tasks
-
-
-    # TODO
-
-
     # main loop
-
-
     def run(self):
-        self.notify_syncd_start(self.uuid, self.hostname, None, local=True)
+        self.notify_syncd_start(
+            self.uuid,
+            self.hostname,
+            self.WORKER.intersync.address,
+            local=True
+        )
         try:
             loops = self.WORKER.get_loops()
             loops.append(self.BC.loop)

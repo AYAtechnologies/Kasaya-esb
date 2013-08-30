@@ -2,7 +2,7 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from servicebus.conf import settings
-from servicebus.binder import bind_socket_to_port_range
+from servicebus.lib.binder import bind_socket_to_port_range
 from servicebus.protocol import messages
 from servicebus.lib.loops import RepLoop
 from servicebus.lib import LOG

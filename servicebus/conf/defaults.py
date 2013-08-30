@@ -23,13 +23,10 @@ WORKER_POOL_SIZE = 10
 
 # HEARBEAT
 
-# co ile sekund wykonywany jest cykl heartbeat
-WORKER_HEARTBEAT = 2
-# czas oczekiwania na odpowiedź od workera po wysłaniu pinga do niego
-#PING_TIMEOUT = 3
-# czas przez jaki worke traktowany jest jako działający
-# od ostatniej aktywności lub odpowiedzi na ping
-# (powinien być większy niż WORKER_HEARTBEAT )
+# co ile sekund wykonywany jest heartbeat
+WORKER_HEARTBEAT = 6
+# po ilu sekundach od przekroczenia czasu heartbeatu
+# worker jest traktowany jako martwy
 HEARTBEAT_TIMEOUT = 2
 
 # zakres portów do automatycznej alokacji dla workerów
@@ -38,7 +35,7 @@ WORKER_MAX_PORT = 6000
 
 # konfiguracja name(?) serwera
 # możliwe:
-#  UDPBROADCAST, RIJAKDB,... cośtam cośtam
+#  udp-broadcast, rijak,... cośtam cośtam
 SYNC_BACKEND = "udp-broadcast"
 
 # jeśli serwer ma synchronizować się z innymi hostami poprzez rozsyłanie broadcastów,
@@ -50,7 +47,7 @@ SYNCD_CONTROL_BIND = "AUTO"
 
 # stan sieci może być przechowywany w lokalnej bazie danych, jeśli
 ## przemyśleć to
-DB_BACKEND = "dict"
+SYNC_DB_BACKEND = "dict"
 
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
 ASYNC_DAEMON_SERVICE = "async_daemon"

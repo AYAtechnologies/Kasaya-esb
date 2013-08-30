@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
+from servicebus.protocol import serialize, deserialize, messages
 from servicebus.conf import settings
 from servicebus import exceptions
-from servicebus.protocol import serialize, deserialize, messages
-from servicebus.binder import get_bind_address
+from servicebus.lib.binder import get_bind_address
 from servicebus.lib.loops import RepLoop
 from servicebus.lib import LOG
 from datetime import datetime, timedelta
@@ -13,7 +13,11 @@ import gevent
 import random
 
 
+
 class TooLong(Exception): pass
+
+
+
 
 
 class SyncWorker(object):
@@ -25,14 +29,24 @@ class SyncWorker(object):
         self.SRV = server
         self.context = zmq.Context()
         self.__pingdb = {}
-
+        # local workers <--> local sync communication
         self.queries = RepLoop(self._connect_queries_loop, context=self.context)
         self.queries.register_message(messages.WORKER_JOIN,  self.handle_worker_join)
         self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
         self.queries.register_message(messages.PING, self.handle_ping)
         self.queries.register_message(messages.QUERY,  self.handle_name_query)
         self.queries.register_message(messages.CTL_CALL, self.handle_control_request)
+        # sync <--> sync communication
+        self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
+        self.intersync.register_message(messages.CTL_CALL, self.handle_inter_sync)
+        # service control tasks
+        #self.sbusmanager = ServiceBusManager(self.SRV, self.intersync.address)
 
+
+    def get_sync_address(self, addr):
+        return "tcp://%s:%i" % (addr, settings.SYNCD_CONTROL_PORT)
+
+    # socket connectors
 
     def _connect_queries_loop(self, context):
         """
@@ -44,15 +58,16 @@ class SyncWorker(object):
         LOG.debug("Connected query socket %s" % addr)
         return sock, addr
 
-    def _connect_syncd_dialog_loop(self, context):
+    def _connect_inter_sync_loop(self, context):
         """
         connext global network syncd dialog
         """
         sock = context.socket(zmq.REP)
-        addr = get_bind_address(settings.SYNCD_CONTROL_BIND)
+        addr = self.get_sync_address( get_bind_address(settings.SYNCD_CONTROL_BIND) )
         sock.bind(addr)
         LOG.debug("Connected inter-sync dialog socket %s" % addr)
         return sock, addr
+
 
     # closing and quitting
 
@@ -64,13 +79,16 @@ class SyncWorker(object):
         #self.local_input.close()
         self.queries.close()
 
-
-    # starting loops
-
+    # all message loops used in syncd
     def get_loops(self):
-        return [self.queries.loop, self.hearbeat_loop]
+        return [
+            self.queries.loop,
+            self.hearbeat_loop,
+            self.intersync.loop,
+        ]
 
-    # message handlers
+
+    # local message handlers
     # -----------------------------------
 
     def handle_worker_join(self, msg):
@@ -125,10 +143,15 @@ class SyncWorker(object):
 
     def handle_control_request(self, msg):
         """
-        wywołanie specjalne servicebus, nie workera
+        wywołanie specjalne servicebus, nie workera.
         """
-        print "CONTROL REQUEST"
-        print msg
+        #print msg['method']
+        print "CONTROL REQUEST\n",msg
+
+        mthd = msg['method']
+        #mthlist = {
+        #    #"host.list" : self.SRV.
+        #}
 
 
 
@@ -207,3 +230,21 @@ class SyncWorker(object):
                 self.worker_stop(unreglist.pop(), True)
 
             gevent.sleep(settings.WORKER_HEARTBEAT)
+
+
+
+    # inter sync communication and global management
+    # -------------------------------------------------
+
+    def handle_inter_sync(self, message):
+        print "MESSAGA", message
+
+    def send_to_another_sync(self, addr, message):
+        sock = self.context.socket(zmq.REQ)
+        sock.connect( self.get_sync_address(addr) )
+        sock.send( serialize(msg) )
+        res = sock.sync_sender.recv()
+        res = deserialize(res)
+        sock.close()
+        return res
+

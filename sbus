@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+#coding: utf-8
+from __future__ import unicode_literals
+from servicebus.client import control
+from servicebus.conf import load_config_from_file
+import plac
+
+
+
+class Jobs(object):
+    commands = ['list']
+
+    def __init__(self):
+        load_config_from_file("config.txt")
+
+    #@plac.annotations(
+    #    w=("Workers summary only", "flag")
+    #)
+    def list(self, w=False):
+        control.host.list()
+
+
+    #def kill(self):
+    #    pass
+
+if __name__=="__main__":
+    plac.call( Jobs() )

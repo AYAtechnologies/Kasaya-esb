@@ -98,3 +98,8 @@ class DictDB(object):
         del self.hosts[uuid]
         return res
 
+    # raportowanie stanu sieci
+
+    def get_worker_list(self, hostfilter=None):
+        for host in self.services.iteritems():
+            print host

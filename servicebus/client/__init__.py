@@ -6,4 +6,4 @@ __all__ = ("sync", "async", "register_auth_processor", "async_result")
 
 sync = SyncExec()
 async = AsyncExec()
-busctl = ControlExec()
+control = ControlExec()

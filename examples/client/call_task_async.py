@@ -8,7 +8,7 @@ sys.path.append( esbpath )
 
 
 from servicebus import client, conf
-from servicebus.client import sync, async, register_auth_processor, async_result, busctl
+from servicebus.client import sync, async, register_auth_processor, async_result, control
 
 if __name__=="__main__":
     conf.load_config_from_file("../../config.txt")
