@@ -17,19 +17,18 @@ import subprocess
 
 
 class TestAsync(TestCase):
-
     @classmethod
     def setUpClass(cls):
         conf.load_config_from_file("../config.txt")
         print conf.settings.MIDDLEWARE
-        PYTHON = "~/PycharmProjects/django-env/bin/python" #PYTHON_INTERPRETER
+        # PYTHON = "~/PycharmProjects/django-env/bin/python" #PYTHON_INTERPRETER
         # subprocess.call(PYTHON + " ../examples/syncserver/run_syncd.py", shell=True)
         # subprocess.call(PYTHON + " ../examples/syncserver/run_async_worker.py", shell=True)
         # subprocess.call(PYTHON + " ../examples/workers/simple_worker.py", shell=True)
 
 
     def test_async_success(self):
-        tid = async.fikumiku.long_task(1, 1)
+        tid = async({"auth":("admin","pass")}).fikumiku.long_task(1, 1)
         print "res", tid
 
     def test_async_fail(self):

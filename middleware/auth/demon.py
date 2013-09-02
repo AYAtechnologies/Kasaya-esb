@@ -1,7 +1,8 @@
 __author__ = 'wektor'
 
 import os, sys
-from servicebus.worker import WorkerDaemon
+from servicebus.middleware.demon import MiddlewareDemon
+
 esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append(esbpath)
 from servicebus.conf import load_config_from_file
@@ -20,7 +21,7 @@ DATA = {
 }
 
 
-class Demon(WorkerDaemon):
+class Demon(MiddlewareDemon):
     def __init__(self, name):
         super(Demon, self).__init__(name)
         self.expose_all()
@@ -37,7 +38,6 @@ class Demon(WorkerDaemon):
 
     def is_authorized_for_method(self, msg):
         return True
-
 
 
 if __name__=="__main__":
