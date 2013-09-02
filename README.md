@@ -1,5 +1,8 @@
 Kasaya-esb
 ==========
+## Status
+At the moment library is unstable 
+
 ## Requirements
 ### fast
  - lightweight
