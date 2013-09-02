@@ -18,14 +18,19 @@ class Jobs(object):
     )
     def list(self, u=False):
         if u:
-            hostline = "HOST [%(addr)s]\thostname [%(hostname)s],\tuuid [%(uuid)s]"
+            hostline   = "HOST [%(addr)s]\thostname [%(hostname)s],\tuuid [%(uuid)s]"
+            workerline = "  WORKER [%(servicename)s]\taddress [%(addr)s],\tuuid[%(uuid)s]"
         else:
-            hostline = "HOST [%(addr)s]\thostname [%(hostname)s]"
+            hostline   = "HOST [%(addr)s]\thostname [%(hostname)s]"
+            workerline = "  WORKER [%(servicename)s]\taddress [%(addr)s]"
         hcnt = 0
+        wcnt = 0
         for host in control.host.list():
             hcnt += 1
             print hostline % host
-        print "Number of costs in servicebus: %i" % hcnt
+            for w in control.host.workers(host['uuid']):
+                print w
+        print "Number of hosts: %i, workers: %i" % (hcnt, wcnt)
 
 
     #def kill(self):

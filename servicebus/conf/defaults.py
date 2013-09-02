@@ -47,7 +47,7 @@ SYNCD_CONTROL_BIND = "AUTO"
 
 # stan sieci może być przechowywany w lokalnej bazie danych, jeśli
 ## przemyśleć to
-SYNC_DB_BACKEND = "dict"
+SYNC_DB_BACKEND = "memory"
 
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
 ASYNC_DAEMON_SERVICE = "async_daemon"

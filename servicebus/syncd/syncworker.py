@@ -33,24 +33,28 @@ class SyncWorker(object):
         self.__pingdb = {}
         # local workers <--> local sync communication
         self.queries = RepLoop(self._connect_queries_loop, context=self.context)
-        self.queries.register_message(messages.WORKER_JOIN,  self.handle_worker_join)
+        self.queries.register_message(messages.WORKER_LIVE, self.handle_worker_live)
         self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
-        self.queries.register_message(messages.PING, self.handle_ping)
-        self.queries.register_message(messages.QUERY,  self.handle_name_query)
-        self.queries.register_message(messages.CTL_CALL, self.handle_control_request)
+        self.queries.register_message(messages.QUERY, self.handle_name_query)
+        self.queries.register_message(messages.CTL_CALL, self.handle_local_control_request)
         # sync <--> sync communication
         self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
         self.intersync.register_message(messages.CTL_CALL, self.handle_inter_sync)
         # service control tasks
         self.__ctltasks = {}
-        self.register_ctltask("host.list", self.ctl_host_list)
+        self.register_ctltask("host.list", self.ctl_host_list, False)
+        self.register_ctltask("host.workers", self.ctl_host_workers, False)
 
 
-    def register_ctltask(self, method, func):
+    def register_ctltask(self, method, func, redirect):
         """
-        Register control method
+        Register control method.
+
+        Jeśli redirect jest True, oznacza to że żądanie może zostać zrealizowane tylko przez
+        serwer syncd którego dotyczy polecenie, jeśli False, to może zostać zrealizwowane
+        na każdym serwerze syncd w sieci.
         """
-        self.__ctltasks[method] = func
+        self.__ctltasks[method] = (func, redirect)
 
 
     def get_sync_address(self, addr):
@@ -102,37 +106,28 @@ class SyncWorker(object):
     # local message handlers
     # -----------------------------------
 
-    def handle_worker_join(self, msg):
-        """
-        New worker started
-        """
-        self.worker_start(msg['service'], msg['addr'], True )
-
-    def handle_worker_leave(self, msg):
-        """
-        Worker is going down
-        """
-        self.worker_stop( msg['addr'], True )
-
-    def handle_ping(self, msg):
+    def handle_worker_live(self, msg):
         """
         Worker notify about himself
         """
         now = datetime.now()
-        addr = msg['addr']
+        uuid = msg['uuid']
+        ip = msg['addr']
+        port = msg['port']
         svce = msg['service']
+        addr = ip+"."+str(port)
         try:
             png = self.__pingdb[addr]
         except KeyError:
             # service is already unknown
-            self.worker_start(svce, addr, True)
+            self.worker_start(uuid, svce, ip, port, True)
             return
 
         if png['s']!=svce:
             # different service under same address!
             LOG.error("Service [%s] expected on address [%s], but [%s] appeared. Removing old, registering new." % (png['s'], addr, svce))
-            self.worker_stop(addr, True)
-            self.worker_start(svce, addr, True)
+            self.worker_stop(ip, port, True)
+            self.worker_start(uuid, svce, ip, port, True)
             return
 
         # update heartbeats
@@ -140,19 +135,32 @@ class SyncWorker(object):
         self.__pingdb[addr] = png
 
 
+    def handle_worker_leave(self, msg):
+        """
+        Worker is going down
+        """
+        self.worker_stop( msg['ip'], msg['port'], True )
+
     def handle_name_query(self, msg):
         """
         Odpowiedź na pytanie o adres workera
         """
         name = msg['service']
-        res = self.DB.get_worker_for_service(name)
+        res = self.DB.choose_worker_for_service(name)
+        if res is None:
+            a = None
+            p = None
+        else:
+            a = res[0]
+            p = res[1]
         return {
             'message':messages.WORKER_ADDR,
             'service':name,
-            'addr':res
+            'ip':a,
+            'port':p
         }
 
-    def handle_control_request(self, msg):
+    def handle_local_control_request(self, msg):
         """
         wywołanie specjalne servicebus, nie workera.
         """
@@ -163,43 +171,45 @@ class SyncWorker(object):
     # worker state changes
     # ------------------------------
 
-    def worker_start(self, service, address, local):
+    def worker_start(self, uuid, service, ip, port, local):
         """
         Handle joining to network by worker (local or blobal)
         """
-        succ = self.DB.worker_register(service, address, local)
+        succ = self.DB.worker_register(uuid, service, ip,port, local)
+        addr = ip+":"+str(port)
         if succ:
             if local:
-                LOG.info("Local worker [%s] started, address [%s]" % (service, address) )
+                LOG.info("Local worker [%s] started, address [%s]" % (service, addr) )
             else:
-                LOG.info("Remote worker [%s] started, address [%s]" % (service, address) )
+                LOG.info("Remote worker [%s] started, address [%s]" % (service, addr) )
         if local:
             # dodanie serwisu do bazy z czasami pingów
-            self.__pingdb[address] =  {
+            self.__pingdb[addr] =  {
                 's' : service,
                 't' : datetime.now(),
             }
             # rozesłanie informacji w sieci
-            self.BC.send_worker_start(service, address)
+            self.BC.send_worker_live(uuid, service, ip,port)
 
 
-    def worker_stop(self, address, local):
+    def worker_stop(self, ip, port, local):
         """
         Handle worker leaving network (local or global)
         """
-        service = self.DB.worker_unregister(address)
+        service = self.DB.worker_unregister(ip,port)
+        addr = ip+":"+str(port)
         if service:
             if local:
-                LOG.info("Local worker [%s] stopped, address [%s]" % (service, address) )
+                LOG.info("Local worker [%s] stopped, address [%s]" % (service, addr) )
             else:
-                LOG.info("Remote worker [%s] stopped, address [%s]" % (service, address) )
+                LOG.info("Remote worker [%s] stopped, address [%s]" % (service, addr) )
         if local:
             # dodanie serwisu do bazy z czasami pingów
             try:
-                del self.__pingdb[address]
+                del self.__pingdb[addr]
             except KeyError:
                 pass
-            self.BC.send_worker_stop(address)
+            self.BC.send_worker_stop(ip,port)
 
 
     def request_workers_register(self):
@@ -230,9 +240,10 @@ class SyncWorker(object):
                 if to<now:
                     LOG.warning("Worker [%s] died on address [%s]. Unregistering." % (nfo['s'], addr) )
                     unreglist.append(addr)
-            # deregister all died workers
+            # unregister all dead workers
             while len(unreglist)>0:
-                self.worker_stop(unreglist.pop(), True)
+                ip,port = unreglist.pop().split(":")
+                self.worker_stop(ip,int(port), True)
 
             gevent.sleep(settings.WORKER_HEARTBEAT)
 
@@ -263,25 +274,37 @@ class SyncWorker(object):
         #print "CONTROL REQUEST, local:",local, "\n",message
         mthd = ".".join(message['method'])
         LOG.debug("Management call [%s]" % mthd)
-        func = self.__ctltasks[mthd]
-        result = func(message, local)
+        #import pprint
+        #pprint.pprint( message )
+        func, redirect = self.__ctltasks[mthd]
+        #if redirect:
+
+        # call internal function
+        kwargs = message['kwargs']
+        kwargs['local'] = local
+        result = func(self, *message['args'], **kwargs)
         return {"message":messages.RESULT, "result":result }
+
 
 
     def ctl_host_list(self, message, local):
         """
         List of all hosts in service bus
         """
-        #import pprint
-        #pprint.pprint( self.DB.services )
         lst = []
         for u,h,a in self.DB.host_list():
-            lst.append( {'addr':a.rsplit(":",1)[0], 'uuid':u, 'hostname':h} )
-            #for a,s in
-            print "-"*40
-            print h
-            for a in self.DB.workers_on_host(u):
-                print a
-            #    print a,s
-
+            lst.append( {'addr':a, 'uuid':u, 'hostname':h} )
         return lst
+
+
+    def ctl_host_workers(self, message, local):
+        """
+        List of all workers on host
+        """
+        huuid = message['uuid']
+        #for a,s in
+        print "-"*40
+        print h
+        for a in self.DB.workers_on_host(u):
+            print "???",a
+        #    print a,s

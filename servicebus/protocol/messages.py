@@ -3,7 +3,7 @@
 from __future__ import unicode_literals
 
 # worker join and leave
-WORKER_JOIN = "wrkr/up"
+WORKER_LIVE = "wrkr/up"
 WORKER_LEAVE = "wrkr/stop"
 # join and leave network by syncd
 HOST_JOIN = "host/up"

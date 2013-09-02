@@ -46,9 +46,9 @@ class SyncDaemon(object):
         konfiguracja bazy danych
         """
         backend = settings.SYNC_DB_BACKEND
-        if backend=="dict":
-            from db.dict import DictDB
-            return DictDB(server=self)
+        if backend=="memory":
+            from db.memsqlite import MemoryDB
+            return MemoryDB()
         raise Exception("Unknown database backend: %s" % backend)
 
 
@@ -94,10 +94,12 @@ class SyncDaemon(object):
 
 
     def notify_syncd_self_start(self):
+        addr = self.WORKER.intersync.address
+        addr = addr.split(":")[1].lstrip("/")
         self.notify_syncd_start(
             self.uuid,
             self.hostname,
-            self.WORKER.intersync.address,
+            addr,
             local=True
         )
 

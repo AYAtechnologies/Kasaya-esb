@@ -51,9 +51,10 @@ def find_worker(method):
     msg = SyncDQuery.query( srvce )
     if not msg['message']==messages.WORKER_ADDR:
         raise exceptions.ServiceBusException("Wrong response from sync server")
-    if msg['addr'] is None:
+    if msg['ip'] is None:
         raise exceptions.ServiceNotFound("No service %s found" % srvce)
-    return msg['addr']
+    addr = "tcp://%s:%i/" % ( msg['ip'],msg['port'] )
+    return addr
 
 
 
@@ -74,7 +75,7 @@ def execute_sync_task(method, context, args, kwargs, addr = None):
         "kwargs" : kwargs
     }
     # wysłanie żądania
-    print "Sync task: ", addr, msg
+    #print "Sync task: ", addr, msg
     msg = worker_caller.send_request_to_worker(addr, msg)
     if msg['message']==messages.RESULT:
         return msg['result']

@@ -24,11 +24,10 @@ class WorkerDaemon(object):
     def __init__(self, servicename):
         self.uuid = str(uuid.uuid4())
         self.servicename = servicename
-        self.address = None
         LOG.info("Starting worker daemon, service [%s], uuid: [%s]" % (self.servicename, self.uuid) )
         self.loop = RepLoop(self.connect)
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
-        self.SYNC = SyncClient(servicename, self.loop.address)
+        self.SYNC = SyncClient(servicename, self.loop.ip, self.loop.port, self.uuid)
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call )
         self.loop.register_message( messages.WORKER_REREG, self.handle_request_register )
@@ -42,14 +41,12 @@ class WorkerDaemon(object):
     def connect(self, context):
         sock = context.socket(zmq.REP)
         addr = bind_socket_to_port_range(sock, settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
-        self.address = addr
         return sock, addr
 
 
     def run(self):
-        self.SYNC.notify_start()
-        #pool = gevent.pool.Pool(settings.WORKER_POOL_SIZE)
-        #self.pool = Pool(size=settings.WORKER_POOL_SIZE)
+        LOG.debug("Sending notification on start to sync daemon. Service [%s] on address [%s]" % (self.servicename, self.loop.address))
+        self.SYNC.notify_live()
         wloop = gevent.spawn(self.loop.loop)
         hbeat = gevent.spawn(self.heartbeat_loop)
         try:
@@ -59,6 +56,7 @@ class WorkerDaemon(object):
             ])
         finally:
             self.loop.close()
+            LOG.debug("Sending notification on stop. Address [%s]" % self.loop.address)
             self.SYNC.notify_stop()
             self.SYNC.close()
 
@@ -72,14 +70,8 @@ class WorkerDaemon(object):
     # Hearbeat
 
     def heartbeat_loop(self):
-        import sys
-        msg = {
-            "message" : messages.PING,
-            "addr" : self.loop.address,
-            "service" : self.servicename
-        }
         while self.__hbloop:
-            self.SYNC.send_raw(msg)
+            self.SYNC.notify_live()
             gevent.sleep(settings.WORKER_HEARTBEAT)
 
 
@@ -163,7 +155,7 @@ class WorkerDaemon(object):
                 tback = unicode(tback, "utf-8")
             except:
                 tback = repr(tback)
-            LOG.info("Worker function [%s] throws exception [%s]. Message: %s" % (funcname, excname, errmsg) )
+            LOG.info("Worker function [%s] exception [%s]. Message: %s" % (funcname, excname, errmsg) )
             LOG.debug(tback)
 
             msg = {

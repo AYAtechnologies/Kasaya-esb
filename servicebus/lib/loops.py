@@ -21,7 +21,14 @@ class BaseLoop(object):
             self.__context = zmq.Context()
         else:
             self.__context = context
-        self.SOCK, self.address = connector(self.__context)
+        # bind to socket
+        self.SOCK, addr = connector(self.__context)
+        self.address = addr
+        addr = addr.split(":")
+        if len(addr)==3:
+            self.ip = addr[1].lstrip("/")
+            self.port = int(addr[2])
+
 
     def stop(self):
         """
