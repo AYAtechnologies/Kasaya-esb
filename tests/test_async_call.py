@@ -10,7 +10,7 @@ esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append( esbpath )
 
 from servicebus import client, conf
-from servicebus.client import sync, async, register_auth_processor, async_result
+from servicebus.client import sync, async, async_result
 import datetime
 import time
 import subprocess

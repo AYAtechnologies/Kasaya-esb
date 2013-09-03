@@ -120,7 +120,4 @@ def register_async_task(method, context, args, kwargs):
 
 
 
-def async_result(task_id, context):
-    #execute_sync_task(method, context, args, kwargs, addr = None)
-    m = [settings.ASYNC_DAEMON_SERVICE, "get_task_result"]
-    return execute_sync_task(m, context, [task_id], {})
+

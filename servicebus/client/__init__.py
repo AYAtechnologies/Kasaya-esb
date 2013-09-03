@@ -1,6 +1,6 @@
 #coding: utf-8
 from exec_context import ExecContext
-from task_caller import async_result
+from proxies import async_result
 
 __all__ = ("sync", "async", "register_auth_processor", "async_result")
 

@@ -21,11 +21,12 @@ class GenericProxy(MiddlewareCore):
         self._top = top
         self._names = []
         self._method = None
+        self._context = []
         self._z_context = zmq.Context()
 
     def __getattr__(self, itemname):
         if itemname.startswith("_"):
-            return super(GenericProxy, self).__getattr__(itemname)
+            return super(GenericProxy, self).__getattribute__(itemname)
         #M = GenericProxy(top=self._top)
         self._names.append(itemname)
         return self
