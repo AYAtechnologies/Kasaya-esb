@@ -11,6 +11,7 @@ netifaces
 zerorpc
 gevent-zeromq
 gevent
+plac
 
 # jeśli ma działać szyfrowanie, to jeszcze to
 pycrypto

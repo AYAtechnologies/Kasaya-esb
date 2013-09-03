@@ -6,6 +6,9 @@ from servicebus.protocol import serialize, deserialize, messages
 
 
 class SyncClient(object):
+    """
+    SyncClient jest używany do komunikacji workera z lokalnym serverem syncd.
+    """
 
     def __init__(self, servicename, ip, port, uuid):
         self.srvname = servicename
@@ -25,8 +28,13 @@ class SyncClient(object):
         #self.sync_sender.setsockopt(zmq.HWM, 8) # how many messages buffer
         self.sync_sender.connect('ipc://'+settings.SOCK_QUERIES)
 
+
+    def send(self, msg):
+
+        self.sync_sender.send( serialize(msg) )
+
     def notify_live(self):
-        self.sync_sender.send( serialize(self.__pingmsg) )
+        self.send(self.__pingmsg)
         self.sync_sender.recv()
 
     def notify_stop(self):
@@ -35,11 +43,7 @@ class SyncClient(object):
             "ip" : self.__addr,
             "port" : self.__port,
             }
-        self.sync_sender.send( serialize(msg) )
-        self.sync_sender.recv()
-
-    def send_raw(self, msg):
-        self.sync_sender.send( serialize(msg) )
+        self.send(msg)
         self.sync_sender.recv()
 
     def close(self):

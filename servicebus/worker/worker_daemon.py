@@ -11,6 +11,7 @@ from worker_reg import worker_methods_db
 from gevent_zeromq import zmq
 from syncclient import SyncClient
 import traceback
+import datetime
 import gevent
 import uuid
 import inspect
@@ -22,6 +23,7 @@ __all__=("WorkerDaemon",)
 #gevent.monkey.patch_all()
 
 class Daemon(MiddlewareCore):
+
     def __init__(self, servicename):
         self.uuid = str(uuid.uuid4())
         self.servicename = servicename
@@ -37,6 +39,14 @@ class Daemon(MiddlewareCore):
         #exposing methods
         self.exposed_methods = []
         MiddlewareCore.__init__(self)
+        # counters
+        #self._sb_errors = 0 # internal service bus errors
+        self._tasks_succes = 0 # succesfully processed tasks
+        self._tasks_error = 0 # task which triggered exceptions
+        self._tasks_nonex = 0 # non existing tasks called
+        self._tasks_control = 0 # control tasks received
+        self._start_time = datetime.datetime.now() # time of worker start
+
 
     def connect(self, context):
         sock = context.socket(zmq.REP)
@@ -103,6 +113,7 @@ class Daemon(MiddlewareCore):
     def handle_control_request(self, message):
         method = ".".join( message['method'] )
         print "WORKER CONTROL REQUEST", method
+        self._tasks_control += 1
         #if message['method']=="stop_all_workers":
         #    self.stop()
 
@@ -118,7 +129,9 @@ class Daemon(MiddlewareCore):
         else:
             try:
                 func = worker_methods_db[funcname]
+                self._tasks_succes += 1
             except KeyError:
+                self._tasks_nonex += 1
                 LOG.info("Unknown worker task called [%s]" % funcname)
                 # we dont know this task
                 return {
@@ -129,11 +142,9 @@ class Daemon(MiddlewareCore):
 
         # try to run function and catch exceptions
         try:
-            #print ">  ",func
-            #print ">  ",args
-            #print ">  ",kwargs
             result = func(*args, **kwargs)
         except Exception as e:
+            self._tasks_error += 1
             excname = e.__class__.__name__
             # error message
             errmsg = e.message

@@ -8,7 +8,7 @@ sys.path.append( esbpath )
 
 
 from servicebus import client, conf
-from servicebus.client import sync, async, register_auth_processor, async_result, control, trans
+from servicebus.client import sync, async, async_result, control, trans
 
 if __name__=="__main__":
     conf.load_config_from_file("../../config.txt")
@@ -32,7 +32,7 @@ if __name__=="__main__":
     with trans(("dupa","jasiu")) as t:
         t.fikumiku.do_work("parameter", 2, foo=456, baz=True)
         t.fikumiku.another_task("important parameter")
-   
+
     #with async("zyga") as A:
     #    A.fikumiku.wyjebka(234)
 
