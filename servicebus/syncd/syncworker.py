@@ -212,7 +212,7 @@ class SyncWorker(object):
             except KeyError:
                 pass
         # rozesłanie informacji w sieci jeśli nastąpi lokalna zmiana stanu
-        if succ and local:
+        if local:
             self.BC.send_worker_stop(ip,port)
 
 

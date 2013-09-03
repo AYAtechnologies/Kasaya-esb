@@ -88,9 +88,11 @@ def serialize(msg):
         msg = msgpack.packb(msg, default=encode_ext_types)
         meta = encryption.encrypt(msg, settings.PASSWORD, compress=settings.COMPRESSION)
         meta['ver'] = 1
+        meta['_n_'] = settings.SERVICE_BUS_NAME
         return msgpack.packb(meta)
     else:
         msg['ver'] = 1
+        meta['_n_'] = settings.SERVICE_BUS_NAME
         msg = msgpack.packb(msg, default=encode_ext_types)
         return msg
 
@@ -110,6 +112,13 @@ def deserialize(msg):
                 raise exceptions.ServiceBusException("Unknown service bus protocol version")
         except:
             raise exceptions.MessageCorrupted()
+
+        # is this message coming from our servicebus?
+        try:
+            if not msg['_n_'] == settings.SERVICE_BUS_NAME:
+                raise exceptions.NotOurMessage()
+        except KeyError:
+            raise exceptions.NotOurMessage()
 
         try:
             msg = encryption.decrypt(msg, settings.PASSWORD)
@@ -133,5 +142,13 @@ def deserialize(msg):
                 raise exceptions.ServiceBusException("Unknown service bus protocol version")
         except:
             raise exceptions.MessageCorrupted()
+
+        # is this message coming from our servicebus?
+        try:
+            if not data['_n_'] == settings.SERVICE_BUS_NAME:
+                raise exceptions.NotOurMessage()
+        except KeyError:
+            raise exceptions.NotOurMessage()
+
         return data
 

@@ -1,6 +1,9 @@
 #coding: utf-8
 from __future__ import unicode_literals
 
+# service bus name
+SERVICE_BUS_NAME = "sb"
+
 # użycie szyfrowania do wszelkiej transmisji poprzez ESB
 ENCRYPTION = False
 COMPRESSION = False

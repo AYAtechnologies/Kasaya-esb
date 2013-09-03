@@ -6,6 +6,7 @@ from gevent import socket
 from gevent_zeromq import zmq
 from servicebus.protocol import serialize, deserialize, messages
 from servicebus.lib import LOG
+from servicebus.exceptions import NotOurMessage
 import traceback
 
 
@@ -42,6 +43,8 @@ class UDPLoop(object):
             # deserialize
             try:
                 msgdata = deserialize(msgdata)
+            except NotOurMessage:
+                continue
             except Exception:
                 LOG.warning("Message from broadcast deserialisation error")
                 LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % msgdata[:1024].encode("hex"))

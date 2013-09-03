@@ -21,4 +21,3 @@ DB_BACKEND = dict
 
 ASYNC_DAEMON_DB_BACKEND = redis
 PYTHON_INTERPRETER = ~/PycharmProjects/django-env/bin/python
-

@@ -8,6 +8,7 @@ import gevent
 #from syncclient import SyncClient
 from servicebus.protocol import serialize, deserialize, messages
 from servicebus.lib import LOG
+from servicebus.exceptions import NotOurMessage
 import traceback,sys
 
 
@@ -103,6 +104,12 @@ class RepLoop(BaseLoop):
             # deserialize
             try:
                 msgdata = deserialize(msgdata)
+
+            except NotOurMessage:
+                # not our servicebus message
+                self.SOCK.send(b"")
+                continue
+
             except Exception as e:
                 self.send_noop()
                 LOG.warning("Message deserialisation error")

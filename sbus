@@ -17,6 +17,9 @@ class Jobs(object):
         u=("Show UUID identifiers", "flag")
     )
     def list(self, u=False):
+        """
+        List all hosts and workers running in service bus
+        """
         hostline   = "  {service: >{ws}}  {addr: <{wa}} (hostname: {hostname})"
         workerline = "  {service: >{ws}}  on port: {port}"
         if u:

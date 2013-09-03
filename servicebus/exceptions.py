@@ -5,6 +5,10 @@ from __future__ import unicode_literals
 class ServiceBusException(Exception):
     pass
 
+
+class NotOurMessage(ServiceBusException):
+    pass
+
 class MessageCorrupted(ServiceBusException):
     """
     Nadchodzączy komunikat jest uszkodzony, lub rozszyfrowanie się nie powiodło.
