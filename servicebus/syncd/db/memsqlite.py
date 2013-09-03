@@ -169,30 +169,43 @@ class MemoryDB(BaseDB):
         Return list of all hosts in network
         """
         self.SEMA.acquire()
-        self.cur.execute( "SELECT uuid, addr, hostname FROM hosts" )
+        self.cur.execute( "SELECT uuid, addr, hostname FROM hosts ORDER BY addr" )
         lst = self.cur.fetchall()
         self.SEMA.release()
-        print ">", lst
         return lst
+
 
     def workers_on_host(self, host_uuid):
-        self.SEMA.acquire()
-        self.cur.execute( "SELECT addr FROM hosts WHERE uuid=?", (host_uuid,) )
-        host = self.cur.fetchone()
-        self.SEMA.release()
-
-        if host==None:
+        addr = self.host_addr_by_uuid(host_uuid)
+        if addr==None:
             return []
-
         self.SEMA.acquire()
-        self.cur.execute( "SELECT uuid, service, addr FROM workers WHERE addr=?", (host[0],) )
+        self.cur.execute( "SELECT uuid, service, ip, port FROM workers WHERE ip=?", (addr,) )
         lst = self.cur.fetchall()
         self.SEMA.release()
         return lst
 
 
-    def uuid2addr(self, uuid):
+    def host_addr_by_uuid(self, uuid):
         """
-        Zwraca adres IP na którym znajduje się host/worker o podanym UUID
+        Zwraca adres IP na którym znajduje się host o podanym UUID
         """
-        pass
+        self.SEMA.acquire()
+        self.cur.execute( "SELECT addr FROM hosts WHERE uuid=?", (uuid,) )
+        host = self.cur.fetchone()
+        self.SEMA.release()
+        if not host is None:
+            return host[0]
+
+    def worker_ip_port_by_uuid(self, uuid):
+        """
+        zwraca ip i port workera o podanym uuid
+        """
+        self.SEMA.acquire()
+        self.cur.execute( "SELECT ip,port FROM workers WHERE uuid=? ORDER BY port", (uuid,) )
+        wrk = self.cur.fetchone()
+        self.SEMA.release()
+        if wrk is None:
+            return None, None
+        else:
+            return wrk[0], wrk[1]

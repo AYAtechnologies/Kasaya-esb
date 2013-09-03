@@ -301,8 +301,12 @@ class SyncWorker(object):
         List of all hosts in service bus
         """
         lst = []
-        for u,h,a in self.DB.host_list():
-            lst.append( {'addr':a, 'uuid':u, 'hostname':h} )
+        # all syncd hosts
+        for u,a,h in self.DB.host_list():
+            ln = {'uuid':u, 'addr':a, 'hostname':h}
+            # workers on host
+            ln ['services'] = self.CTL_host_workers(u)
+            lst.append( ln )
         return lst
 
 
@@ -310,9 +314,8 @@ class SyncWorker(object):
         """
         List of all workers on host
         """
-        #for a,s in
-        print "-"*40
-        #print uuid
-        for a in self.DB.workers_on_host(uuid):
-            print "???",a
-        #    print a,s
+        lst = []
+        for u,s,i,p in self.DB.workers_on_host(uuid):
+            res = {'uuid':u, 'service':s, 'ip':i, 'port':p}
+            lst.append(res)
+        return lst
