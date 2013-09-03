@@ -75,5 +75,5 @@ LOG_LEVEL = "DEBUG"
 
 # Select database backend for async daemon
 # possible values: memory, redis
-ASYNC_DAEMON_DB_BACKEND = "memory"
+ASYNC_DAEMON_DB_BACKEND = "redis"
 
