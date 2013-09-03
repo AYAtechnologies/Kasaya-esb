@@ -1,11 +1,11 @@
 #coding: utf-8
-from funcproxy import SyncExec, AsyncExec, ControlExec, TransactionExec, register_auth_processor
+from exec_context import ExecContext
 from task_caller import async_result
 
 __all__ = ("sync", "async", "register_auth_processor", "async_result")
 
-sync = SyncExec()
-async = AsyncExec()
-trans = TransactionExec()
-control = ControlExec()
+sync = ExecContext(default_proxy="sync")
+async = ExecContext(default_proxy="async")
+trans = ExecContext(default_proxy="trans")
+control = ExecContext(default_proxy="control")
 
