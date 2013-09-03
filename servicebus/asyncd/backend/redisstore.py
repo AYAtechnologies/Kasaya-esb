@@ -5,7 +5,7 @@ import datetime
 
 import redis
 
-from servicebus.backend.base import BackendBase, TaskNotFound
+from servicebus.asyncd.backend.base import BackendBase, TaskNotFound
 
 
 class RedisBackend(BackendBase):
