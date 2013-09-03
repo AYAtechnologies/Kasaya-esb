@@ -141,6 +141,12 @@ class ControlExec(ExecAndContext):
     """
     call_type = "ctl"
 
+class TransactionExec(ExecAndContext):
+    """
+    Wywołania tranzakcyjne
+    """
+    call_type = "trs"
+
 
 #with Context(....) as C:
 #    C.sync.serv.metoda(...)

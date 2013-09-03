@@ -1,8 +1,11 @@
 #coding: utf-8
 __author__ = 'wektor'
 
-import datetime, uuid
-from base import BackendBase, TaskNotFound
+import datetime
+import uuid
+
+from servicebus.asyncd.backend.base import BackendBase, TaskNotFound
+
 
 class MemoryBackend(BackendBase):
     store = {}
