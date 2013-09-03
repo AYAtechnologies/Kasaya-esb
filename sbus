@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+#coding: utf-8
+from __future__ import unicode_literals
+from servicebus.client import control
+from servicebus.conf import load_config_from_file
+import plac
+
+
+
+class Jobs(object):
+    commands = ['list']
+
+    def __init__(self):
+        load_config_from_file("config.txt")
+
+    @plac.annotations(
+        u=("Show UUID identifiers", "flag")
+    )
+    def list(self, u=False):
+        if u:
+            hostline   = "HOST [%(addr)s]\thostname [%(hostname)s],\tuuid [%(uuid)s]"
+            workerline = "  WORKER [%(servicename)s]\taddress [%(addr)s],\tuuid[%(uuid)s]"
+        else:
+            hostline   = "HOST [%(addr)s]\thostname [%(hostname)s]"
+            workerline = "  WORKER [%(servicename)s]\taddress [%(addr)s]"
+        hcnt = 0
+        wcnt = 0
+        for host in control.host.list():
+            hcnt += 1
+            print hostline % host
+            for w in control.host.workers(host['uuid']):
+                print w
+        print "Number of hosts: %i, workers: %i" % (hcnt, wcnt)
+
+
+    #def kill(self):
+    #    pass
+
+if __name__=="__main__":
+    plac.call( Jobs() )

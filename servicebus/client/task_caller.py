@@ -3,8 +3,8 @@
 from __future__ import unicode_literals
 from servicebus.protocol import messages, serialize, deserialize
 from servicebus.client.queries import SyncDQuery
+#from servicebus.lib.binder import get_bind_address, bind_socket_to_port_range
 from servicebus.middleware.core import MiddlewareCore
-from servicebus.binder import get_bind_address, bind_socket_to_port_range
 from servicebus.conf import settings
 from servicebus import exceptions
 from gevent_zeromq import zmq
@@ -38,9 +38,10 @@ def find_worker(method):
     msg = SyncDQuery.query( srvce )
     if not msg['message']==messages.WORKER_ADDR:
         raise exceptions.ServiceBusException("Wrong response from sync server")
-    if msg['addr'] is None:
+    if msg['ip'] is None:
         raise exceptions.ServiceNotFound("No service %s found" % srvce)
-    return msg['addr']
+    addr = "tcp://%s:%i/" % ( msg['ip'],msg['port'] )
+    return addr
 
 
 
@@ -61,7 +62,7 @@ def execute_sync_task(method, context, args, kwargs, addr = None):
         "kwargs" : kwargs
     }
     # wysłanie żądania
-    print "Sync task: ", addr, msg
+    #print "Sync task: ", addr, msg
     msg = worker_caller.send_request_to_worker(addr, msg)
     if msg['message']==messages.RESULT:
         return msg['result']
@@ -93,10 +94,12 @@ def execute_control_task(method, context, args, kwargs, addr = None):
         "kwargs" : kwargs
     }
     # wysłanie żądania
-    print "Control task: ", msg
+    #print "Control task: ", msg
+    msgbody = SyncDQuery.control_task(msg)
+    msg = msgbody['message']
+    if msg==messages.RESULT:
+        return msgbody['result']
 
-    msg = SyncDQuery.control_task( msg)
-    return msg
 
 
 

@@ -38,3 +38,8 @@ class ServiceNotFound(ServiceBusException):
     pass
 
 
+class MethodNotFound(ServiceBusException):
+    """
+    Żądana funkcja nie istnieje w tym serwisie
+    """
+    pass

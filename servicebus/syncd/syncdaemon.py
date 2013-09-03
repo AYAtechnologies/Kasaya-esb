@@ -45,10 +45,10 @@ class SyncDaemon(object):
         """
         konfiguracja bazy danych
         """
-        backend = settings.DB_BACKEND
-        if backend=="dict":
-            from db.dict import DictDB
-            return DictDB(server=self)
+        backend = settings.SYNC_DB_BACKEND
+        if backend=="memory":
+            from db.memsqlite import MemoryDB
+            return MemoryDB()
         raise Exception("Unknown database backend: %s" % backend)
 
 
@@ -56,7 +56,7 @@ class SyncDaemon(object):
         """
         This worker loop is for communication between syncd and local workers.
         """
-        return SyncWorker(server=self)
+        return SyncWorker(server=self, database=self.DB, broadcaster=self.BC)
 
 
     def setup_broadcaster(self):
@@ -72,7 +72,6 @@ class SyncDaemon(object):
 
     # global network changes
 
-
     def notify_syncd_start(self, uuid, hostname, addr, local=False):
         """
         Send information about startup to all hosts in network
@@ -85,6 +84,24 @@ class SyncDaemon(object):
             if succ:
                 a = str(addr)
                 LOG.info("Remote sync host [%s] started, address [%s], uuid [%s]" % (hostname, a, uuid) )
+        # if registered new syncd AND it's not local host, then
+        # it must be new host in network, wchih don't know other hosts
+        # so we send again registering information about ourselves,
+        # but after some waiting
+        if succ and (not local):
+            gevent.sleep(0.5)
+            self.notify_syncd_self_start()
+
+
+    def notify_syncd_self_start(self):
+        addr = self.WORKER.intersync.address
+        addr = addr.split(":")[1].lstrip("/")
+        self.notify_syncd_start(
+            self.uuid,
+            self.hostname,
+            addr,
+            local=True
+        )
 
 
     def notify_syncd_stop(self, uuid, local=False):
@@ -100,18 +117,9 @@ class SyncDaemon(object):
                 a,h = str(res['addr']), res['hostname']
                 LOG.info("Remote sync host [%s] stopped, addres [%s], uuid [%s]" % (h, a, uuid))
 
-
-    # global network control tasks
-
-
-    # TODO
-
-
     # main loop
-
-
     def run(self):
-        self.notify_syncd_start(self.uuid, self.hostname, None, local=True)
+        self.notify_syncd_self_start()
         try:
             loops = self.WORKER.get_loops()
             loops.append(self.BC.loop)
