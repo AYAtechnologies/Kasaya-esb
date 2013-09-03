@@ -48,16 +48,10 @@ class Daemon(MiddlewareCore):
         LOG.debug("Sending notification on start to sync daemon. Service [%s] on address [%s]" % (self.servicename, self.loop.address))
         self.SYNC.notify_live()
         self.setup_middleware()
-        self._run()
-
-    def _run(self):
-        self.SYNC.notify_start()
-        wloop = gevent.spawn(self.loop.loop)
-        hbeat = gevent.spawn(self.heartbeat_loop)
         try:
             gevent.joinall([
-                wloop,
-                hbeat,
+                gevent.spawn(self.loop.loop),
+                gevent.spawn(self.heartbeat_loop),
             ])
         finally:
             self.loop.close()
