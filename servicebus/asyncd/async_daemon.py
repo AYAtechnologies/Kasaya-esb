@@ -7,8 +7,8 @@ esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append( esbpath )
 
 from servicebus.conf import settings
-from backend import get_backend_class
-from servicebus.worker import WorkerDaemon
+from servicebus.backend import get_backend_class
+from servicebus.worker import Daemon
 from servicebus.protocol import messages
 from servicebus.client.task_caller import execute_sync_task, find_worker
 
@@ -16,10 +16,10 @@ from gevent import *
 from gevent.coros import Semaphore
 from gevent.pool import Pool
 
-class AsyncDeamon(WorkerDaemon):
+class AsyncDeamon(Daemon):
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
-        self.loop.register_message(messages.ASYNC_CALL, self.handle_async_call)
+        self.loop.register_message(messages.SYSTEM_CALL, self.handle_async_call)
         backend = get_backend_class(settings.ASYNC_DAEMON_DB_BACKEND)
         self.backend = backend(self.uuid)
         self.greenlets_semaphore = Semaphore()

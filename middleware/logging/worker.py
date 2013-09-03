@@ -5,15 +5,16 @@ from servicebus.middleware.worker import MiddlewareBaseWorker
 class WorkerMiddleware(MiddlewareBaseWorker):
 
     def __init__(self, worker):
-        pass
+        self.worker = worker
 
     def prepare_message(self, message):
-        print "checking authorization", message
-        if sync.auth.is_authorized_for_service(message["service"], message["context"]):
-            return message
-        else:
-            raise Exception("Not Authorized")
-
+        try:
+            message["context"]["worker"] = str(self.worker)
+        except:
+            message["context"] = {"worker": str(self.worker)}
+        sync.logging.log_worker_received(message)
+        return message
 
     def postprocess_message(self, message):
+        sync.logging.log_worker_respond(message)
         return message

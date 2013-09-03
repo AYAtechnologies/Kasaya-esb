@@ -5,6 +5,7 @@ from servicebus.conf import settings
 from servicebus.lib.binder import bind_socket_to_port_range
 from servicebus.protocol import messages
 from servicebus.lib.loops import RepLoop
+from servicebus.middleware.core import MiddlewareCore
 from servicebus.lib import LOG
 from worker_reg import worker_methods_db
 from gevent_zeromq import zmq
@@ -13,14 +14,14 @@ import traceback
 import gevent
 import uuid
 import inspect
-
+import sys
 
 __all__=("WorkerDaemon",)
 
 #import gevent.monkey;
 #gevent.monkey.patch_all()
 
-class WorkerDaemon(object):
+class Daemon(MiddlewareCore):
     def __init__(self, servicename):
         self.uuid = str(uuid.uuid4())
         self.servicename = servicename
@@ -36,17 +37,21 @@ class WorkerDaemon(object):
         self.__hbloop=True
         #exposing methods
         self.exposed_methods = []
-
+        MiddlewareCore.__init__(self)
 
     def connect(self, context):
         sock = context.socket(zmq.REP)
         addr = bind_socket_to_port_range(sock, settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
         return sock, addr
 
-
     def run(self):
         LOG.debug("Sending notification on start to sync daemon. Service [%s] on address [%s]" % (self.servicename, self.loop.address))
         self.SYNC.notify_live()
+        self.setup_middleware()
+        self._run()
+
+    def _run(self):
+        self.SYNC.notify_start()
         wloop = gevent.spawn(self.loop.loop)
         hbeat = gevent.spawn(self.heartbeat_loop)
         try:
@@ -93,11 +98,13 @@ class WorkerDaemon(object):
 
     def handle_sync_call(self, msgdata):
         name = msgdata['service']
+        msgdata = self.prepare_message(msgdata)
         result = self.run_task(
             funcname = msgdata['method'],
             args = msgdata['args'],
             kwargs = msgdata['kwargs']
         )
+        result = self.postprocess_message(result)
         return result
 
 
@@ -112,10 +119,8 @@ class WorkerDaemon(object):
         #if message['method']=="stop_all_workers":
         #    self.stop()
 
-
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )
-
         # find task in worker db
         self_func = getattr(self, funcname, None)
         if self_func is not None and funcname in self.exposed_methods:

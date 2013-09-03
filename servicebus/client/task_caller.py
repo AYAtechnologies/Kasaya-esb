@@ -4,46 +4,33 @@ from __future__ import unicode_literals
 from servicebus.protocol import messages, serialize, deserialize
 from servicebus.client.queries import SyncDQuery
 #from servicebus.lib.binder import get_bind_address, bind_socket_to_port_range
+from servicebus.middleware.core import MiddlewareCore
 from servicebus.conf import settings
 from servicebus import exceptions
 from gevent_zeromq import zmq
 
 
-class WorkerCaller(object):
+class Caller(MiddlewareCore):
 
     def __init__(self):
+        super(Caller, self).__init__()
         self.context = zmq.Context()
-        self.load_middleware()
-
-    def load_middleware(self):
-        pass
-
-    def prepare_message(self, message):
-        """
-        client part of the middleware handling - hook before sending the message
-        """
-        return message
-
-    def prepare_result(self, result):
-        """
-        client part of the middleware handling - hook after getting result
-        """
-        return result
 
     def send_request_to_worker(self, target, msg):
-        msg = self.prepare_message(msg) # middleware hook
+        msg = self.prepare_message(msg) # _middleware hook
+        if "context" not in msg:
+            msg["context"] = {}
         REQUESTER = self.context.socket(zmq.REQ)
-
         REQUESTER.connect(target)
         REQUESTER.send(serialize(msg))
         res = REQUESTER.recv()
         res = deserialize(res)
         REQUESTER.close()
-        res = self.prepare_result(res) # middleware hook
+        res = self.postprocess_message(res) # _middleware hook
         return res
 
 
-worker_caller = WorkerCaller()
+worker_caller = Caller()
 
 
 def find_worker(method):
