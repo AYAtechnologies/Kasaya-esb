@@ -29,8 +29,8 @@ if __name__=="__main__":
     #print async_result(tid, "stefan")
     #print sync("stefan").async_daemon.get_result(tid)
 
-    control.jajo()
-    sync.fikumiku.wyjebka(234)
+    #control.jajo()
+    #sync.fikumiku.wyjebka(234)
     #with async("zyga") as A:
     #    A.fikumiku.wyjebka(234)
 

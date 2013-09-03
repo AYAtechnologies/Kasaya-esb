@@ -104,7 +104,7 @@ class MemoryDB(BaseDB):
         """
         self.SEMA.acquire()
         self.cur.execute(
-            "SELECT ip,port FROM workers WHERE local=?",
+            "SELECT uuid,service,ip,port FROM workers WHERE local=?",
             [True] )
         lst = self.cur.fetchall()
         self.SEMA.release()
@@ -169,9 +169,10 @@ class MemoryDB(BaseDB):
         Return list of all hosts in network
         """
         self.SEMA.acquire()
-        self.cur.execute( "SELECT uuid, hostname, addr FROM hosts" )
+        self.cur.execute( "SELECT uuid, addr, hostname FROM hosts" )
         lst = self.cur.fetchall()
         self.SEMA.release()
+        print ">", lst
         return lst
 
     def workers_on_host(self, host_uuid):
@@ -188,14 +189,6 @@ class MemoryDB(BaseDB):
         lst = self.cur.fetchall()
         self.SEMA.release()
         return lst
-
-
-        #haddr = self.hosts[host_uuid]
-        #haddr = haddr['addr'].rsplit(":",1)[0]
-        #for svce, addrlist in self.services.iteritems():
-        #    for addr in addrlist:
-        #        if addr.rsplit(":",1)[0]==haddr:
-        #            yield svce, addr
 
 
     def uuid2addr(self, uuid):

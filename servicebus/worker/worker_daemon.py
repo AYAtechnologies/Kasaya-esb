@@ -31,7 +31,6 @@ class Daemon(MiddlewareCore):
         self.SYNC = SyncClient(servicename, self.loop.ip, self.loop.port, self.uuid)
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call )
-        self.loop.register_message( messages.WORKER_REREG, self.handle_request_register )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )
         # heartbeat
         self.__hbloop=True
@@ -45,7 +44,7 @@ class Daemon(MiddlewareCore):
         return sock, addr
 
     def run(self):
-        LOG.debug("Sending notification on start to sync daemon. Service [%s] on address [%s]" % (self.servicename, self.loop.address))
+        LOG.debug("Sending notification to local sync daemon. Service [%s] starting on address [%s]" % (self.servicename, self.loop.address))
         self.SYNC.notify_live()
         self.setup_middleware()
         try:
@@ -58,7 +57,6 @@ class Daemon(MiddlewareCore):
             LOG.debug("Sending notification on stop. Address [%s]" % self.loop.address)
             self.SYNC.notify_stop()
             self.SYNC.close()
-
 
     def stop(self):
         self.loop.stop()
@@ -82,13 +80,13 @@ class Daemon(MiddlewareCore):
             # this must be a defined method - attribute error raises when trying to expose method that doesnt exist
             self.exposed_methods.append(method_name)
 
-    # This method is pure evil! Die die die!
     def expose_all(self):
         exposed = []
         for name, val in inspect.getmembers(self):
             if inspect.ismethod(val) and not name.startswith("_"):
                 exposed.append(name)
         self.exposed_methods += exposed
+
 
     def handle_sync_call(self, msgdata):
         name = msgdata['service']
@@ -100,11 +98,6 @@ class Daemon(MiddlewareCore):
         )
         result = self.postprocess_message(result)
         return result
-
-
-    def handle_request_register(self, message):
-        self.SYNC.notify_start()
-        return {"message":messages.NOOP}
 
 
     def handle_control_request(self, message):

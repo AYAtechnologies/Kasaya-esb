@@ -77,17 +77,19 @@ class SyncDaemon(object):
         Send information about startup to all hosts in network
         """
         succ = self.DB.host_register(uuid, hostname, addr)
-        self.WORKER.request_workers_register()
+        self.WORKER.request_workers_broadcast()
         if local:
+            # it is ourself starting, send broadcast about this
             self.BC.send_host_start(uuid, hostname, addr)
         else:
+            # it's remote host starting, information is from broadcast
             if succ:
                 a = str(addr)
                 LOG.info("Remote sync host [%s] started, address [%s], uuid [%s]" % (hostname, a, uuid) )
+
         # if registered new syncd AND it's not local host, then
-        # it must be new host in network, wchih don't know other hosts
-        # so we send again registering information about ourselves,
-        # but after some waiting
+        # it must be new host in network, which don't know other hosts.
+        # We send again registering information about self syncd instance.
         if succ and (not local):
             gevent.sleep(0.5)
             self.notify_syncd_self_start()

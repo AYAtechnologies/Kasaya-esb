@@ -39,11 +39,11 @@ class SyncWorker(object):
         self.queries.register_message(messages.CTL_CALL, self.handle_local_control_request)
         # sync <--> sync communication
         self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
-        self.intersync.register_message(messages.CTL_CALL, self.handle_inter_sync)
+        self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
         # service control tasks
         self.__ctltasks = {}
-        self.register_ctltask("host.list", self.ctl_host_list, False)
-        self.register_ctltask("host.workers", self.ctl_host_workers, False)
+        self.register_ctltask("host.list", self.CTL_host_list, False)
+        self.register_ctltask("host.workers", self.CTL_host_workers, False)
 
 
     def register_ctltask(self, method, func, redirect):
@@ -162,9 +162,9 @@ class SyncWorker(object):
 
     def handle_local_control_request(self, msg):
         """
-        wywołanie specjalne servicebus, nie workera.
+        control requests from localhost
         """
-        return self.handle_inter_sync(msg, local=True)
+        return self.handle_control_request(msg, islocal=True)
 
 
 
@@ -188,7 +188,9 @@ class SyncWorker(object):
                 's' : service,
                 't' : datetime.now(),
             }
-            # rozesłanie informacji w sieci
+
+        # rozesłanie informacji w sieci jeśli nastąpi lokalna zmiana stanu
+        if succ and local:
             self.BC.send_worker_live(uuid, service, ip,port)
 
 
@@ -209,23 +211,19 @@ class SyncWorker(object):
                 del self.__pingdb[addr]
             except KeyError:
                 pass
+        # rozesłanie informacji w sieci jeśli nastąpi lokalna zmiana stanu
+        if succ and local:
             self.BC.send_worker_stop(ip,port)
 
 
-    def request_workers_register(self):
+    def request_workers_broadcast(self):
         """
         Send to all local workers request for registering in network.
         Its used after new host start.
         """
-        msg = {"message":messages.WORKER_REREG}
-        for worker in self.DB.get_local_workers():
-            sck = self.context.socket(zmq.REQ)
-            try:
-                sck.connect(worker)
-                sck.send( serialize(msg) )
-                res = sck.recv()
-            finally:
-                sck.close()
+        for uuid, service, ip, port in self.DB.get_local_workers():
+            gevent.sleep(0.4)
+            self.BC.send_worker_live(uuid, service, ip,port)
 
 
     # heartbeat
@@ -266,28 +264,39 @@ class SyncWorker(object):
         return res
 
 
+    def handle_global_control_request(self, message):
+        """
+        Control requests from remote hosts
+        """
+        return handle_control_request(message, islocal=False)
 
-    def handle_inter_sync(self, message, local=False):
+
+    def handle_control_request(self, message, islocal):
         """
-        All control requests are realised here,
+        All control requests are handled here.
+           message - message body
+           islocal - if true then request is from localhost
         """
-        #print "CONTROL REQUEST, local:",local, "\n",message
-        mthd = ".".join(message['method'])
-        LOG.debug("Management call [%s]" % mthd)
-        #import pprint
-        #pprint.pprint( message )
-        func, redirect = self.__ctltasks[mthd]
-        #if redirect:
+        method = ".".join(message['method'])
+        LOG.debug("Management call [%s]" % method)
+        # get handler for method
+        func, redirect = self.__ctltasks[method]
+
+        if redirect:
+            # this request can be called only on localhost
+            # if target uuid is not for this syncd instance
+            # then we should redirect it to remote host
+            raise NotImplemented("redirecting requests is not ready yet")
 
         # call internal function
-        kwargs = message['kwargs']
-        kwargs['local'] = local
-        result = func(self, *message['args'], **kwargs)
+        result = func(*message['args'], **message['kwargs'])
         return {"message":messages.RESULT, "result":result }
 
 
+    # host tasks
 
-    def ctl_host_list(self, message, local):
+
+    def CTL_host_list(self):
         """
         List of all hosts in service bus
         """
@@ -297,14 +306,13 @@ class SyncWorker(object):
         return lst
 
 
-    def ctl_host_workers(self, message, local):
+    def CTL_host_workers(self, uuid):
         """
         List of all workers on host
         """
-        huuid = message['uuid']
         #for a,s in
         print "-"*40
-        print h
-        for a in self.DB.workers_on_host(u):
+        #print uuid
+        for a in self.DB.workers_on_host(uuid):
             print "???",a
         #    print a,s
