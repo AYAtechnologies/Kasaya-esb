@@ -39,8 +39,6 @@ class MemoryDB(BaseDB):
           należy rzucić wyjątek DBException
         """
         # sprawdzenie czy worker istnieje w bazie
-        self.worker_unregister(ip,port)
-
         self.SEMA.acquire()
         self.cur.execute(
             "SELECT * FROM workers WHERE uuid=?",
@@ -52,6 +50,7 @@ class MemoryDB(BaseDB):
             #uu, sv, ad, lc = res
             if (res[0]==worker_uuid):
                 return False
+        self.worker_unregister(ip,port)
         # dodanie nowego workera do bazy
         self.SEMA.acquire()
         self.cur.execute(
