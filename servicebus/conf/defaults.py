@@ -32,6 +32,10 @@ WORKER_HEARTBEAT = 6
 # worker jest traktowany jako martwy
 HEARTBEAT_TIMEOUT = 2
 
+# ile czasu ma syncd na odpowiedź
+SYNC_REPLY_TIMEOUT = 2
+
+
 # zakres portów do automatycznej alokacji dla workerów
 WORKER_MIN_PORT = 5000
 WORKER_MAX_PORT = 6000
