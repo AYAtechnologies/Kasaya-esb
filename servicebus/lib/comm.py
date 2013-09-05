@@ -8,7 +8,7 @@ import gevent
 #from syncclient import SyncClient
 from servicebus.protocol import serialize, deserialize, messages
 from servicebus.lib import LOG
-from servicebus.exceptions import NotOurMessage
+from servicebus.exceptions import NotOurMessage, ReponseTimeout
 import traceback,sys
 
 
@@ -162,3 +162,25 @@ class RepLoop(BaseLoop):
                 self.send_noop()
             else:
                 self.send(result)
+
+
+def send_and_receive(context, address, message, timeout=10):
+    """
+    context - ZMQ context
+    address - full ZMQ destination address (eg: tcp://127.0.0.1:1234)
+    message - message payload (will be automatically serialized)
+    timeout - time in seconds after which TimeoutError will be raised
+    """
+    SOCK = context.socket(zmq.REQ)
+    SOCK.connect(address)
+    SOCK.send( serialize(message) )
+    try:
+        with gevent.Timeout(timeout, ReponseTimeout):
+            res = SOCK.recv()
+    except ReponseTimeout:
+        SOCK.close()
+        raise ReponseTimeout("Response timeout")
+    res = deserialize(res)
+    SOCK.close()
+    return res
+

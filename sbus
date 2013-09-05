@@ -8,10 +8,12 @@ from pprint import pprint
 
 
 class Jobs(object):
-    commands = ['list']
+    commands = ['list', 'stop']
+
 
     def __init__(self):
         load_config_from_file("config.txt")
+
 
     @plac.annotations(
         u=("Show UUID identifiers", "flag")
@@ -49,6 +51,17 @@ class Jobs(object):
             print ()
         print ("Total number of hosts: {0}, workers: {1}".format(hcnt, wcnt) )
 
+
+
+    @plac.annotations(
+        uuid=("UUID of worker to stop")
+    )
+    def stop(self, uuid):
+        """
+        Send stop signal to worker with specified uuid. If worker is currently
+        processing task, worker will stop after finishing current job.
+        """
+        control.worker.stop(uuid)
 
     #def kill(self):
     #    pass

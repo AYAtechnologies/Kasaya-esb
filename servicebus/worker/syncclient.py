@@ -5,9 +5,9 @@ from gevent_zeromq import zmq
 from servicebus.protocol import serialize, deserialize, messages
 import gevent
 from gevent.coros import Semaphore
+from servicebus.exceptions import ReponseTimeout
+#from servicebus.lib.comm import send_and_receive
 
-
-class TooLong(Exception): pass
 
 
 class SyncClient(object):
@@ -49,10 +49,10 @@ class SyncClient(object):
         """
         self.sync_sender.send( serialize(msg) )
         try:
-            with gevent.Timeout(settings.SYNC_REPLY_TIMEOUT, TooLong):
+            with gevent.Timeout(settings.SYNC_REPLY_TIMEOUT, ReponseTimeout):
                 self.sync_sender.recv()
                 return True
-        except TooLong:
+        except ReponseTimeout:
             self.SEMA.acquire()
             self.disconnect()
             self.connect()

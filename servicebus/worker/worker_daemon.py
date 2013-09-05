@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from servicebus.conf import settings
 from servicebus.lib.binder import bind_socket_to_port_range
 from servicebus.protocol import messages
-from servicebus.lib.loops import RepLoop
+from servicebus.lib.comm import RepLoop, send_and_receive
 from servicebus.middleware.core import MiddlewareCore
 from servicebus.lib import LOG
 from worker_reg import worker_methods_db

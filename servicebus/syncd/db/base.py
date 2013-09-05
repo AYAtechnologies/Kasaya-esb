@@ -101,3 +101,4 @@ class BaseDB(object):
 
     def workers_on_host(self, host_uuid):
         raise NotImplemented
+

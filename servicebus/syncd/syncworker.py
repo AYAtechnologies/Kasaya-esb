@@ -5,17 +5,20 @@ from servicebus.protocol import serialize, deserialize, messages
 from servicebus.conf import settings
 from servicebus import exceptions
 from servicebus.lib.binder import get_bind_address
-from servicebus.lib.loops import RepLoop
+from servicebus.lib.comm import RepLoop, send_and_receive
 from servicebus.lib import LOG
 from datetime import datetime, timedelta
 from gevent_zeromq import zmq
 import gevent
 import random
+from pprint import pprint
+
+__all__=("SyncWorker",)
 
 
-class TooLong(Exception): pass
-
-
+class RedirectRequired(Exception):
+    def __init__(self, ip):
+        self.remote_ip = ip
 
 
 
@@ -41,11 +44,12 @@ class SyncWorker(object):
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
         # service control tasks
         self.__ctltasks = {}
-        self.register_ctltask("host.list", self.CTL_host_list, False)
-        self.register_ctltask("host.workers", self.CTL_host_workers, False)
+        self.register_ctltask("host.list", self.CTL_host_list)
+        self.register_ctltask("host.workers", self.CTL_host_workers)
+        self.register_ctltask("worker.stop", self.CTL_worker_stop)
 
 
-    def register_ctltask(self, method, func, redirect):
+    def register_ctltask(self, method, func):
         """
         Register control method.
 
@@ -53,11 +57,11 @@ class SyncWorker(object):
         serwer syncd którego dotyczy polecenie, jeśli False, to może zostać zrealizwowane
         na każdym serwerze syncd w sieci.
         """
-        self.__ctltasks[method] = (func, redirect)
+        self.__ctltasks[method] = func
 
 
-    def get_sync_address(self, addr):
-        return "tcp://%s:%i" % (addr, settings.SYNCD_CONTROL_PORT)
+    def get_sync_address(self, ip):
+        return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
 
 
     # socket connectors
@@ -249,25 +253,23 @@ class SyncWorker(object):
     # inter sync communication and global management
     # -------------------------------------------------
 
-
-    def send_to_another_sync(self, addr, message):
+    def own_ip_or_exception(self, ip):
         """
-        Send request to another syncd server
+        Check if given IP is own host ip, if not then raise exception
+        to redirect message to proper destination
         """
-        sock = self.context.socket(zmq.REQ)
-        sock.connect( self.get_sync_address(addr) )
-        sock.send( serialize(msg) )
-        res = sock.sync_sender.recv()
-        res = deserialize(res)
-        sock.close()
-        return res
+        if ip is None:
+            return
+        ownip = self.intersync.ip==ip
+        if not ownip:
+            raise RedirectRequired(ip)
 
 
     def handle_global_control_request(self, message):
         """
         Control requests from remote hosts
         """
-        return handle_control_request(message, islocal=False)
+        return self.handle_control_request(message, islocal=False)
 
 
     def handle_control_request(self, message, islocal):
@@ -278,17 +280,27 @@ class SyncWorker(object):
         """
         method = ".".join(message['method'])
         LOG.debug("Management call [%s]" % method)
+        LOG.debug(repr(message))
         # get handler for method
-        func, redirect = self.__ctltasks[method]
-
-        if redirect:
-            # this request can be called only on localhost
-            # if target uuid is not for this syncd instance
-            # then we should redirect it to remote host
-            raise NotImplemented("redirecting requests is not ready yet")
+        func = self.__ctltasks[method]
 
         # call internal function
-        result = func(*message['args'], **message['kwargs'])
+        try:
+            result = func(*message['args'], **message['kwargs'])
+        except RedirectRequired as e:
+            # Function can't process this request, it should be redirected
+            # to another host to process. Valid IP for request is stored
+            # in exception remote_ip field
+            if 'redirected' in message:
+                # this message is coming from another sync daemon
+                # if still should be redirected, then it's wrong
+                # request and should be dropped
+                raise ServiceBusException("Message redirection fail")
+            message['redirected'] = True
+            addr = self.get_sync_address(e.remote_ip)
+            return send_and_receive(self.context, addr, message, settings.SYNC_REPLY_TIMEOUT)
+            #return self.forward_to_remote_sync(e.remote_ip, message)
+
         return {"message":messages.RESULT, "result":result }
 
 
@@ -318,3 +330,17 @@ class SyncWorker(object):
             res = {'uuid':u, 'service':s, 'ip':i, 'port':p}
             lst.append(res)
         return lst
+
+
+    def CTL_worker_stop(self, uuid):
+        """
+        Send stop signal to worker
+        """
+        ip,port = self.DB.worker_ip_port_by_uuid(uuid)
+        self.own_ip_or_exception(ip)
+        if ip is None:
+            return False
+        #msg = {""}
+        send_and_receive(self.context, )
+        print '   KILL', ip,port
+        return "fiku miku suck"
