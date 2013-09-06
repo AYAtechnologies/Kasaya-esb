@@ -28,10 +28,6 @@ def fiku(a,b=None,foo=None, baz=None):
     print "another_task"
     print
 
-@Task(name="messages.mail.send_heavy_spam")
-def sendspam(a,b):
-    print "sendspam"
-    print a,b
 
 @Task(name="long_task")
 def long_task(a, x):
