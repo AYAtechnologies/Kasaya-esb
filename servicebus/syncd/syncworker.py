@@ -199,9 +199,9 @@ class SyncWorker(object):
         addr = ip+":"+str(port)
         if service:
             if local:
-                LOG.info("Local worker [%s] stopped, address [%s]" % (service, addr) )
+                LOG.info("Local worker stopped, address [%s]" % addr )
             else:
-                LOG.info("Remote worker [%s] stopped, address [%s]" % (service, addr) )
+                LOG.info("Remote worker stopped, address [%s]" % addr )
         if local:
             # dodanie serwisu do bazy z czasami pingów
             try:
@@ -259,7 +259,7 @@ class SyncWorker(object):
             raise RedirectRequiredEx(ip)
 
 
-    def handle_global_control_request(self, message):
+    def handle_global_control_request(self, msg):
         """
         Control requests from remote hosts
         """
@@ -309,6 +309,4 @@ class SyncWorker(object):
             'method':['stop']
         }
         res = send_and_receive(self.context, addr, msg)
-        print ">>> res", res
-        print '   KILL', ip,port
-        return "fiku miku suck"
+        return res

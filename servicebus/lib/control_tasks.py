@@ -5,6 +5,7 @@ from servicebus.lib.comm import send_and_receive
 from servicebus import exceptions
 from servicebus.lib import LOG
 from servicebus.protocol import messages
+from servicebus.conf import settings
 
 
 __all__=("RedirectRequired", "ControlTasks")
