@@ -72,7 +72,7 @@ class PullLoop(BaseLoop):
                 handler = self._msgdb[ msg ]
             except KeyError:
                 # unknown messages are ignored silently
-                print "unknown message ", msg
+                #print "unknown message ", msg
                 continue
 
             # run handler
@@ -185,4 +185,39 @@ def send_and_receive(context, address, message, timeout=10):
     res = deserialize(res)
     SOCK.close()
     return res
+
+
+def send_and_receive_response(context, address, message, timeout=10):
+    """
+    j.w. ale dekoduje wynik i go zwraca, lub rzuca otrzymany w wiadomości exception
+    """
+    print ">>>", address
+    print message
+    print
+    msg = send_and_receive(context, address, message, timeout)
+    print
+    from pprint import pprint
+    pprint (msg)
+    typ = msg['message']
+
+    if typ==messages.RESULT:
+        return msg['result']
+
+    elif typ==messages.ERROR:
+        if msg['internal']:
+            # internal service bus exception
+            e = exceptions.ServiceBusException(msg['info'])
+        else:
+            # exception task
+            e = Exception(msg['info'])
+        # copy exception internals
+        try:
+            e.traceback = msg['traceback']
+        except AttributeError:
+            pass
+        # fire in the hole!
+        raise e
+
+    else:
+        raise exceptions.ServiceBusException("Wrong message received")
 

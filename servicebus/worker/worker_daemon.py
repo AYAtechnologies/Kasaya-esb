@@ -6,7 +6,7 @@ from servicebus.lib.binder import bind_socket_to_port_range
 from servicebus.protocol import messages
 from servicebus.lib.comm import RepLoop, send_and_receive
 from servicebus.middleware.core import MiddlewareCore
-from servicebus.lib import LOG
+from servicebus.lib import LOG, system
 from worker_reg import worker_methods_db
 from gevent_zeromq import zmq
 from syncclient import SyncClient
@@ -42,6 +42,7 @@ class Daemon(MiddlewareCore):
         # control tasks
         self.ctl = ControlTasks( self.loop.get_context() )
         self.ctl.register_task("stop", self.CTL_stop )
+        self.ctl.register_task("stats", self.CTL_stats )
         # stats
         #self._sb_errors = 0 # internal service bus errors
         self._tasks_succes = 0 # succesfully processed tasks
@@ -123,12 +124,10 @@ class Daemon(MiddlewareCore):
 
 
     def handle_control_request(self, message):
-        #method = ".".join( message['method'] )
-        #print "WORKER CONTROL REQUEST", method
         self._tasks_control += 1
-        self.ctl.handle_request(message)
-        #if message['method']=="stop_all_workers":
-        #    self.stop()
+        result = self.ctl.handle_request(message)
+        return {"message":messages.RESULT, "result":result }
+
 
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )
@@ -199,3 +198,22 @@ class Daemon(MiddlewareCore):
         g = gevent.Greenlet.spawn(self.stop)
         g.start_later(3)
         return True
+
+    def CTL_stats(self):
+        """
+        Return current worker stats
+        """
+        now = datetime.datetime.now()
+        uptime = now - self._start_time
+        return {
+            "task_succ" : self._tasks_succes,
+            "task_err"  : self._tasks_error,
+            "task_nonx" : self._tasks_nonex,
+            "task_ctl"  : self._tasks_control,
+            "ip"        : self.loop.ip,
+            "port"      : self.loop.port,
+            "service"   : self.servicename,
+            "mem_total" : system.get_memory_used(),
+            "uptime"    : uptime,
+        }
+

@@ -5,7 +5,7 @@ from servicebus.protocol import serialize, deserialize, messages
 from servicebus.conf import settings
 from servicebus import exceptions
 from servicebus.lib.binder import get_bind_address
-from servicebus.lib.comm import RepLoop, send_and_receive
+from servicebus.lib.comm import RepLoop, send_and_receive_response
 from servicebus.lib import LOG
 from datetime import datetime, timedelta
 from gevent_zeromq import zmq
@@ -20,6 +20,9 @@ __all__=("SyncWorker",)
 
 def _ip_to_sync_addr(ip):
     return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
+
+def _ip_port_to_worker_addr(ip,port):
+    return "tcp://%s:%i" % (ip,port)
 
 class RedirectRequiredEx(RedirectRequiredToAddr):
     def __init__(self, ip):
@@ -52,6 +55,7 @@ class SyncWorker(object):
         self.ctl.register_task("host.list", self.CTL_host_list)
         self.ctl.register_task("host.workers", self.CTL_host_workers)
         self.ctl.register_task("worker.stop", self.CTL_worker_stop)
+        self.ctl.register_task("worker.stats", self.CTL_worker_stats)
 
 
     def get_sync_address(self, ip):
@@ -161,7 +165,9 @@ class SyncWorker(object):
         """
         control requests from localhost
         """
-        return self.ctl.handle_request(msg)
+        result = self.ctl.handle_request(msg)
+        #print ">>>>>>>>.", result
+        return {"message":messages.RESULT, "result":result }
 
 
 
@@ -247,13 +253,13 @@ class SyncWorker(object):
     # inter sync communication and global management
     # -------------------------------------------------
 
-    def own_ip_or_exception(self, ip):
+    def redirect_or_exception_by_ip(self, ip):
         """
         Check if given IP is own host ip, if not then raise exception
         to redirect message to proper destination
         """
         if ip is None:
-            return
+            raise Exception("Unknown worker")
         ownip = self.intersync.ip==ip
         if not ownip:
             raise RedirectRequiredEx(ip)
@@ -263,7 +269,9 @@ class SyncWorker(object):
         """
         Control requests from remote hosts
         """
-        return self.ctl.handle_request(msg)
+        result = self.ctl.handle_request(msg)
+        return {"message":messages.RESULT, "result":result }
+
 
 
     # syncd host tasks
@@ -299,14 +307,30 @@ class SyncWorker(object):
         Send stop signal to worker
         """
         ip,port = self.DB.worker_ip_port_by_uuid(uuid)
-        self.own_ip_or_exception(ip)
-        if ip is None:
-            return False
-        #msg = {""}
-        addr = "tcp://%s:%i" % (ip,port)
+        self.redirect_or_exception_by_ip(ip)
+
+        addr = _ip_port_to_worker_addr(ip,port)
         msg = {
             'message':messages.CTL_CALL,
             'method':['stop']
         }
-        res = send_and_receive(self.context, addr, msg)
+        res = send_and_receive_response(self.context, addr, msg)
         return res
+
+
+    def CTL_worker_stats(self, uuid):
+        """
+        Return full stats of worker
+        """
+        ip,port = self.DB.worker_ip_port_by_uuid(uuid)
+        self.redirect_or_exception_by_ip(ip)
+
+        addr = _ip_port_to_worker_addr(ip,port)
+        msg = {
+            'message':messages.CTL_CALL,
+            'method':['stats']
+        }
+        res = send_and_receive_response(self.context, addr, msg)
+        #print ">>>>>>>>>>..",res
+        return res
+

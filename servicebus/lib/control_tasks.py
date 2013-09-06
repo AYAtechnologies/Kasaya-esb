@@ -38,6 +38,7 @@ class ControlTasks(object):
     def ip_to_zmq_addr(self, ip):
         raise NotImplemented
 
+
     def redirect(self, addr, message):
         # If function can't process this request, it should be redirected
         # to another host to process. Valid IP for request is stored
@@ -82,5 +83,5 @@ class ControlTasks(object):
         except RedirectRequiredToAddr as e:
             return self.redirect(e.remote_addr, message)
 
-        return {"message":messages.RESULT, "result":result }
+        return result
 
