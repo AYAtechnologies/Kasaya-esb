@@ -10,12 +10,12 @@ from servicebus.lib import LOG
 from worker_reg import worker_methods_db
 from gevent_zeromq import zmq
 from syncclient import SyncClient
+from servicebus.lib.control_tasks import ControlTasks
 import traceback
 import datetime
 import gevent
 import uuid
 import inspect
-import sys
 
 __all__=("WorkerDaemon",)
 
@@ -39,7 +39,10 @@ class Daemon(MiddlewareCore):
         #exposing methods
         self.exposed_methods = []
         MiddlewareCore.__init__(self)
-        # counters
+        # control tasks
+        self.ctl = ControlTasks( self.loop.get_context() )
+        self.ctl.register_task("stop", self.CTL_stop )
+        # stats
         #self._sb_errors = 0 # internal service bus errors
         self._tasks_succes = 0 # succesfully processed tasks
         self._tasks_error = 0 # task which triggered exceptions
@@ -57,20 +60,29 @@ class Daemon(MiddlewareCore):
         LOG.debug("Sending notification to local sync daemon. Service [%s] starting on address [%s]" % (self.servicename, self.loop.address))
         self.SYNC.notify_live()
         self.setup_middleware()
+        self.__greens = []
+        self.__greens.append( gevent.spawn(self.loop.loop) )
+        self.__greens.append( gevent.spawn(self.heartbeat_loop) )
         try:
-            gevent.joinall([
-                gevent.spawn(self.loop.loop),
-                gevent.spawn(self.heartbeat_loop),
-            ])
+            gevent.joinall(self.__greens)
         finally:
-            self.loop.close()
-            LOG.debug("Sending notification on stop. Address [%s]" % self.loop.address)
-            self.SYNC.notify_stop()
-            self.SYNC.close()
+            self.stop()
+            self.close()
 
     def stop(self):
-        self.loop.stop()
         self.__hbloop = False
+        LOG.debug("Sending stop notification. Address [%s]" % self.loop.address)
+        self.SYNC.notify_stop()
+        self.loop.stop()
+        # killing greenlets
+        for g in self.__greens:
+            g.kill(block=True)
+        LOG.debug("Worker [%s] stopped" % self.servicename)
+
+    def close(self):
+        self.loop.close()
+        self.SYNC.close()
+
 
 
     # --------------------
@@ -111,9 +123,10 @@ class Daemon(MiddlewareCore):
 
 
     def handle_control_request(self, message):
-        method = ".".join( message['method'] )
-        print "WORKER CONTROL REQUEST", method
+        #method = ".".join( message['method'] )
+        #print "WORKER CONTROL REQUEST", method
         self._tasks_control += 1
+        self.ctl.handle_request(message)
         #if message['method']=="stop_all_workers":
         #    self.stop()
 
@@ -175,3 +188,14 @@ class Daemon(MiddlewareCore):
         }
 
 
+    # worker internal control tasks
+    # -----------------------------
+
+
+    def CTL_stop(self):
+        """
+        Stop request. Finish current task and shutdown.
+        """
+        g = gevent.Greenlet.spawn(self.stop)
+        g.start_later(3)
+        return True

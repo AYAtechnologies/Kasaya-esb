@@ -25,3 +25,10 @@ RESULT = "call/result" # result of synchronous task
 ERROR = "call/error" # exception thrown in task
 # null message
 NOOP = "noop" # null message
+
+
+# TODO: make functions to create more complicated messages
+
+#def make_error_message(exception):
+#    pass
+

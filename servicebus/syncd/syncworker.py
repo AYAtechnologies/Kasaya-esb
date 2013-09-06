@@ -13,12 +13,17 @@ import gevent
 import random
 from pprint import pprint
 
+from servicebus.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
+
 __all__=("SyncWorker",)
 
 
-class RedirectRequired(Exception):
+def _ip_to_sync_addr(ip):
+    return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
+
+class RedirectRequiredEx(RedirectRequiredToAddr):
     def __init__(self, ip):
-        self.remote_ip = ip
+        self.remote_addr = _ip_to_sync_addr(ip)
 
 
 
@@ -43,21 +48,10 @@ class SyncWorker(object):
         self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
         # service control tasks
-        self.__ctltasks = {}
-        self.register_ctltask("host.list", self.CTL_host_list)
-        self.register_ctltask("host.workers", self.CTL_host_workers)
-        self.register_ctltask("worker.stop", self.CTL_worker_stop)
-
-
-    def register_ctltask(self, method, func):
-        """
-        Register control method.
-
-        Jeśli redirect jest True, oznacza to że żądanie może zostać zrealizowane tylko przez
-        serwer syncd którego dotyczy polecenie, jeśli False, to może zostać zrealizwowane
-        na każdym serwerze syncd w sieci.
-        """
-        self.__ctltasks[method] = func
+        self.ctl = ControlTasks(self.context, allow_redirect=True)
+        self.ctl.register_task("host.list", self.CTL_host_list)
+        self.ctl.register_task("host.workers", self.CTL_host_workers)
+        self.ctl.register_task("worker.stop", self.CTL_worker_stop)
 
 
     def get_sync_address(self, ip):
@@ -81,7 +75,7 @@ class SyncWorker(object):
         connext global network syncd dialog
         """
         sock = context.socket(zmq.REP)
-        addr = self.get_sync_address( get_bind_address(settings.SYNCD_CONTROL_BIND) )
+        addr = _ip_to_sync_addr( get_bind_address(settings.SYNCD_CONTROL_BIND) )
         sock.bind(addr)
         LOG.debug("Connected inter-sync dialog socket %s" % addr)
         return sock, addr
@@ -167,7 +161,7 @@ class SyncWorker(object):
         """
         control requests from localhost
         """
-        return self.handle_control_request(msg, islocal=True)
+        return self.ctl.handle_request(msg)
 
 
 
@@ -262,49 +256,17 @@ class SyncWorker(object):
             return
         ownip = self.intersync.ip==ip
         if not ownip:
-            raise RedirectRequired(ip)
+            raise RedirectRequiredEx(ip)
 
 
     def handle_global_control_request(self, message):
         """
         Control requests from remote hosts
         """
-        return self.handle_control_request(message, islocal=False)
+        return self.ctl.handle_request(msg)
 
 
-    def handle_control_request(self, message, islocal):
-        """
-        All control requests are handled here.
-           message - message body
-           islocal - if true then request is from localhost
-        """
-        method = ".".join(message['method'])
-        LOG.debug("Management call [%s]" % method)
-        LOG.debug(repr(message))
-        # get handler for method
-        func = self.__ctltasks[method]
-
-        # call internal function
-        try:
-            result = func(*message['args'], **message['kwargs'])
-        except RedirectRequired as e:
-            # Function can't process this request, it should be redirected
-            # to another host to process. Valid IP for request is stored
-            # in exception remote_ip field
-            if 'redirected' in message:
-                # this message is coming from another sync daemon
-                # if still should be redirected, then it's wrong
-                # request and should be dropped
-                raise ServiceBusException("Message redirection fail")
-            message['redirected'] = True
-            addr = self.get_sync_address(e.remote_ip)
-            return send_and_receive(self.context, addr, message, settings.SYNC_REPLY_TIMEOUT)
-            #return self.forward_to_remote_sync(e.remote_ip, message)
-
-        return {"message":messages.RESULT, "result":result }
-
-
-    # host tasks
+    # syncd host tasks
 
 
     def CTL_host_list(self):
@@ -341,6 +303,12 @@ class SyncWorker(object):
         if ip is None:
             return False
         #msg = {""}
-        send_and_receive(self.context, )
+        addr = "tcp://%s:%i" % (ip,port)
+        msg = {
+            'message':messages.CTL_CALL,
+            'method':['stop']
+        }
+        res = send_and_receive(self.context, addr, msg)
+        print ">>> res", res
         print '   KILL', ip,port
         return "fiku miku suck"

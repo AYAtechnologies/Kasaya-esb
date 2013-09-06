@@ -30,6 +30,8 @@ class BaseLoop(object):
             self.ip = addr[1].lstrip("/")
             self.port = int(addr[2])
 
+    def get_context(self):
+        return self.__context
 
     def stop(self):
         """
