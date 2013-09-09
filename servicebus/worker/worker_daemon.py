@@ -32,7 +32,7 @@ class Daemon(MiddlewareCore):
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
         self.SYNC = SyncClient(servicename, self.loop.ip, self.loop.port, self.uuid)
         # registering handlers
-        self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call )
+        self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call, raw_msg_response=True )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )
         # heartbeat
         self.__hbloop=True
@@ -126,7 +126,8 @@ class Daemon(MiddlewareCore):
     def handle_control_request(self, message):
         self._tasks_control += 1
         result = self.ctl.handle_request(message)
-        return {"message":messages.RESULT, "result":result }
+        return result
+        #return {"message":messages.RESULT, "result":result }
 
 
     def run_task(self, funcname, args, kwargs):

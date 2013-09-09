@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from servicebus.lib.comm import send_and_receive
+from servicebus.lib.comm import send_and_receive_response
 from servicebus import exceptions
 from servicebus.lib import LOG
 from servicebus.protocol import messages
@@ -51,7 +51,9 @@ class ControlTasks(object):
             # delivered to wrong host, then we drop message
             raise ServiceBusException("Message redirection fail")
         message['redirected'] = True
-        return send_and_receive(self.__context, addr, message, settings.SYNC_REPLY_TIMEOUT)
+        result = send_and_receive_response(self.__context, addr, message, settings.SYNC_REPLY_TIMEOUT)
+        print ">>>>>>",result,"\nredirected"
+        return result
 
     def handle_request(self, message):
         """
@@ -74,13 +76,16 @@ class ControlTasks(object):
         if not 'kwargs' in message:
             message['kwargs'] = {}
 
-        # call internal function
         try:
+            # call internal function
             result = func(*message['args'], **message['kwargs'])
+
         except RedirectRequiredToIP as e:
+            # redirect to IP
             addr = self.ip_to_zmq_addr(e.remote_ip)
             return self.redirect(addr, message)
         except RedirectRequiredToAddr as e:
+            # redirect to address
             return self.redirect(e.remote_addr, message)
 
         return result

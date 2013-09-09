@@ -7,8 +7,9 @@ from gevent_zeromq import zmq
 import gevent
 #from syncclient import SyncClient
 from servicebus.protocol import serialize, deserialize, messages
+#from servicebus.exceptions import NotOurMessage, ReponseTimeout
 from servicebus.lib import LOG
-from servicebus.exceptions import NotOurMessage, ReponseTimeout
+from servicebus import exceptions
 import traceback,sys
 
 
@@ -42,8 +43,14 @@ class BaseLoop(object):
     def close(self):
         self.SOCK.close()
 
-    def register_message(self, message, func):
-        self._msgdb[message]=func
+    def register_message(self, message, func, raw_msg_response=False):
+        """
+            message - handled message type
+            func - handler function
+            raw_msg_response - True means that function returns complete message,
+                               False - result shoult be packed to message outside handler
+        """
+        self._msgdb[message]=(func, raw_msg_response)
 
     def loop(self):
         raise NotImplemented("loop method must be implemented when BaseLoop is inherited")
@@ -107,7 +114,7 @@ class RepLoop(BaseLoop):
             try:
                 msgdata = deserialize(msgdata)
 
-            except NotOurMessage:
+            except exceptions.NotOurMessage:
                 # not our servicebus message
                 self.SOCK.send(b"")
                 continue
@@ -126,7 +133,7 @@ class RepLoop(BaseLoop):
 
             # find handler
             try:
-                handler = self._msgdb[ msg ]
+                handler, rawmsg = self._msgdb[ msg ]
             except KeyError:
                 # unknown messages are ignored
                 self.send_noop()
@@ -162,8 +169,10 @@ class RepLoop(BaseLoop):
             # send result
             if result is None:
                 self.send_noop()
-            else:
+            elif rawmsg:
                 self.send(result)
+            else:
+                self.send( {"message":messages.RESULT, "result":result } )
 
 
 def send_and_receive(context, address, message, timeout=10):
@@ -177,30 +186,38 @@ def send_and_receive(context, address, message, timeout=10):
     SOCK.connect(address)
     SOCK.send( serialize(message) )
     try:
-        with gevent.Timeout(timeout, ReponseTimeout):
+        with gevent.Timeout(timeout, exceptions.ReponseTimeout):
             res = SOCK.recv()
-    except ReponseTimeout:
+    except exceptions.ReponseTimeout:
         SOCK.close()
-        raise ReponseTimeout("Response timeout")
+        raise exceptions.ReponseTimeout("Response timeout")
     res = deserialize(res)
     SOCK.close()
     return res
 
-
+#import sys
+#def f():
+#    sys.stdout.flush()
 def send_and_receive_response(context, address, message, timeout=10):
     """
     j.w. ale dekoduje wynik i go zwraca, lub rzuca otrzymany w wiadomości exception
     """
-    print ">>>", address
-    print message
-    print
+    #from pprint import pprint
+    #pprint(msg)
+    #print ">>>", address
+    #print message
+    #print
     msg = send_and_receive(context, address, message, timeout)
-    print
-    from pprint import pprint
-    pprint (msg)
+    #print
+    #pprint (msg)
+    #f()
     typ = msg['message']
-
     if typ==messages.RESULT:
+        #print "ZWROT WYNIKU"
+        #print "-"*60
+        #print msg['result']
+        #print "-"*60
+        #f()
         return msg['result']
 
     elif typ==messages.ERROR:

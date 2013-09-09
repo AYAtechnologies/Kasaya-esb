@@ -45,7 +45,7 @@ class SyncWorker(object):
         self.queries = RepLoop(self._connect_queries_loop, context=self.context)
         self.queries.register_message(messages.WORKER_LIVE, self.handle_worker_live)
         self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
-        self.queries.register_message(messages.QUERY, self.handle_name_query)
+        self.queries.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
         self.queries.register_message(messages.CTL_CALL, self.handle_local_control_request)
         # sync <--> sync communication
         self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
@@ -167,7 +167,8 @@ class SyncWorker(object):
         """
         result = self.ctl.handle_request(msg)
         #print ">>>>>>>>.", result
-        return {"message":messages.RESULT, "result":result }
+        return result
+        #return {"message":messages.RESULT, "result":result }
 
 
 
@@ -270,7 +271,8 @@ class SyncWorker(object):
         Control requests from remote hosts
         """
         result = self.ctl.handle_request(msg)
-        return {"message":messages.RESULT, "result":result }
+        return result
+        #return {"message":messages.RESULT, "result":result }
 
 
 
@@ -324,13 +326,14 @@ class SyncWorker(object):
         """
         ip,port = self.DB.worker_ip_port_by_uuid(uuid)
         self.redirect_or_exception_by_ip(ip)
-
+        # call worker for stats
         addr = _ip_port_to_worker_addr(ip,port)
         msg = {
             'message':messages.CTL_CALL,
             'method':['stats']
         }
         res = send_and_receive_response(self.context, addr, msg)
-        #print ">>>>>>>>>>..",res
+
+        print "RSULT\n",res,"\n<<<<<<<<<"
         return res
 
