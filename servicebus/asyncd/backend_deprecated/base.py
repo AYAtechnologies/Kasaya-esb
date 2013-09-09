@@ -6,7 +6,7 @@ class TaskNotFound(Exception):
 
 
 
-class BackendBase(object):
+class AsyncBackendBase(object):
     """
     Class which is the interface for all queue backends.
     It lists all methods which need to be implemented.

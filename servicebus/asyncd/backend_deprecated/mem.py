@@ -4,10 +4,10 @@ __author__ = 'wektor'
 import datetime
 import uuid
 
-from servicebus.asyncd.backend.base import BackendBase, TaskNotFound
+from servicebus.asyncd.backend.base import AsyncBackendBase, TaskNotFound
 
 
-class MemoryBackend(BackendBase):
+class MemoryAsyncBackend(AsyncBackendBase):
     store = {}
 
     def __init__(self, uuid):

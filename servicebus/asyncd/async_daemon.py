@@ -7,10 +7,10 @@ esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append( esbpath )
 
 from servicebus.conf import settings
-from servicebus.asyncd.backend import get_backend_class
 from servicebus.worker import Daemon
 from servicebus.protocol import messages
-from servicebus.client.task_caller import execute_sync_task, find_worker
+from servicebus.client.proxies import SyncProxy
+from servicebus.asyncd.async_backend import AsyncBackend
 
 from gevent import *
 from gevent.coros import Semaphore
@@ -20,8 +20,7 @@ class AsyncDeamon(Daemon):
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
         self.loop.register_message(messages.SYSTEM_CALL, self.handle_async_call)
-        backend = get_backend_class(settings.ASYNC_DAEMON_DB_BACKEND)
-        self.backend = backend(self.uuid)
+        self.backend = AsyncBackend("name")
         self.greenlets_semaphore = Semaphore()
         self.greenlets = {}
         self.pool = Pool(size=settings.WORKER_POOL_SIZE)
@@ -46,7 +45,7 @@ class AsyncDeamon(Daemon):
         else:
             self.backend.set_result_fail(task_id, "error", greenlet.exception)
             # ponawiać ?
-        #print self.backend.store
+        #print self.backend.backend
 
     def sanitize_loose_task(self, task_id):
         task = self.backend.get_task(task_id)
@@ -58,9 +57,11 @@ class AsyncDeamon(Daemon):
             print "TASK ERROR:", task
 
     def execute_task(self, task_id, method, context, args, kwargs):
-        worker = find_worker(method)
+        s = SyncProxy()
+        s.initialize(method, context)
+        worker = s.addr
         self.backend.start_execution(task_id, worker)
-        return execute_sync_task(method, context, args, kwargs)
+        return s(*args, **kwargs)
 
     def start_greenlet(self, g, task_id):
         self.greenlets_semaphore.acquire()
