@@ -2,7 +2,7 @@ __author__ = 'wektor'
 
 
 class GenericBackend(object):
-    
+
     def set(self, key, value):
         raise NotImplemented
 

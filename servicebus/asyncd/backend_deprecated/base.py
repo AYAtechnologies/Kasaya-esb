@@ -1,8 +1,7 @@
 __author__ = 'wektor'
 
 
-class TaskNotFound(Exception):
-    pass
+
 
 
 

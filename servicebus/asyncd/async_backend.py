@@ -3,14 +3,13 @@ __author__ = 'wektor'
 import uuid
 import datetime
 
-from servicebus.asyncd.backend.base import AsyncBackendBase, TaskNotFound
+
 from servicebus.backend import get_backend_class
 from servicebus.conf import settings
 
-
 Backend = get_backend_class(settings.ASYNC_DAEMON_DB_BACKEND)
 
-class AsyncBackend(AsyncBackendBase):
+class AsyncBackend(object):
     TASK_LINK = "t:" # link to current state of the task
     TASK_WAITING = "w:"
     TASK_IN_PROGRESS = "p:"
@@ -107,3 +106,7 @@ class AsyncBackend(AsyncBackendBase):
 
     def set_result_fail(self, task_id, error_code, error):
         self.finish_task(task_id, error_code, repr(error))
+
+
+class TaskNotFound(Exception):
+    pass
