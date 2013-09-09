@@ -52,7 +52,10 @@ class AsyncBackend(object):
 
     def setadd(self, key, set_item):
         task_set = self.backend.get(key)
-        task_set[set_item] = 1
+        try:
+            task_set[set_item] = 1
+        except:
+            task_set = {set_item:1}
         self.backend.set(key, task_set)
 
     def setrem(self, key, set_item):
@@ -85,7 +88,7 @@ class AsyncBackend(object):
             try:
                 task = self.backend.get(self.TASK_COMPLETE +task_id)
                 return task["result_type"], task["result"]
-            except KeyError:
+            except:
                 return "in_progress", None
         except KeyError:
             raise TaskNotFound

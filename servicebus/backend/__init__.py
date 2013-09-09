@@ -8,4 +8,7 @@ def get_backend_class(name):
     elif name=="redis":
         from redisstore import RedisBackend
         return RedisBackend
+    elif name=="riak":
+        from riakstore import RiakBackend
+        return RiakBackend
     raise Exception("Unknown backend [%s]" % str(name) )
