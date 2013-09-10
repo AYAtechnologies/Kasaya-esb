@@ -10,7 +10,7 @@ from servicebus.protocol import serialize, deserialize, messages
 #from servicebus.exceptions import NotOurMessage, ReponseTimeout
 from servicebus.lib import LOG
 from servicebus import exceptions
-import traceback,sys
+import traceback, sys
 
 
 
@@ -145,31 +145,23 @@ class RepLoop(BaseLoop):
             try:
                 result = handler(msgdata)
             except Exception as e:
-                # log exception details
-                excname = e.__class__.__name__
-                # traceback
-                tback = traceback.format_exc()
-                try:
-                    tback = unicode(tback, "utf-8")
-                except:
-                    tback = repr(tback)
-                # error message
-                errmsg = e.message
-                try:
-                    errmsg = unicode(errmsg, "utf-8")
-                except:
-                    errmsg = repr(errmsg)
-                # log & clean
-                LOG.error("Exception [%s] when processing message [%s]. Message: %s." % (excname, msg, errmsg) )
+                result = exception_serialize(e, False)
+                #print "HERE I AM"
+                LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
                 LOG.debug("Message dump: %s" % repr(msgdata) )
-                LOG.debug(tback)
-                del excname, tback, errmsg
-                result = None
+                LOG.debug(result['traceback'])
+                self.send(result)
+                continue
 
-            # send result
+            # it no result, return nothing
             if result is None:
                 self.send_noop()
-            elif rawmsg:
+                continue
+
+            # send result
+            if rawmsg:
+                #print "RAW RESULT"
+                #print ">>>",result
                 self.send(result)
             else:
                 self.send( {"message":messages.RESULT, "result":result } )
@@ -185,12 +177,19 @@ def send_and_receive(context, address, message, timeout=10):
     SOCK = context.socket(zmq.REQ)
     SOCK.connect(address)
     SOCK.send( serialize(message) )
-    try:
-        with gevent.Timeout(timeout, exceptions.ReponseTimeout):
-            res = SOCK.recv()
-    except exceptions.ReponseTimeout:
-        SOCK.close()
-        raise exceptions.ReponseTimeout("Response timeout")
+    if timeout is None:
+        # don't use timeout
+        # it's dangerous, can lock client permanently
+        # if sender die before sending any response
+        res = SOCK.recv()
+    else:
+        # throw exception after timeout and close socket
+        try:
+            with gevent.Timeout(timeout, exceptions.ReponseTimeout):
+                res = SOCK.recv()
+        except exceptions.ReponseTimeout:
+            SOCK.close()
+            raise exceptions.ReponseTimeout("Response timeout")
     res = deserialize(res)
     SOCK.close()
     return res
@@ -200,26 +199,92 @@ def send_and_receive_response(context, address, message, timeout=10):
     """
     j.w. ale dekoduje wynik i go zwraca, lub rzuca otrzymany w wiadomości exception
     """
-    msg = send_and_receive(context, address, message, timeout)
-    typ = msg['message']
+    result = send_and_receive(context, address, message, timeout)
+    typ = result['message']
     if typ==messages.RESULT:
-        return msg['result']
+        return result['result']
 
     elif typ==messages.ERROR:
-        if msg['internal']:
-            # internal service bus exception
-            e = exceptions.ServiceBusException(msg['info'])
-        else:
-            # exception task
-            e = Exception(msg['info'])
-        # copy exception internals
-        try:
-            e.traceback = msg['traceback']
-        except AttributeError:
-            pass
-        # fire in the hole!
+        #print "ERROR RESPONSE"
+        #print message
+        e = exception_deserialize(result)
+        if e is None:
+            raise exceptions.MessageCorrupted()
         raise e
-
     else:
-        raise exceptions.ServiceBusException("Wrong message received")
+        raise exceptions.ServiceBusException("Wrong message type received")
 
+
+
+def exception_serialize(exc, internal=None):
+    """
+    Serialize exception object into message
+    """
+    # try to extract traceback
+    tb = traceback.format_exc()
+    if not type(tb)==unicode:
+        try:
+            tb = unicode(tb,"utf-8")
+        except:
+            tb = repr(tb)
+    # error message
+    errmsg = exc.message
+    try:
+        errmsg = unicode(errmsg, "utf-8")
+    except:
+        errmsg = repr(errmsg)
+
+    if internal is None:
+        # try to guess if exception is servicebus internal internal,
+        # or client code external exception
+        internal = isinstance(exc, exceptions.ServiceBusException)
+
+    return {
+        "message" : messages.ERROR,
+        "name" : exc.__class__.__name__,
+        "description" : errmsg,
+        "internal" : internal,
+        "traceback" : tb,
+    }
+
+
+
+def exception_serialize_internal(description):
+    """
+    Simple internal errors serializer
+    """
+    return {
+        "message" : messages.ERROR,
+        "description" : description,
+        "internal" : True,
+    }
+
+
+
+def exception_deserialize(msg):
+    """
+    Deserialize exception from message into exception object which can be raised.
+    #If message doesn't contains exception, then result will be None.
+    """
+    #print "!"*10
+    #print msg
+    #if msg['message']!=messages.ERROR:
+    #    return None
+    if msg['internal']:
+        e = ServiceBusException(msg['description'])
+    else:
+        e = Exception(msg['description'])
+
+    try:
+        e.name = msg['name']
+    except KeyError:
+        e.name = "Exception"
+
+    try:
+        tb = msg['traceback']
+    except KeyError:
+        tb = None
+    if not tb is None:
+        e.traceback = tb
+
+    return e

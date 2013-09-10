@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from servicebus.conf import settings
 from servicebus.lib.binder import bind_socket_to_port_range
 from servicebus.protocol import messages
-from servicebus.lib.comm import RepLoop, send_and_receive
+from servicebus.lib.comm import RepLoop, send_and_receive, exception_serialize_internal, exception_serialize
 from servicebus.middleware.core import MiddlewareCore
 from servicebus.lib import LOG, system
 from worker_reg import worker_methods_db
@@ -133,6 +133,8 @@ class Daemon(MiddlewareCore):
 
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )
+
+        # TODO: Fix method finde because it's ugly
         # find task in worker db
         self_func = getattr(self, funcname, None)
         if self_func is not None and funcname in self.exposed_methods:
@@ -147,46 +149,23 @@ class Daemon(MiddlewareCore):
             except KeyError:
                 self._tasks_nonex += 1
                 LOG.info("Unknown worker task called [%s]" % funcname)
-                # we dont know this task
-                return {
-                    'message' : messages.ERROR,
-                    'internal' : True,  # internal service bus problem
-                    'info' : 'Method %s not found' % funcname,
-                }
+                return exception_serialize_internal( 'Method %s not found' % funcname )
 
         # try to run function and catch exceptions
         try:
             result = func(*args, **kwargs)
-        except Exception as e:
-            self._tasks_error += 1
-            excname = e.__class__.__name__
-            # error message
-            errmsg = e.message
-            try:
-                errmsg = unicode(errmsg, "utf-8")
-            except:
-                errmsg = repr(errmsg)
-            # traceback
-            tback = traceback.format_exc()
-            try:
-                tback = unicode(tback, "utf-8")
-            except:
-                tback = repr(tback)
-            LOG.info("Worker function [%s] exception [%s]. Message: %s" % (funcname, excname, errmsg) )
-            LOG.debug(tback)
+            return {
+                'message' : messages.RESULT,
+                'result' : result
+            }
 
-            msg = {
-                'message' : messages.ERROR,
-                'internal' : False, # means that error is not internal bus error
-                'traceback' : tback,
-                'info' : e.message,
-                }
-            return msg
-        # normal function return
-        return {
-            'message' : messages.RESULT,
-            'result' : result
-        }
+        except Exception as e:
+            # exception occured
+            self._tasks_error += 1
+            err = exception_serialize(e, internal=False)
+            LOG.info("Worker function [%s] exception [%s]. Message: %s" % (funcname, err['name'], err['description']) )
+            LOG.debug(err['traceback'])
+            return err
 
 
     # worker internal control tasks

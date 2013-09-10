@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from servicebus.protocol import serialize, deserialize, messages
+from servicebus.protocol import messages
 from servicebus.conf import settings
 from servicebus import exceptions
 from servicebus.lib.binder import get_bind_address
 from servicebus.lib.comm import RepLoop, send_and_receive_response
+from servicebus.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
 from servicebus.lib import LOG
 from datetime import datetime, timedelta
 from gevent_zeromq import zmq
 import gevent
 import random
-from pprint import pprint
+#from pprint import pprint
 
-from servicebus.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
 
 __all__=("SyncWorker",)
 
@@ -331,7 +331,5 @@ class SyncWorker(object):
             'method':['stats']
         }
         res = send_and_receive_response(self.context, addr, msg)
-
-        print "RSULT\n",res,"\n<<<<<<<<<"
         return res
 

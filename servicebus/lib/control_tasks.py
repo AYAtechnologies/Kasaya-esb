@@ -52,7 +52,6 @@ class ControlTasks(object):
             raise ServiceBusException("Message redirection fail")
         message['redirected'] = True
         result = send_and_receive_response(self.__context, addr, message, settings.SYNC_REPLY_TIMEOUT)
-        print ">>>>>>",result,"\nredirected"
         return result
 
     def handle_request(self, message):
