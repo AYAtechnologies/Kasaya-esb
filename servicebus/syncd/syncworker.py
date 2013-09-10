@@ -166,9 +166,7 @@ class SyncWorker(object):
         control requests from localhost
         """
         result = self.ctl.handle_request(msg)
-        #print ">>>>>>>>.", result
         return result
-        #return {"message":messages.RESULT, "result":result }
 
 
 

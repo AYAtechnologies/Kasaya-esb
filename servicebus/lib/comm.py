@@ -195,29 +195,14 @@ def send_and_receive(context, address, message, timeout=10):
     SOCK.close()
     return res
 
-#import sys
-#def f():
-#    sys.stdout.flush()
+
 def send_and_receive_response(context, address, message, timeout=10):
     """
     j.w. ale dekoduje wynik i go zwraca, lub rzuca otrzymany w wiadomości exception
     """
-    #from pprint import pprint
-    #pprint(msg)
-    #print ">>>", address
-    #print message
-    #print
     msg = send_and_receive(context, address, message, timeout)
-    #print
-    #pprint (msg)
-    #f()
     typ = msg['message']
     if typ==messages.RESULT:
-        #print "ZWROT WYNIKU"
-        #print "-"*60
-        #print msg['result']
-        #print "-"*60
-        #f()
         return msg['result']
 
     elif typ==messages.ERROR:
