@@ -46,7 +46,6 @@ def wyjebka(param):
 
 
 from servicebus.worker import Daemon
-import middleware.auth.worker as auth
 import middleware.logging.worker as logging
 
 if __name__=="__main__":

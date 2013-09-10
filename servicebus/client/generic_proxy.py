@@ -24,6 +24,11 @@ class GenericProxy(MiddlewareCore):
         self._context = []
         self._z_context = zmq.Context()
 
+    def initialize(self, method, context):
+        self._names = method
+        self._context = context
+        self.addr = self.find_worker(method)
+
     def __getattr__(self, itemname):
         if itemname.startswith("_"):
             return super(GenericProxy, self).__getattribute__(itemname)
@@ -31,7 +36,7 @@ class GenericProxy(MiddlewareCore):
         self._names.append(itemname)
         return self
 
-    def _find_worker(self, method):
+    def find_worker(self, method):
         srvce = method[0]
         msg = SyncDQuery.query( srvce )
         if not msg['message']==messages.WORKER_ADDR:
