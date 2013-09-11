@@ -47,35 +47,10 @@ class GenericProxy(MiddlewareCore):
         return addr
 
     def _send_message(self, addr, msg):
+        msg = self.prepare_message(msg) # _middleware hook
         res = send_and_receive_response(self._z_context, addr, msg, 30)
+        res = self.postprocess_message(res) # _middleware hook
         return res
-        #---------
-        #msg = self._send_request_to_worker(addr, msg)
-        #if msg['message']==messages.RESULT:
-        #    return msg['result']
-        #elif msg['message']==messages.ERROR:
-        #    # internal service bus error
-        #    if msg['internal']:
-        #        raise Exception(msg['info'])
-        #    # error during task execution
-        #    e = Exception(msg['info'])
-        #    e.traceback = msg['traceback']
-        #    raise e
-        #else:
-        #    raise Exception("Wrong worker response", str(msg))
-
-    #def _send_request_to_worker(self, target, msg):
-    #    msg = self.prepare_message(msg) # _middleware hook
-    #    if "context" not in msg:
-    #        msg["context"] = {}
-    #    REQUESTER = self._z_context.socket(zmq.REQ)
-    #    REQUESTER.connect(target)
-    #    REQUESTER.send(serialize(msg))
-    #    res = REQUESTER.recv()
-    #    res = deserialize(res)
-    #    REQUESTER.close()
-    #    res = self.postprocess_message(res) # _middleware hook
-    #    return res
 
     def __call__(self, *args, **kwargs):
         print "generic proxy", self._names

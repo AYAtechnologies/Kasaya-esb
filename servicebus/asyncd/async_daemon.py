@@ -7,7 +7,7 @@ esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append( esbpath )
 
 from servicebus.conf import settings
-from servicebus.worker import Daemon
+from servicebus.worker import WorkerDaemon
 from servicebus.protocol import messages
 from servicebus.client.proxies import SyncProxy
 from servicebus.asyncd.async_backend import AsyncBackend
@@ -16,7 +16,7 @@ from gevent import *
 from gevent.coros import Semaphore
 from gevent.pool import Pool
 
-class AsyncDeamon(Daemon):
+class AsyncDeamon(WorkerDaemon):
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
         self.loop.register_message(messages.SYSTEM_CALL, self.handle_async_call)

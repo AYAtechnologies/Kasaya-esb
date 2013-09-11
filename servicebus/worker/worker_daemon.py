@@ -23,7 +23,7 @@ __all__=("WorkerDaemon",)
 #gevent.monkey.patch_all()
 
 
-class Daemon(MiddlewareCore):
+class WorkerDaemon(MiddlewareCore):
 
     def __init__(self, servicename):
         self.uuid = str(uuid.uuid4())

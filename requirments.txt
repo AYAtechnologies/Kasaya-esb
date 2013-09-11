@@ -1,15 +1,17 @@
 # to musiałem apt-getem zainstalować na czystym ubuntu żeby odpalić system
 
-libzmq-dev
-cython
-libevent-dev
-g++
-python-dev
+#libzmq-dev
+#cython
+#libevent-dev
+#g++
+#python-dev
 
-#a to pipem
+# a to pipem
 netifaces
 zerorpc
 gevent-zeromq
 gevent
 plac
 pycrypto
+msgpack-python
+

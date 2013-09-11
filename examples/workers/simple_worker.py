@@ -40,11 +40,11 @@ def wyjebka(param):
     return param / 0
 
 
-from servicebus.worker import Daemon
+from servicebus.worker import WorkerDaemon
 
 if __name__=="__main__":
     load_config_from_file("../../config.txt")
-    daemon = Daemon("fikumiku")
+    daemon = WorkerDaemon("fikumiku")
     daemon.run()
 
 
