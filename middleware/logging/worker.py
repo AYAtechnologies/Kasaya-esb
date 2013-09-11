@@ -1,5 +1,5 @@
 __author__ = 'wektor'
-from servicebus.client import sync, async, register_auth_processor, async_result, busctl
+from servicebus.client import sync, async, async_result, control
 from servicebus.middleware.worker import MiddlewareBaseWorker
 
 class WorkerMiddleware(MiddlewareBaseWorker):

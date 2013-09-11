@@ -6,6 +6,8 @@ from gevent import socket
 from gevent_zeromq import zmq
 from servicebus.protocol import serialize, deserialize, messages
 from servicebus.lib import LOG
+from servicebus.exceptions import NotOurMessage
+import traceback
 
 
 class UDPLoop(object):
@@ -41,6 +43,8 @@ class UDPLoop(object):
             # deserialize
             try:
                 msgdata = deserialize(msgdata)
+            except NotOurMessage:
+                continue
             except Exception:
                 LOG.warning("Message from broadcast deserialisation error")
                 LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % msgdata[:1024].encode("hex"))
@@ -91,17 +95,17 @@ class UDPBroadcast(UDPLoop):
     def __init__(self, server):
         self.SRV = server
         super(UDPBroadcast, self).__init__()
-        self.register_message(messages.WORKER_JOIN, self.handle_worker_join)
+        self.register_message(messages.WORKER_LIVE, self.handle_worker_join)
         self.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
         self.register_message(messages.HOST_JOIN, self.handle_host_join)
         self.register_message(messages.HOST_LEAVE, self.handle_host_leave)
 
 
     def handle_worker_join(self, msgdata):
-        self.SRV.WORKER.worker_start(msgdata['service'], msgdata['addr'], False )
+        self.SRV.WORKER.worker_start(msgdata['uuid'], msgdata['service'], msgdata['ip'], msgdata['port'], False )
 
     def handle_worker_leave(self, msgdata):
-        self.SRV.WORKER.worker_stop(msgdata['addr'], False )
+        self.SRV.WORKER.worker_stop(msgdata['ip'], msgdata['port'], False )
 
     def handle_host_join(self, msgdata):
         self.SRV.notify_syncd_start(msgdata['uuid'], msgdata['hostname'], msgdata['addr'])
@@ -124,24 +128,27 @@ class UDPBroadcast(UDPLoop):
 
     # broadcast specific messages
 
-    def send_worker_start(self, service, address):
+    def send_worker_live(self, uuid, service, ip,port):
         """
         Send information to other hosts about new worker
         """
         msg = {
-            "message" : messages.WORKER_JOIN,
-            "addr" : address,
+            "message" : messages.WORKER_LIVE,
+            "uuid" : uuid,
+            "ip" : ip,
+            "port": port,
             "service" : service,
             }
         self.broadcast_message(msg)
 
-    def send_worker_stop(self, address):
+    def send_worker_stop(self, ip,port):
         """
         Send information to other hosts about shutting down worker
         """
         msg = {
             "message" : messages.WORKER_LEAVE,
-            "addr" : address,
+            "ip" : ip,
+            "port": port,
             }
         self.broadcast_message(msg)
 

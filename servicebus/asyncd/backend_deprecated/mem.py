@@ -1,10 +1,13 @@
 #coding: utf-8
 __author__ = 'wektor'
 
-import datetime, uuid
-from base import BackendBase, TaskNotFound
+import datetime
+import uuid
 
-class MemoryBackend(BackendBase):
+from servicebus.asyncd.backend.base import AsyncBackendBase, TaskNotFound
+
+
+class MemoryAsyncBackend(AsyncBackendBase):
     store = {}
 
     def __init__(self, uuid):

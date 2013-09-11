@@ -5,6 +5,13 @@ from __future__ import unicode_literals
 class ServiceBusException(Exception):
     pass
 
+
+class NotOurMessage(ServiceBusException):
+    pass
+
+class ReponseTimeout(ServiceBusException):
+    pass
+
 class MessageCorrupted(ServiceBusException):
     """
     Nadchodzączy komunikat jest uszkodzony, lub rozszyfrowanie się nie powiodło.
@@ -38,3 +45,8 @@ class ServiceNotFound(ServiceBusException):
     pass
 
 
+class MethodNotFound(ServiceBusException):
+    """
+    Żądana funkcja nie istnieje w tym serwisie
+    """
+    pass

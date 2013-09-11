@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+#coding: utf-8
+from __future__ import unicode_literals, print_function
+from servicebus.client import control
+from servicebus.conf import load_config_from_file
+import plac
+from pprint import pprint
+
+
+class Jobs(object):
+    commands = ['list', 'stop', 'stats']
+
+
+    def __init__(self):
+        load_config_from_file("config.txt")
+
+
+    @plac.annotations(
+        u=("Show UUID identifiers", "flag")
+    )
+    def list(self, u=False):
+        """
+        List all hosts and workers running in service bus
+        """
+        hostline   = "  {service: >{ws}}  {addr: <{wa}} (hostname: {hostname})"
+        workerline = "  {service: >{ws}}  on port: {port}"
+        if u:
+            hostline   += "   uuid:{uuid}"
+            workerline += "   uuid:{uuid}"
+
+        # all hosts in network
+        hosts = control.host.list()
+
+        # maximum length of names
+        whst, wadr, wsvc = 5,0,0
+        for h in hosts:
+            whst = max(whst, len(h['hostname']) )
+            wadr = max(wadr, len(h['addr']) )
+            for s in h['services']:
+                wsvc = max(wsvc, len(s['service']) )
+
+        # report
+        hcnt, wcnt = 0,0
+        for h in hosts:
+            hcnt += 1
+            print ( hostline.format(wh=whst, wa=wadr, ws=wsvc, service="SYNCD", **h) )
+
+            for w in h['services']:
+                wcnt += 1
+                print ( workerline.format(ws=wsvc, **w) )
+            print ()
+        print ("Total number of hosts: {0}, workers: {1}".format(hcnt, wcnt) )
+
+
+
+    @plac.annotations(
+        uuid=("UUID of worker to stop")
+    )
+    def stop(self, uuid):
+        """
+        Send stop signal to worker with specified uuid. If worker is currently
+        processing task, worker will stop after finishing current job.
+        """
+        control.worker.stop(uuid)
+
+
+    @plac.annotations(
+        uuid=("UUID of worker to stop")
+    )
+    def stats(self, uuid):
+        """
+        Send stop signal to worker with specified uuid. If worker is currently
+        processing task, worker will stop after finishing current job.
+        """
+        res = control.worker.stats(uuid)
+        if res is None:
+            print ("Worker not found (uuid: %s)" % uuid)
+            return
+
+        ln = "{0:>26}: {1}"
+        addr = "%s:%i" % (res['ip'], res['port'])
+        print ( ln.format("address", addr) )
+        #print (ln.format("NAME",res['service']))
+        print ( ln.format("used memory", "{:,} KB".format(res['mem_total'])) )
+        ttot = res['task_err'] + res['task_ctl'] + res['task_succ']
+        print ( ln.format("total processed tasks", ttot) )
+        print ( ln.format("successfull tasks", res['task_succ']) )
+        print ( ln.format("error tasks", res['task_err']) )
+        print ( ln.format("control tasks", res['task_ctl']) )
+        print ( ln.format("non existing method calls", res['task_nonx']) )
+
+
+
+
+if __name__=="__main__":
+    plac.call( Jobs() )

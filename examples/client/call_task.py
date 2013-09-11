@@ -8,7 +8,7 @@ sys.path.append( esbpath )
 
 
 from servicebus import client, conf
-from servicebus.client import sync, async, register_auth_processor, async_result, busctl
+from servicebus.client import sync, async, async_result, control, trans
 
 if __name__=="__main__":
     conf.load_config_from_file("../../config.txt")
@@ -24,13 +24,18 @@ if __name__=="__main__":
 
     # wywołanie asynchroniczne,
     # user o nazwie "stefan"
-    print "async"
-    tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False)
-    print async_result(tid, "stefan")
-    print sync("stefan").async_daemon.get_result(tid)
+    #print "async"
+    #tid = async("stefan").fikumiku.do_work("trololo", 3, foo=567, baz=False)
+    #print async_result(tid, "stefan")
+    #print sync("stefan").async_daemon.get_result(tid)
 
-    busctl.jajo()
+    with trans(("dupa","jasiu")) as t:
+        t.fikumiku.do_work("parameter", 2, foo=456, baz=True)
+        t.fikumiku.another_task("important parameter")
+
+    #sync.fikumiku.waligora("123")
     sync.fikumiku.wyjebka(234)
+
     #with async("zyga") as A:
     #    A.fikumiku.wyjebka(234)
 

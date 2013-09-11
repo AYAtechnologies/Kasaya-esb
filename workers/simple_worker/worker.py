@@ -39,21 +39,17 @@ def long_task(a, x):
     time.sleep(float(a))
     return "hurra " + str(x)
 
-
 @Task(name="wyjebka")
 def wyjebka(param):
     return param / 0
 
 
 from servicebus.worker import Daemon
-import middleware.logging.worker as logging
 
 if __name__=="__main__":
-    load_config_from_file("../config.txt")
-    demon = Daemon("fikumiku")
-    demon.middleware_classes = [ logging.WorkerMiddleware]
-    demon.run()
-
+    load_config_from_file("../../config.txt")
+    daemon = Daemon("fikumiku")
+    daemon.run()
 
 
 
