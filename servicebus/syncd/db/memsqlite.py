@@ -16,7 +16,7 @@ class MemoryDB(BaseDB):
         self.__db = SQ.connect(":memory:")
         self.cur=self.__db.cursor()
         self.cur.execute("CREATE TABLE hosts (uuid TEXT, hostname TEXT, addr TEXT)")
-        self.cur.execute("CREATE TABLE workers (uuid TEXT, service TEXT, ip TEXT, port INT, local INT)")
+        self.cur.execute("CREATE TABLE workers (uuid TEXT, service TEXT, ip TEXT, port INT, pid INT, local INT)")
         self.SEMA = Semaphore()
 
     def close(self):
@@ -24,7 +24,7 @@ class MemoryDB(BaseDB):
 
 
 
-    def worker_register(self, worker_uuid, service_name, ip,port, localservice):
+    def worker_register(self, worker_uuid, service_name, ip,port, pid, localservice):
         """
         Zarejestrowanie workera w bazie.
           name - nazwa serwisu
@@ -54,8 +54,8 @@ class MemoryDB(BaseDB):
         # dodanie nowego workera do bazy
         self.SEMA.acquire()
         self.cur.execute(
-            "INSERT INTO workers ('uuid','ip','port', 'service','local') VALUES (?,?,?,?,?)",
-            (worker_uuid, ip,port, service_name, localservice))
+            "INSERT INTO workers ('uuid','ip','port', 'service','pid', 'local') VALUES (?,?,?,?,?,?)",
+            (worker_uuid, ip,port, service_name, pid, localservice))
         self.__db.commit()
         self.SEMA.release()
         return True
@@ -105,7 +105,7 @@ class MemoryDB(BaseDB):
         """
         self.SEMA.acquire()
         self.cur.execute(
-            "SELECT uuid,service,ip,port FROM workers WHERE local=?",
+            "SELECT uuid,service,ip,port,pid FROM workers WHERE local=?",
             [True] )
         lst = self.cur.fetchall()
         self.SEMA.release()
@@ -181,7 +181,7 @@ class MemoryDB(BaseDB):
         if addr==None:
             return []
         self.SEMA.acquire()
-        self.cur.execute( "SELECT uuid, service, ip, port FROM workers WHERE ip=?", (addr,) )
+        self.cur.execute( "SELECT uuid, service, ip, port, pid FROM workers WHERE ip=?", (addr,) )
         lst = self.cur.fetchall()
         self.SEMA.release()
         return lst
@@ -198,15 +198,17 @@ class MemoryDB(BaseDB):
         if not host is None:
             return host[0]
 
-    def worker_ip_port_by_uuid(self, uuid):
+    def worker_ip_port_by_uuid(self, uuid, pid=False):
         """
         zwraca ip i port workera o podanym uuid
         """
         self.SEMA.acquire()
-        self.cur.execute( "SELECT ip,port FROM workers WHERE uuid=? ORDER BY port", (uuid,) )
+        self.cur.execute( "SELECT ip,port,pid FROM workers WHERE uuid=?", (uuid,) )
         wrk = self.cur.fetchone()
         self.SEMA.release()
         if wrk is None:
             return None, None
         else:
+            if pid:
+                return wrk[0], wrk[1], wrk[2]
             return wrk[0], wrk[1]

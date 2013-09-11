@@ -26,7 +26,7 @@ class Jobs(object):
         workerline = "  {service: >{ws}}  on port: {port}"
         if u:
             hostline   += "   uuid:{uuid}"
-            workerline += "   uuid:{uuid}"
+            workerline += "   uuid:{uuid} pid:{pid}"
 
         # all hosts in network
         hosts = control.host.list()
@@ -54,14 +54,16 @@ class Jobs(object):
 
 
     @plac.annotations(
-        uuid=("UUID of worker to stop")
+        uuid=("UUID of worker to stop"),
+        terminate=("Use pid rather then uuid", "flag"),
+        sigkill=("Send SIGKILL (if everything else fails)", "flag")
     )
-    def stop(self, uuid):
+    def stop(self, uuid, terminate=False, sigkill=False):
         """
         Send stop signal to worker with specified uuid. If worker is currently
         processing task, worker will stop after finishing current job.
         """
-        control.worker.stop(uuid)
+        control.worker.stop(uuid, terminate, sigkill)
 
 
     @plac.annotations(

@@ -15,7 +15,7 @@ class SyncClient(object):
     SyncClient jest używany do komunikacji workera z lokalnym serverem syncd.
     """
 
-    def __init__(self, servicename, ip, port, uuid):
+    def __init__(self, servicename, ip, port, uuid, pid):
         self.srvname = servicename
         self.__addr = ip
         self.__port = port
@@ -24,7 +24,8 @@ class SyncClient(object):
             "addr" : ip,
             "port" : port,
             "uuid" : uuid,
-            "service" : servicename
+            "service" : servicename,
+            "pid": pid
         }
         # connect to zmq
         self.connect()
