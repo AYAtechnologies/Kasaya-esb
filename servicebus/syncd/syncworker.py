@@ -226,9 +226,9 @@ class SyncWorker(object):
         Send to all local workers request for registering in network.
         Its used after new host start.
         """
-        for uuid, service, ip, port in self.DB.get_local_workers():
+        for uuid, service, ip, port, pid in self.DB.get_local_workers():
             gevent.sleep(0.4)
-            self.BC.send_worker_live(uuid, service, ip,port)
+            self.BC.send_worker_live(uuid, service, ip,port, pid)
 
 
     # heartbeat

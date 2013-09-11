@@ -105,7 +105,7 @@ class MemoryDB(BaseDB):
         """
         self.SEMA.acquire()
         self.cur.execute(
-            "SELECT uuid,service,ip,port FROM workers WHERE local=?",
+            "SELECT uuid,service,ip,port,pid FROM workers WHERE local=?",
             [True] )
         lst = self.cur.fetchall()
         self.SEMA.release()

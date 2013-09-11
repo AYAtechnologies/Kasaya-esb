@@ -34,7 +34,7 @@ if __name__=="__main__":
         t.fikumiku.another_task("important parameter")
 
     #sync.fikumiku.waligora("123")
-    sync.fikumiku.wyjebka(234)
+    #sync.fikumiku.wyjebka(234)
 
     #with async("zyga") as A:
     #    A.fikumiku.wyjebka(234)

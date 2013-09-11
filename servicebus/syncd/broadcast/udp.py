@@ -102,7 +102,7 @@ class UDPBroadcast(UDPLoop):
 
 
     def handle_worker_join(self, msgdata):
-        self.SRV.WORKER.worker_start(msgdata['uuid'], msgdata['service'], msgdata['ip'], msgdata['port'], False )
+        self.SRV.WORKER.worker_start(msgdata['uuid'], msgdata['service'], msgdata['ip'], msgdata['port'], msgdata['pid'], False )
 
     def handle_worker_leave(self, msgdata):
         self.SRV.WORKER.worker_stop(msgdata['ip'], msgdata['port'], False )
