@@ -16,6 +16,7 @@ import datetime
 import gevent
 import uuid
 import inspect
+import os
 
 __all__=("WorkerDaemon",)
 
@@ -31,7 +32,7 @@ class Daemon(MiddlewareCore):
         LOG.info("Starting worker daemon, service [%s], uuid: [%s]" % (self.servicename, self.uuid) )
         self.loop = RepLoop(self.connect)
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
-        self.SYNC = SyncClient(servicename, self.loop.ip, self.loop.port, self.uuid)
+        self.SYNC = SyncClient(servicename, self.loop.ip, self.loop.port, self.uuid, os.getpid())
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call, raw_msg_response=True )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )

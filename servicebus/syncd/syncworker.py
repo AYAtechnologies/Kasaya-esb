@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from gevent_zeromq import zmq
 import gevent
 import random
+from signal import SIGKILL, SIGTERM
+from os import kill
 #from pprint import pprint
 
 
@@ -116,19 +118,20 @@ class SyncWorker(object):
         ip = msg['addr']
         port = msg['port']
         svce = msg['service']
+        pid = msg['pid']
         addr = ip+"."+str(port)
         try:
             png = self.__pingdb[addr]
         except KeyError:
             # service is already unknown
-            self.worker_start(uuid, svce, ip, port, True)
+            self.worker_start(uuid, svce, ip, port, pid, True)
             return
 
         if png['s']!=svce:
             # different service under same address!
             LOG.error("Service [%s] expected on address [%s], but [%s] appeared. Removing old, registering new." % (png['s'], addr, svce))
             self.worker_stop(ip, port, True)
-            self.worker_start(uuid, svce, ip, port, True)
+            self.worker_start(uuid, svce, ip, port, pid, True)
             return
 
         # update heartbeats
@@ -173,11 +176,11 @@ class SyncWorker(object):
     # worker state changes
     # ------------------------------
 
-    def worker_start(self, uuid, service, ip, port, local):
+    def worker_start(self, uuid, service, ip, port, pid, local):
         """
         Handle joining to network by worker (local or blobal)
         """
-        succ = self.DB.worker_register(uuid, service, ip,port, local)
+        succ = self.DB.worker_register(uuid, service, ip,port, pid, local)
         addr = ip+":"+str(port)
         if succ:
             if local:
@@ -193,7 +196,7 @@ class SyncWorker(object):
 
         # rozesłanie informacji w sieci jeśli nastąpi lokalna zmiana stanu
         if succ and local:
-            self.BC.send_worker_live(uuid, service, ip,port)
+            self.BC.send_worker_live(uuid, service, ip,port, pid)
 
 
     def worker_stop(self, ip, port, local):
@@ -296,26 +299,34 @@ class SyncWorker(object):
         List of all workers on host
         """
         lst = []
-        for u,s,i,p in self.DB.workers_on_host(uuid):
-            res = {'uuid':u, 'service':s, 'ip':i, 'port':p}
+        for u,s,i,p, pi in self.DB.workers_on_host(uuid):
+            res = {'uuid':u, 'service':s, 'ip':i, 'port':p, 'pid': pi}
             lst.append(res)
         return lst
 
 
-    def CTL_worker_stop(self, uuid):
+    def CTL_worker_stop(self, uuid, terminate=False, sigkill=False):
         """
         Send stop signal to worker
         """
-        ip,port = self.DB.worker_ip_port_by_uuid(uuid)
+        ip,port,pid = self.DB.worker_ip_port_by_uuid(uuid, pid=True)
         self.redirect_or_exception_by_ip(ip)
 
-        addr = _ip_port_to_worker_addr(ip,port)
-        msg = {
-            'message':messages.CTL_CALL,
-            'method':['stop']
-        }
-        res = send_and_receive_response(self.context, addr, msg)
-        return res
+        if terminate:
+            signal = SIGTERM
+            if sigkill:
+                signal = SIGKILL
+
+            kill(pid, signal)
+            return True
+        else:
+            addr = _ip_port_to_worker_addr(ip,port)
+            msg = {
+                'message':messages.CTL_CALL,
+                'method':['stop']
+            }
+            res = send_and_receive_response(self.context, addr, msg)
+            return res
 
 
     def CTL_worker_stats(self, uuid):

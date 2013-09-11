@@ -128,7 +128,7 @@ class UDPBroadcast(UDPLoop):
 
     # broadcast specific messages
 
-    def send_worker_live(self, uuid, service, ip,port):
+    def send_worker_live(self, uuid, service, ip,port, pid):
         """
         Send information to other hosts about new worker
         """
@@ -138,6 +138,7 @@ class UDPBroadcast(UDPLoop):
             "ip" : ip,
             "port": port,
             "service" : service,
+            "pid": pid
             }
         self.broadcast_message(msg)
 
