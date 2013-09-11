@@ -79,7 +79,6 @@ class PullLoop(BaseLoop):
                 handler = self._msgdb[ msg ]
             except KeyError:
                 # unknown messages are ignored silently
-                #print "unknown message ", msg
                 continue
 
             # run handler
@@ -146,7 +145,6 @@ class RepLoop(BaseLoop):
                 result = handler(msgdata)
             except Exception as e:
                 result = exception_serialize(e, False)
-                #print "HERE I AM"
                 LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
                 LOG.debug("Message dump: %s" % repr(msgdata) )
                 LOG.debug(result['traceback'])
@@ -160,8 +158,6 @@ class RepLoop(BaseLoop):
 
             # send result
             if rawmsg:
-                #print "RAW RESULT"
-                #print ">>>",result
                 self.send(result)
             else:
                 self.send( {"message":messages.RESULT, "result":result } )
@@ -205,8 +201,6 @@ def send_and_receive_response(context, address, message, timeout=10):
         return result['result']
 
     elif typ==messages.ERROR:
-        #print "ERROR RESPONSE"
-        #print message
         e = exception_deserialize(result)
         if e is None:
             raise exceptions.MessageCorrupted()
@@ -266,25 +260,18 @@ def exception_deserialize(msg):
     Deserialize exception from message into exception object which can be raised.
     #If message doesn't contains exception, then result will be None.
     """
-    #print "!"*10
-    #print msg
-    #if msg['message']!=messages.ERROR:
-    #    return None
     if msg['internal']:
         e = ServiceBusException(msg['description'])
     else:
         e = Exception(msg['description'])
-
     try:
         e.name = msg['name']
     except KeyError:
         e.name = "Exception"
-
     try:
         tb = msg['traceback']
     except KeyError:
         tb = None
     if not tb is None:
         e.traceback = tb
-
     return e

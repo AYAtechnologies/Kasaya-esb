@@ -72,11 +72,9 @@ class Jobs(object):
         Send stop signal to worker with specified uuid. If worker is currently
         processing task, worker will stop after finishing current job.
         """
-        try:
-            res = control.worker.stats(uuid)
-            pprint (res)
-        except:
-            print ("Non existing worker or smth...")
+        res = control.worker.stats(uuid)
+        if res is None:
+            print ("Worker not found (uuid: %s)" % uuid)
             return
 
         ln = "{0:>26}: {1}"
@@ -90,10 +88,6 @@ class Jobs(object):
         print ( ln.format("error tasks", res['task_err']) )
         print ( ln.format("control tasks", res['task_ctl']) )
         print ( ln.format("non existing method calls", res['task_nonx']) )
-
-
-
-
 
 
 
