@@ -2,7 +2,7 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from kasaya.conf import settings
-from kasaya.servicebus.lib import LOG, system
+from kasaya.core.lib import LOG, system
 from syncworker import SyncWorker
 import gevent, uuid
 

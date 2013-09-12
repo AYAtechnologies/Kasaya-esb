@@ -4,9 +4,9 @@
 from kasaya.conf import settings
 from gevent import socket
 from gevent_zeromq import zmq
-from kasaya.servicebus.protocol import serialize, deserialize, messages
-from kasaya.servicebus.lib import LOG
-from kasaya.servicebus.exceptions import NotOurMessage
+from kasaya.core.protocol import serialize, deserialize, messages
+from kasaya.core.lib import LOG
+from kasaya.core.exceptions import NotOurMessage
 import traceback
 
 

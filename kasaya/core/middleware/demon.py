@@ -1,6 +1,6 @@
 __author__ = 'wektor'
-from servicebus.worker import Daemon
-from servicebus.middleware.core import MiddlewareCore
+from kasaya.worker import Daemon
+from kasaya.middleware.core import MiddlewareCore
 
 class MiddlewareDemon(Daemon):
     pass

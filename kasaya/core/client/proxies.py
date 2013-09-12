@@ -1,6 +1,6 @@
 #coding: utf-8
-from kasaya.servicebus.protocol import messages
-from kasaya.servicebus.client.queries import SyncDQuery
+from kasaya.core.protocol import messages
+from kasaya.core.client.queries import SyncDQuery
 from kasaya.conf import settings
 from generic_proxy import GenericProxy
 

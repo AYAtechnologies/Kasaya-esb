@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
 from kasaya.conf import load_config_from_file
-from kasaya.servicebus.worker.decorators import Task
+from kasaya.core.worker import Task
 
 import time
 
@@ -29,31 +29,16 @@ def long_task(a, x):
     time.sleep(float(a))
     return "hurra " + str(x)
 
-@Task(name="wyjebka")
-def wyjebka(param):
+@Task(name="wrong")
+def wrong_task(param):
     return param / 0
 
 
-from kasaya.servicebus.worker import WorkerDaemon
+from kasaya.core.worker import WorkerDaemon
 
 if __name__=="__main__":
     load_config_from_file("kasaya.conf")
-    daemon = WorkerDaemon("fikumiku")
+    daemon = WorkerDaemon("myservice")
     daemon.run()
-
-
-
-#from servicebus.worker.syncclient import SyncClient
-
-
-#try:
-#    import random
-#    addr = "1.2.3.4:"+str(random.randint(5000,6000))
-#    nsc = SyncClient("fikumiku", addr)
-#    nsc.notify_start()
-#    import time
-#    time.sleep(60)
-#finally:
-#    nsc.notify_stop()
 
 

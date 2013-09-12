@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals, print_function
-from kasaya.servicebus.client import control
+from kasaya.core.client import control
 from kasaya.conf import load_config_from_file
 import plac
-from pprint import pprint
+#from pprint import pprint
 
 
 class Jobs(object):

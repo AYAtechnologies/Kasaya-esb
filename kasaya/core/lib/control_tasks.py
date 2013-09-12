@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from kasaya.servicebus.lib.comm import send_and_receive_response
-from kasaya.servicebus import exceptions
-from kasaya.servicebus.lib import LOG
-from kasaya.servicebus.protocol import messages
+from kasaya.core.lib.comm import send_and_receive_response
+from kasaya.core import exceptions
+from kasaya.core.lib import LOG
+from kasaya.core.protocol import messages
 from kasaya.conf import settings
 
 

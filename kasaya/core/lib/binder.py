@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from zmq.core.error import ZMQError
 from kasaya.conf import settings
+from zmq.core.error import ZMQError
 import netifaces
 import socket, fcntl, struct, array
 

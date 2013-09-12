@@ -2,12 +2,12 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from kasaya.conf import settings
-from kasaya.servicebus.lib.binder import bind_socket_to_port_range
-from kasaya.servicebus.protocol import messages
-from kasaya.servicebus.lib.comm import RepLoop, send_and_receive, exception_serialize_internal, exception_serialize
-from kasaya.servicebus.middleware.core import MiddlewareCore
-from kasaya.servicebus.lib.control_tasks import ControlTasks
-from kasaya.servicebus.lib import LOG, system
+from kasaya.core.lib.binder import bind_socket_to_port_range
+from kasaya.core.protocol import messages
+from kasaya.core.lib.comm import RepLoop, send_and_receive, exception_serialize_internal, exception_serialize
+from kasaya.core.middleware.core import MiddlewareCore
+from kasaya.core.lib.control_tasks import ControlTasks
+from kasaya.core.lib import LOG, system
 from worker_reg import worker_methods_db
 from gevent_zeromq import zmq
 from syncclient import SyncClient

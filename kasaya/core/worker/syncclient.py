@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #coding: utf-8
 from kasaya.conf import settings
-from kasaya.servicebus.protocol import serialize, deserialize, messages
-from kasaya.servicebus.exceptions import ReponseTimeout
+from kasaya.core.protocol import serialize, deserialize, messages
+from kasaya.core.exceptions import ReponseTimeout
 from gevent_zeromq import zmq
 from gevent.coros import Semaphore
 import gevent

@@ -2,8 +2,9 @@
 #coding: utf-8
 from __future__ import unicode_literals
 
-from servicebus import client, conf
-from servicebus.client import sync, async, register_auth_processor, async_result, control
+from kasaya import conf
+from kasaya.core import client
+from kasaya.core.client import sync, async, register_auth_processor, async_result, control
 
 if __name__=="__main__":
     conf.load_config_from_file("kasaya.conf")

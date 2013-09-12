@@ -3,9 +3,9 @@
 from __future__ import unicode_literals
 from gevent_zeromq import zmq
 import gevent
-from kasaya.servicebus.protocol import serialize, deserialize, messages
-from kasaya.servicebus.lib import LOG
-from kasaya.servicebus import exceptions
+from kasaya.core.protocol import serialize, deserialize, messages
+from kasaya.core.lib import LOG
+from kasaya.core import exceptions
 import traceback, sys
 
 

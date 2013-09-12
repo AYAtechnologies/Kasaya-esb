@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from kasaya.servicebus.middleware.core import MiddlewareCore
-from kasaya.servicebus.protocol import messages, serialize, deserialize
-from kasaya.servicebus.client.queries import SyncDQuery
-from kasaya.servicebus.lib.comm import send_and_receive_response
-from kasaya.servicebus import exceptions
+from kasaya.core.middleware.core import MiddlewareCore
+from kasaya.core.protocol import messages, serialize, deserialize
+from kasaya.core.client.queries import SyncDQuery
+from kasaya.core.lib.comm import send_and_receive_response
+from kasaya.core import exceptions
 from gevent_zeromq import zmq
 
 

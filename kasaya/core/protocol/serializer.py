@@ -1,6 +1,6 @@
 #coding: utf-8
 from kasaya.conf import settings
-from kasaya.servicebus import exceptions
+from kasaya.core import exceptions
 import msgpack
 import datetime
 import encryption

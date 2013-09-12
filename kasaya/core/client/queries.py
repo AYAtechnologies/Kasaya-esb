@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from kasaya.servicebus.protocol import serialize, deserialize, messages
+from kasaya.core.protocol import serialize, deserialize, messages
+from kasaya.core.lib.comm import send_and_receive
 from kasaya.conf import settings
 from gevent_zeromq import zmq
-from kasaya.servicebus.lib.comm import send_and_receive
 
 
 class SyncQuery(object):
