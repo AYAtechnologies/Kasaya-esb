@@ -2,15 +2,11 @@
 #coding: utf-8
 from __future__ import unicode_literals
 __author__ = 'wektor'
+from kasaya import conf
+from kasaya.core import client
+from kasaya.core.client import sync, async, async_result
 
-from unittest import TestCase
-
-import sys,os
-esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.append( esbpath )
-
-from servicebus import client, conf
-from servicebus.client import sync, async, async_result
+from unittest import TestCase, main
 import datetime
 import time
 import subprocess
@@ -20,20 +16,20 @@ class TestAsync(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        conf.load_config_from_file("../config.txt")
-        PYTHON = "~/PycharmProjects/django-env/bin/python" #PYTHON_INTERPRETER
+        conf.load_config_from_file("../examples/kasaya.conf")
+        #PYTHON = "~/PycharmProjects/django-env/bin/python" #PYTHON_INTERPRETER
         # subprocess.call(PYTHON + " ../examples/syncserver/run_syncd.py", shell=True)
         # subprocess.call(PYTHON + " ../examples/syncserver/run_async_worker.py", shell=True)
         # subprocess.call(PYTHON + " ../examples/workers/simple_worker.py", shell=True)
 
 
     def test_register(self):
-        tid = async.fikumiku.long_task(1, 1)
+        tid = async.myservice.long_task(1, 1)
         print "res", tid
 
     def test_in_progress(self):
         print "start"
-        tid = async.fikumiku.long_task(1, 1)
+        tid = async.myservice.long_task(1, 1)
         print "res", tid
         res = async_result(tid, "stefan")
         assert res == ['in_progress', None]
@@ -50,7 +46,7 @@ class TestAsync(TestCase):
         print "long"
         TASK_COUNT = 10 # Docelowo ta liczba powinna byc duzo wieksza - narazie jest mala
         for i in range(TASK_COUNT):
-            tid = async.fikumiku.long_task(1, i)
+            tid = async.myservice.long_task(1, i)
             print "res", tid
             print sync.async_daemon.get_task_result(tid)
             tasks.append(tid)
@@ -68,7 +64,7 @@ class TestAsync(TestCase):
         print "long"
         TASK_COUNT = 50
         for i in range(TASK_COUNT):
-            tid = async.fikumiku.long_task(0, i)
+            tid = async.myservice.long_task(0, i)
             print "res", tid
             print sync.async_daemon.get_task_result(tid)
             tasks.append(tid)
@@ -99,3 +95,7 @@ class TestAsync(TestCase):
 
     def test_local_timeout(self): # local = ustawiony przy wywolaniu
         pass
+
+
+if __name__ == '__main__':
+    main()

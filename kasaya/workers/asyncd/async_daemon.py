@@ -1,20 +1,15 @@
 #!/usr/bin/env python
 #coding: utf-8
-import sys
-import os
-
-esbpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.append( esbpath )
-
-from servicebus.conf import settings
-from servicebus.worker import WorkerDaemon
-from servicebus.protocol import messages
-from servicebus.client.proxies import SyncProxy
-from servicebus.asyncd.async_backend import AsyncBackend
+from kasaya.conf import settings
+from kasaya.core.worker import WorkerDaemon
+from kasaya.core.protocol import messages
+from kasaya.core.client.proxies import SyncProxy
+from async_backend import AsyncBackend
 
 from gevent import *
 from gevent.coros import Semaphore
 from gevent.pool import Pool
+
 
 class AsyncDeamon(WorkerDaemon):
     def __init__(self):

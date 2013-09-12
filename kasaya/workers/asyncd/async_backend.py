@@ -1,11 +1,9 @@
 #coding: utf-8
 __author__ = 'wektor'
+from kasaya.conf import settings
+from kasaya.core.backend import get_backend_class
 import uuid
 import datetime
-
-
-from servicebus.backend import get_backend_class
-from servicebus.conf import settings
 
 Backend = get_backend_class(settings.ASYNC_DAEMON_DB_BACKEND)
 
