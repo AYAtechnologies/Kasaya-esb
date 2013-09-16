@@ -1,8 +1,17 @@
 #coding: utf-8
+import os
+import defaults
+
+__all__ = ("settings", "load_config_from_file")
 
 class SettingsProxy(dict):
     def __getattr__(self, k):
         return self[k]
+
+settings = SettingsProxy()
+
+
+SYSTEM_CONF_FILE = "/etc/kasaya/kasaya.conf"
 
 
 def _parse_config(filename):
@@ -22,30 +31,43 @@ def _parse_config(filename):
             res[k.rstrip()] = v.strip()
     return res
 
-def load_config_from_file(filename):
+
+def load_config_from_file(filename, optional=False):
     """
     Load config and change values to types used in default settings
     """
-    for k,v in _parse_config(filename).iteritems():
+    try:
+        cnf = _parse_config(filename)
+    except IOError as e:
+        if optional:
+            print "Optional config file [%s] not exists. Skipping." % filename
+            return
+        else:
+            print "Config file [%s] not exists. Stopping." % filename
+            import sys
+            sys.exit(1)
+
+    for k,v in cnf.iteritems():
         if k in settings:
             typ = type( settings[k] )
             # boolean has some special values
             if typ is bool:
-                settings[k] = v.lower() in ("1", "tak", "yes","true")
+                settings[k] = v.lower() in ("1", "tak", "y", "yes","true")
             else:
                 settings[k] = typ(v)
         else:
             settings[k] = v
 
 
-# load default settings
-settings = SettingsProxy()
 
-import defaults
+# loading default settings
 for k,v in defaults.__dict__.iteritems():
     if k in defaults.__builtins__:
         continue
     if k.startswith("__"):
         continue
     settings[k] = v
+
+# loading system settings
+load_config_from_file(SYSTEM_CONF_FILE, optional=True)
 

@@ -37,7 +37,7 @@ def wrong_task(param):
 from kasaya.core.worker import WorkerDaemon
 
 if __name__=="__main__":
-    load_config_from_file("kasaya.conf")
+    load_config_from_file("example.conf", optional=True)
     daemon = WorkerDaemon("myservice")
     daemon.run()
 

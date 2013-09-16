@@ -5,6 +5,6 @@ from kasaya.conf import load_config_from_file
 from kasaya.workers.asyncd import AsyncDeamon
 
 if __name__=="__main__":
-    load_config_from_file("kasaya.conf")
+    load_config_from_file("example.conf", optional=True)
     daemon = AsyncDeamon()
     daemon.run()

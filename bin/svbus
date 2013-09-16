@@ -12,7 +12,8 @@ class Jobs(object):
 
 
     def __init__(self):
-        load_config_from_file("examples/kasaya.conf")
+        pass
+    #    load_config_from_file("examples/kasaya.conf")
 
 
     @plac.annotations(
@@ -80,9 +81,9 @@ class Jobs(object):
             return
 
         ln = "{0:>26}: {1}"
+        print (ln.format("service name",res['service']))
         addr = "%s:%i" % (res['ip'], res['port'])
         print ( ln.format("address", addr) )
-        #print (ln.format("NAME",res['service']))
         print ( ln.format("used memory", "{:,} KB".format(res['mem_total'])) )
         ttot = res['task_err'] + res['task_ctl'] + res['task_succ']
         print ( ln.format("total processed tasks", ttot) )
@@ -95,4 +96,6 @@ class Jobs(object):
 
 
 if __name__=="__main__":
+    #from kasaya.conf import settings
+    #print (settings.SERVICE_BUS_NAME)
     plac.call( Jobs() )

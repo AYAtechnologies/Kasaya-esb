@@ -41,6 +41,19 @@ setup(
         ("config", ["examples/kasaya.conf"]),
         #("")
     ],
+    # tools
+    scripts=['bin/svbus'],
+    # requirments
+    install_requires = [
+        'gevent',
+        'zerorpc',
+        'gevent-zeromq',
+        'msgpack-python',
+        'netifaces',
+        'plac',
+        'pycrypto',
+    ],
+
     #home_page = "http://github.com/AYAtechnologies/Kasaya-esb",
     license = file('LICENSE').read(),
     long_description = file('README.md').read(),

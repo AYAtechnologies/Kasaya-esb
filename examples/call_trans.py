@@ -2,11 +2,11 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from servicebus import client, conf
-from servicebus.client import sync, async, async_result, control, trans
+from servicebus.client import sync, async, control, trans
 from servicebus.client import ExecContext
 
 if __name__=="__main__":
-    conf.load_config_from_file("kasaya.conf")
+    load_config_from_file("example.conf", optional=True)
     with sync(("ala","ma", "kota")) as s:
         s.fikumiku.do_work("sync", 2, foo=456, baz=True)
 
