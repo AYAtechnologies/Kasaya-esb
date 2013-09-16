@@ -31,15 +31,15 @@ package_finder("kasaya")
 #pprint (packages)
 #pprint (package_dir)
 
+from kasaya import version
 
 setup(
     name = 'Kasaya ESB',
-    version = '0.0.1',
+    version = version,
     packages = packages,
     package_dir = package_dir,
     data_files = [
         ("config", ["examples/example.conf"]),
-        #("")
     ],
     # tools
     scripts=['bin/svbus'],
