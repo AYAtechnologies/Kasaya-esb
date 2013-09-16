@@ -38,7 +38,7 @@ setup(
     packages = packages,
     package_dir = package_dir,
     data_files = [
-        ("config", ["examples/kasaya.conf"]),
+        ("config", ["examples/example.conf"]),
         #("")
     ],
     # tools
