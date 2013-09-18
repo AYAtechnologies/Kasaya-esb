@@ -9,7 +9,6 @@ import subprocess, sys, os, codecs
 
 
 
-
 class Config(SafeConfigParser):
 
     def __init__(self, filename):
@@ -31,12 +30,6 @@ class Config(SafeConfigParser):
         except:
             self.add_section(sec)
             SafeConfigParser.set(self, sec,opt, value )
-
-    #def get(key):
-    #    try:
-    #        SafeConfigParser.get(self, *key.split(":",1) )
-    #    except:
-    #        pass
 
     def getint(key):
         try:
@@ -64,27 +57,17 @@ class Config(SafeConfigParser):
         return datetime.date( int(d[2]), int(d[1]), int(d[0]) )
 
 
+
+
+
 class Service(object):
 
-    def __init__(self, directory):
+    def __init__(self, directory, globalcnf):
         self.directory = os.path.join(settings.USER_WORKERS_DIR, directory)
-        self.loc_conf = self.__get_service_local_config()
+        self.loc_conf = Config( os.path.join(self.directory, "service.conf") )
+        self.glob_conf = globalcnf
         self.name = self.loc_conf['service|name'].strip()
         self.mode = "python"
-
-    def __get_service_local_config(self, configname="service.conf"):
-        fn = os.path.join(self.directory, configname)
-        return Config(fn)
-
-    def __get_service_global_config(self, configname="services.conf"):
-        fn = os.path.join(os.path.dirname(self.directory), configname)
-        return Config(fn)
-
-    def prepare(self):
-        """
-        Loads extra config before starting service
-        """
-        self.glob_conf = self.__get_service_global_config()
 
 
     def get_venv(self):
@@ -169,7 +152,7 @@ class Service(object):
         return env
 
 
-    def start_service_python(self):
+    def start_service(self):
         cmd = [ self.get_python_cmd() ]
         cmd.append( launcher.__file__ )
 
@@ -182,36 +165,58 @@ class Service(object):
             #stderr=subprocess.PIPE,
         )
         #po.wait()
-        print po
+        #print po
 
 
 
-def find_local_services():
+
+class InternalService(Service):
+
+    def __init__(self, name, globalcnf):
+        self.name = name
+        self.directory = os.path.dirname(launcher.__file__)
+        self.mode = "python"
+        #self.directory =
+
+    def get_environment(self):
+        env = os.environ.copy()
+        env['SV_MODULE_IMPORT'] = self.name
+        env['SV_SERVICE_NAME'] = self.name
+
+
+    def get_python_cmd(self):
+        return "python"
+
+
+def local_services(configname="services.conf"):
     """
     Return list of local services
     """
-    svlist = []
-    def addsv(name, dirname=None, config=None):
-        d = {'service':name, 'dir':dirname, 'config':config}
-        svlist.append(d)
+    cnfame = os.path.join( settings['USER_WORKERS_DIR'], configname )
+    config = Config(cnfame)
+    result = {}
 
-    # embedded services
+    # internal services
     if settings.USE_ASYNC_SERVICE:
-        addsv(settings.ASYNC_DAEMON_SERVICE)
+        s = InternalService("asyncd", config)
+        result[s.name] = s
 
     if settings.USE_TRANSACTION_SERVICE:
-        addsv("transd")
+        s = InternalService("transactiond", config)
+        result[s.name] = s
 
     if settings.USE_AUTH_SERVICE:
-        addsv("authd")
+        s = InternalService("authd", config)
+        result[s.name] = s
 
     if settings.USE_LOG_SERVICE:
-        addsv("logd")
+        s = InternalService("logd", config)
+        result[s.name] = s
 
     # user services
     dname = os.path.abspath( settings.USER_WORKERS_DIR )
     if not os.path.exists(dname):
-        return svlist
+        return result
 
     for sdir in os.listdir( dname ):
         fp = os.path.join(dname, sdir)
@@ -223,18 +228,18 @@ def find_local_services():
             continue
 
         # is service worker
-        addsv(sdir, fp, cnf)
+        s = Service(sdir, config)
+        if s.name in result:
+            raise Exception ("Service duplicated %s" % s.name)
+        result[s.name] = s
 
-    return svlist
+    return result
+
 
 
 
 if __name__=="__main__":
-    #wlst = find_local_services()
-    #print wlst
-    s = Service('/home/moozg/services/myservice')
-    s.prepare()
-    s.start_service_python()
-    #print s.get_service_global_config()
-    #get_service_config('/home/moozg/services/simple')
-    #run_service_worker('/home/moozg/services/simple')
+    settings['USER_WORKERS_DIR'] = '/home/moozg/services'
+
+    wlst = local_services()
+
