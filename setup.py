@@ -45,8 +45,8 @@ setup(
     scripts=['bin/svbus'],
     # requirments
     install_requires = [
+        #'pyzmq>=13.0',
         'gevent',
-        'zerorpc',
         'gevent-zeromq',
         'msgpack-python',
         'netifaces',
@@ -61,9 +61,3 @@ setup(
     author_email = "kb@ayatechnologies.net",
 )
 
-
-
-#setup(...,
-#      data_files=[('/sbin', ['rootfill']),
-#                  ('/etc/init.d', ['init-script'])]
-#     )

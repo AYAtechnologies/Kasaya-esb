@@ -2,7 +2,8 @@
 import os
 import defaults
 
-__all__ = ("settings", "load_config_from_file")
+__all__ = ("Config", "settings", "load_config_from_file")
+
 
 class SettingsProxy(dict):
     def __getattr__(self, k):

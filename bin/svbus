@@ -94,6 +94,13 @@ class Jobs(object):
 
 
 
+    @plac.annotations(
+        service=("service name")
+    )
+    def worker(self, service):
+        pass
+
+
 
 if __name__=="__main__":
     #from kasaya.conf import settings

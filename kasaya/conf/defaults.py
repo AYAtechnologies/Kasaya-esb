@@ -81,3 +81,13 @@ LOG_LEVEL = "DEBUG"
 # possible values: memory, redis
 ASYNC_DAEMON_DB_BACKEND = "redis"
 
+
+
+# builtin ESB workers
+USE_ASYNC_SERVICE = False
+USE_TRANSACTION_SERVICE = False
+USE_AUTH_SERVICE = False
+USE_LOG_SERVICE = False
+
+# User workers directory
+USER_WORKERS_DIR = "/opt/services"

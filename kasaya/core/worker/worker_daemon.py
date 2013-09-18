@@ -177,8 +177,8 @@ class WorkerDaemon(MiddlewareCore):
         """
         Stop request. Finish current task and shutdown.
         """
-        g = gevent.Greenlet.spawn(self.stop)
-        g.start_later(3)
+        g = gevent.Greenlet(self.stop)
+        g.start_later(2)
         return True
 
     def CTL_stats(self):
