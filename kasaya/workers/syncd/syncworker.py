@@ -6,7 +6,7 @@ from kasaya.core import exceptions
 from kasaya.core.lib.binder import get_bind_address
 from kasaya.core.lib.comm import RepLoop, send_and_receive_response
 from kasaya.core.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
-from kasaya.core.lib import LOG
+from kasaya.core.lib import LOG, servicesctl
 from datetime import datetime, timedelta
 from gevent_zeromq import zmq
 import gevent
@@ -41,6 +41,8 @@ class SyncWorker(object):
         self.BC = broadcaster
         self.context = zmq.Context()
         self.__pingdb = {}
+        # cache
+        self.__services = None
         # local workers <--> local sync communication
         self.queries = RepLoop(self._connect_queries_loop, context=self.context)
         self.queries.register_message(messages.WORKER_LIVE, self.handle_worker_live)
@@ -52,10 +54,10 @@ class SyncWorker(object):
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
         # service control tasks
         self.ctl = ControlTasks(self.context, allow_redirect=True)
-        self.ctl.register_task("host.list", self.CTL_host_list)
-        self.ctl.register_task("host.workers", self.CTL_host_workers)
-        self.ctl.register_task("worker.stop", self.CTL_worker_stop)
-        self.ctl.register_task("worker.stats", self.CTL_worker_stats)
+        self.ctl.register_task("svbus.status",  self.CTL_global_services)
+        self.ctl.register_task("worker.stop",   self.CTL_worker_stop)
+        self.ctl.register_task("worker.stats",  self.CTL_worker_stats)
+        self.ctl.register_task("service.start", self.CTL_service_start)
 
 
     def get_sync_address(self, ip):
@@ -102,6 +104,42 @@ class SyncWorker(object):
             self.hearbeat_loop,
             self.intersync.loop,
         ]
+
+
+    def local_services_list(self, rescan=False):
+        """
+        List of local services available
+        """
+        if rescan or (self.__services is None):
+            self.__services = servicesctl.local_services()
+        return self.__services.keys()
+
+
+    def local_services_stats(self):
+        """
+        List of all services on localhost including inactive.
+        result is dict, key is service name, value is number
+        of workers currently running for this service.
+        """
+        svlist = self.local_services_list()
+        result = {}
+        # list of running workers
+        for wrk in self.DB.get_local_workers():
+            name = wrk[1]
+            if not name in result:
+                result[name] = {'count':0,'uuid':[]}
+            result[name]['count'] += 1
+            result[name]['uuid'].append(wrk[0])
+        # add inactive services
+        for svc in self.__services:
+            if svc in result:
+                continue
+            result[svc] = {'count':0,'uuid':[]}
+        return result
+
+
+    def get_service_ctl(self, name):
+        return self.__services[name]
 
 
     # local message handlers
@@ -253,7 +291,7 @@ class SyncWorker(object):
     # inter sync communication and global management
     # -------------------------------------------------
 
-    def redirect_or_exception_by_ip(self, ip):
+    def redirect_or_pass_by_ip(self, ip):
         """
         Check if given IP is own host ip, if not then raise exception
         to redirect message to proper destination
@@ -278,28 +316,44 @@ class SyncWorker(object):
     # syncd host tasks
 
 
-    def CTL_host_list(self):
+    def CTL_global_services(self):
         """
-        List of all hosts in service bus
+        List of all working hosts and services in network
         """
         lst = []
         # all syncd hosts
         for u,a,h in self.DB.host_list():
             ln = {'uuid':u, 'addr':a, 'hostname':h}
             # workers on host
-            ln ['services'] = self.CTL_host_workers(u)
+            ln ['services'] = self.CTL_services_on_host(u)
             lst.append( ln )
         return lst
 
 
-    def CTL_host_workers(self, uuid):
+    # this command is not currently exposed via control interface
+    def CTL_services_on_host(self, uuid):
         """
-        List of all workers on host
+        List of all services on host
         """
+        print "CTL_services_on_host", uuid
         lst = []
+        managed = self.DB.host_services(uuid)
+        #print "!!!!!!!!!", managed
+        from pprint import pprint
+        # online services
         for u,s,i,p, pi in self.DB.workers_on_host(uuid):
-            res = {'uuid':u, 'service':s, 'ip':i, 'port':p, 'pid': pi}
+            res = {'uuid':u, 'service':s, 'ip':i, 'port':p, 'pid': pi, 'running':True}
+            pprint(res)
+            #print  managed
+            if s in managed:
+                managed.remove(s)
+            res['managed'] = s in managed
+            #res['managed']= True
             lst.append(res)
+
+        # offline services
+        for sv in managed:
+            lst.append( {'service':sv,'running':False, 'managed':True} )
         return lst
 
 
@@ -308,7 +362,7 @@ class SyncWorker(object):
         Send stop signal to worker
         """
         ip,port,pid = self.DB.worker_ip_port_by_uuid(uuid, pid=True)
-        self.redirect_or_exception_by_ip(ip)
+        self.redirect_or_pass_by_ip(ip)
 
         if terminate:
             signal = SIGTERM
@@ -332,7 +386,7 @@ class SyncWorker(object):
         Return full stats of worker
         """
         ip,port = self.DB.worker_ip_port_by_uuid(uuid)
-        self.redirect_or_exception_by_ip(ip)
+        self.redirect_or_pass_by_ip(ip)
         # call worker for stats
         addr = _ip_port_to_worker_addr(ip,port)
         msg = {
@@ -341,4 +395,22 @@ class SyncWorker(object):
         }
         res = send_and_receive_response(self.context, addr, msg)
         return res
+
+
+    def CTL_service_start(self, name, ip=None):
+        """
+        Start service on host, or locally if host is not given.
+        name - name of service to start
+        ip - ip address of host on which service shoult be started
+        """
+        try:
+            svc = self.get_service_ctl(name)
+        except KeyError:
+            raise Exception("Nie ma tu takiego")
+        #print "SERVICE START!",
+        #print name,
+        #print ip
+        svc.start_service()
+        #return True
+
 

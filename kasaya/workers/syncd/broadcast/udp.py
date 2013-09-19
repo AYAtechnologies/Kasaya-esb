@@ -108,7 +108,7 @@ class UDPBroadcast(UDPLoop):
         self.SRV.WORKER.worker_stop(msgdata['ip'], msgdata['port'], False )
 
     def handle_host_join(self, msgdata):
-        self.SRV.notify_syncd_start(msgdata['uuid'], msgdata['hostname'], msgdata['addr'])
+        self.SRV.notify_syncd_start( msgdata['uuid'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
 
     def handle_host_leave(self, msgdata):
         self.SRV.notify_syncd_stop(msgdata['uuid'])
@@ -154,12 +154,13 @@ class UDPBroadcast(UDPLoop):
         self.broadcast_message(msg)
 
 
-    def send_host_start(self, uuid, hostname, address=None):
+    def send_host_start(self, uuid, hostname, address=None, services=None):
         msg = {
             "message" : messages.HOST_JOIN,
             "hostname" : hostname,
             "addr" : address,
-            "uuid" : uuid
+            "uuid" : uuid,
+            "services" : services,
             }
         self.broadcast_message(msg)
 

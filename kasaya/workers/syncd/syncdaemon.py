@@ -72,11 +72,11 @@ class SyncDaemon(object):
 
     # global network changes
 
-    def notify_syncd_start(self, uuid, hostname, addr, local=False):
+    def notify_syncd_start(self, uuid, hostname, addr, services, local=False):
         """
-        Send information about startup to all hosts in network
+        Send information about startup of host to all other hosts in network
         """
-        succ = self.DB.host_register(uuid, hostname, addr)
+        succ = self.DB.host_register(uuid, hostname, addr, services)
         self.WORKER.request_workers_broadcast()
         if local:
             # it is ourself starting, send broadcast about this
@@ -96,13 +96,17 @@ class SyncDaemon(object):
 
 
     def notify_syncd_self_start(self):
+        """
+        send information about self start to all hosts
+        """
         addr = self.WORKER.intersync.address
         addr = addr.split(":")[1].lstrip("/")
         self.notify_syncd_start(
             self.uuid,
             self.hostname,
             addr,
-            local=True
+            self.WORKER.local_services_list(),
+            local=True,
         )
 
 

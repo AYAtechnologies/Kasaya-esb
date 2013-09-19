@@ -8,7 +8,7 @@ import plac
 
 
 class Jobs(object):
-    commands = ['list', 'stop', 'stats']
+    commands = ['list', 'stop', 'stats', 'start']
 
 
     def __init__(self):
@@ -17,20 +17,23 @@ class Jobs(object):
 
 
     @plac.annotations(
-        u=("Show UUID identifiers", "flag")
+        u=("Show UUID identifiers", "flag"),
+        hi=("Hide offline services", "flag"),
     )
-    def list(self, u=False):
+    def list(self, u=False, hi=False):
         """
         List all hosts and workers running in service bus
         """
-        hostline   = "  {service: >{ws}}  {addr: <{wa}} (hostname: {hostname})"
-        workerline = "  {service: >{ws}}  on port: {port}"
+        hostline     = "  {service: >{ws}}  {addr: <{wa}} (hostname: {hostname})"
+        workerline   = "  {service: >{ws}}  on port: {port} {extra}"
+        inactiveline = "  {service: >{ws}}  off"
+
         if u:
-            hostline   += "   uuid:{uuid}"
-            workerline += "   uuid:{uuid} pid:{pid}"
+            hostline   += "   uuid: {uuid}"
+            workerline += "   uuid: {uuid}  pid: {pid}"
 
         # all hosts in network
-        hosts = control.host.list()
+        hosts = control.svbus.status()
 
         # maximum length of names
         whst, wadr, wsvc = 5,0,0
@@ -46,11 +49,32 @@ class Jobs(object):
             hcnt += 1
             print ( hostline.format(wh=whst, wa=wadr, ws=wsvc, service="SYNCD", **h) )
 
+            inact = []
             for w in h['services']:
+                # if worker is not managed,
+                # which means that this worker is not existing in local services set
+                # and cannot be started after shutting down by syncd daemon,
+                # then show exclamation let know about this
+                if not w['managed']:
+                    w['extra'] = "[!]"
+                else:
+                    w['extra'] = "   "
+
+                if not w['running']:
+                    inact.append( w['service'])
+                    continue
+
                 wcnt += 1
                 print ( workerline.format(ws=wsvc, **w) )
+
+            # inactive services
+            if (not hi) and (len(inact)>0):
+                for sv in inact:
+                    print ( inactiveline.format(ws=wsvc, service=sv) )
+
             print ()
-        print ("Total number of hosts: {0}, workers: {1}".format(hcnt, wcnt) )
+
+        print ("Total number of hosts: {0}, running services: {1}".format(hcnt, wcnt) )
 
 
 
@@ -62,13 +86,14 @@ class Jobs(object):
     def stop(self, uuid, terminate=False, sigkill=False):
         """
         Send stop signal to worker with specified uuid. If worker is currently
-        processing task, worker will stop after finishing current job.
+        processing task, it will stop after finishing current job.
         """
         control.worker.stop(uuid, terminate, sigkill)
 
 
+
     @plac.annotations(
-        uuid=("UUID of worker to stop")
+        uuid=("UUID of worker to show stats")
     )
     def stats(self, uuid):
         """
@@ -95,10 +120,12 @@ class Jobs(object):
 
 
     @plac.annotations(
-        service=("service name")
+        name=("service name to start"),
+        ip=("IP of host on which service should be started")
     )
-    def worker(self, service):
-        pass
+    def start(self, name, ip=None):
+        res = control.service.start(name, ip)
+
 
 
 

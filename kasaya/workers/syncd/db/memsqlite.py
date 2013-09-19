@@ -17,6 +17,7 @@ class MemoryDB(BaseDB):
         self.cur=self.__db.cursor()
         self.cur.execute("CREATE TABLE hosts (uuid TEXT, hostname TEXT, addr TEXT)")
         self.cur.execute("CREATE TABLE workers (uuid TEXT, service TEXT, ip TEXT, port INT, pid INT, local INT)")
+        self.cur.execute("CREATE TABLE services (host_uuid TEXT, name TEXT)")
         self.SEMA = Semaphore()
 
     def close(self):
@@ -114,7 +115,7 @@ class MemoryDB(BaseDB):
 
     # global network state
 
-    def host_register(self, host_uuid, hostname, addr):
+    def host_register(self, host_uuid, hostname, addr, services=None):
         # sprawdzenie czy worker istnieje w bazie
         self.SEMA.acquire()
         self.cur.execute(
@@ -132,6 +133,12 @@ class MemoryDB(BaseDB):
         self.cur.execute(
             "INSERT INTO hosts ('uuid','addr','hostname') VALUES (?,?,?)",
             (host_uuid, addr, hostname))
+        # services available on host
+        if not services is None:
+            for name in services:
+                self.cur.execute(
+                    "INSERT INTO services ('host_uuid','name') VALUES (?,?)",
+                    (host_uuid, name))
         self.__db.commit()
         self.SEMA.release()
         return True
@@ -139,7 +146,7 @@ class MemoryDB(BaseDB):
 
     def host_unregister(self, uuid):
         """
-        Wyrejestrowanie workera z bazy.
+        Wyrejestrowanie hosta z bazy.
           Zwraca True jeśli wyrejestrowano workera,
           False jeśli workera nie było w bazie
         """
@@ -149,17 +156,36 @@ class MemoryDB(BaseDB):
             [uuid] )
         res = self.cur.fetchone()
         self.SEMA.release()
+
         # host nie istnieje
         if res==None:
             return False
+
         # wykasowanie istniejącego
         self.SEMA.acquire()
         self.cur.execute(
             "DELETE FROM hosts WHERE uuid=?",
             [uuid] )
+        # usunięcie wpisów o serwisach
+        self.cur.execute(
+            "DELETE FROM services WHERE host_uuid=?",
+            [uuid] )
         self.__db.commit()
         self.SEMA.release()
+
         return {"addr":res[2],"hostname":res[1]}
+
+
+    def host_services(self, uuid):
+        """
+        List of all services available on host
+        """
+        self.SEMA.acquire()
+        self.cur.execute( "SELECT name FROM services WHERE host_uuid=?", (uuid,) )
+        lst = self.cur.fetchall()
+        self.SEMA.release()
+        res = [ l[0] for l in lst ]
+        return res
 
 
     # raportowanie stanu sieci

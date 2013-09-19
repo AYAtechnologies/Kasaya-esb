@@ -1,11 +1,11 @@
-#!/home/moozg/venvs/kasatest/bin/python
+#!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
 from kasaya.conf import settings
-from ConfigParser import SafeConfigParser
+from kasaya.core.lib import LOG
 from kasaya.workers import launcher
 import subprocess, sys, os, codecs
-#!/usr/bin/env python
+from ConfigParser import SafeConfigParser
 
 
 
@@ -161,8 +161,8 @@ class Service(object):
             cmd,
             cwd=self.directory,
             env=env,
-            #stdout=subprocess.PIPE,
-            #stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         #po.wait()
         #print po
@@ -193,7 +193,10 @@ def local_services(configname="services.conf"):
     Return list of local services
     """
     cnfame = os.path.join( settings['USER_WORKERS_DIR'], configname )
-    config = Config(cnfame)
+    if os.path.exists(cnfame):
+        config = Config(cnfame)
+    else:
+        config = None
     result = {}
 
     # internal services
@@ -230,16 +233,9 @@ def local_services(configname="services.conf"):
         # is service worker
         s = Service(sdir, config)
         if s.name in result:
-            raise Exception ("Service duplicated %s" % s.name)
+            LOG.error("Found more than one service with name [%s]. Ignoring." % s.name)
+            continue
         result[s.name] = s
 
     return result
-
-
-
-
-if __name__=="__main__":
-    settings['USER_WORKERS_DIR'] = '/home/moozg/services'
-
-    wlst = local_services()
 
