@@ -33,6 +33,20 @@ def _parse_config(filename):
     return res
 
 
+
+def set_value(k,v):
+    if k in settings:
+        typ = type( settings[k] )
+        # boolean has some special values
+        if typ is bool:
+            settings[k] = v.lower() in ("1", "tak", "y", "yes","true")
+        else:
+            settings[k] = typ(v)
+    else:
+        settings[k] = v
+
+
+
 def load_config_from_file(filename, optional=False):
     """
     Load config and change values to types used in default settings
@@ -49,15 +63,7 @@ def load_config_from_file(filename, optional=False):
             sys.exit(1)
 
     for k,v in cnf.iteritems():
-        if k in settings:
-            typ = type( settings[k] )
-            # boolean has some special values
-            if typ is bool:
-                settings[k] = v.lower() in ("1", "tak", "y", "yes","true")
-            else:
-                settings[k] = typ(v)
-        else:
-            settings[k] = v
+        set_value(k,v)
 
 
 

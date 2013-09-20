@@ -147,14 +147,9 @@ class RepLoop(BaseLoop):
                 self.send(result)
                 continue
 
-            # it no result, return nothing
-            if result is None:
-                self.send_noop()
-                continue
-
             # send result
             if rawmsg:
-                self.send(result)
+                self.send( result )
             else:
                 self.send( {"message":messages.RESULT, "result":result } )
 

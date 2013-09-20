@@ -80,7 +80,7 @@ class SyncDaemon(object):
         self.WORKER.request_workers_broadcast()
         if local:
             # it is ourself starting, send broadcast about this
-            self.BC.send_host_start(uuid, hostname, addr)
+            self.BC.send_host_start(uuid, hostname, addr, services)
         else:
             # it's remote host starting, information is from broadcast
             if succ:

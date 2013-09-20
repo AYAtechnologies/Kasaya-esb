@@ -161,11 +161,10 @@ class Service(object):
             cmd,
             cwd=self.directory,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            #stdout=subprocess.PIPE,
+            #stderr=subprocess.PIPE,
+            close_fds=True, # <--- very important!
         )
-        #po.wait()
-        #print po
 
 
 

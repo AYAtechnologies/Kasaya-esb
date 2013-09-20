@@ -46,9 +46,9 @@ class ControlTasks(object):
         if not self.__allow_redirect:
             raise ServiceBusException("Message redirection is not allowed here")
         if 'redirected' in message:
-            # this message is coming from another sync daemon
-            # we allow only one redirection and if message is still
-            # delivered to wrong host, then we drop message
+            # This message is currently coming from another sync daemon.
+            # We allow only one redirection of message, and if after redirection
+            # message is still delivered to wrong host we raise exception.
             raise ServiceBusException("Message redirection fail")
         message['redirected'] = True
         result = send_and_receive_response(self.__context, addr, message, settings.SYNC_REPLY_TIMEOUT)

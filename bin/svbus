@@ -4,11 +4,11 @@ from __future__ import unicode_literals, print_function
 from kasaya.core.client import control
 from kasaya.conf import load_config_from_file
 import plac
-#from pprint import pprint
+
 
 
 class Jobs(object):
-    commands = ['list', 'stop', 'stats', 'start']
+    commands = ['list', 'stop', 'stats', 'start', 'stopservice']
 
 
     def __init__(self):
@@ -91,7 +91,6 @@ class Jobs(object):
         control.worker.stop(uuid, terminate, sigkill)
 
 
-
     @plac.annotations(
         uuid=("UUID of worker to show stats")
     )
@@ -120,13 +119,18 @@ class Jobs(object):
 
 
     @plac.annotations(
-        name=("service name to start"),
+        name=("name of the service to start"),
         ip=("IP of host on which service should be started")
     )
     def start(self, name, ip=None):
         res = control.service.start(name, ip)
 
-
+    @plac.annotations(
+        servicename=("name of the service to stop"),
+        ip=("IP of host on which service should be stopped")
+    )
+    def stopservice(self, servicename, ip=None):
+        control.service.stop(servicename, ip)
 
 
 if __name__=="__main__":

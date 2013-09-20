@@ -58,6 +58,7 @@ class SyncWorker(object):
         self.ctl.register_task("worker.stop",   self.CTL_worker_stop)
         self.ctl.register_task("worker.stats",  self.CTL_worker_stats)
         self.ctl.register_task("service.start", self.CTL_service_start)
+        self.ctl.register_task("service.stop",  self.CTL_service_stop)
 
 
     def get_sync_address(self, ip):
@@ -291,13 +292,14 @@ class SyncWorker(object):
     # inter sync communication and global management
     # -------------------------------------------------
 
+
     def redirect_or_pass_by_ip(self, ip):
         """
         Check if given IP is own host ip, if not then raise exception
         to redirect message to proper destination
         """
         if ip is None:
-            raise Exception("Unknown worker")
+            raise exceptions.ServiceBusException("Unknown address")
         ownip = self.intersync.ip==ip
         if not ownip:
             raise RedirectRequiredEx(ip)
@@ -335,25 +337,27 @@ class SyncWorker(object):
         """
         List of all services on host
         """
-        print "CTL_services_on_host", uuid
         lst = []
         managed = self.DB.host_services(uuid)
-        #print "!!!!!!!!!", managed
-        from pprint import pprint
-        # online services
+        running = set()
+
         for u,s,i,p, pi in self.DB.workers_on_host(uuid):
-            res = {'uuid':u, 'service':s, 'ip':i, 'port':p, 'pid': pi, 'running':True}
-            pprint(res)
-            #print  managed
-            if s in managed:
-                managed.remove(s)
-            res['managed'] = s in managed
-            #res['managed']= True
+            running.add(s)
+            res = {
+                'uuid':u,
+                'service':s,
+                'ip':i,
+                'port':p,
+                'pid': pi,
+                'running':True,
+                'managed':s in managed,
+            }
             lst.append(res)
 
         # offline services
         for sv in managed:
-            lst.append( {'service':sv,'running':False, 'managed':True} )
+            if not sv in running:
+                lst.append( {'service':sv,'running':False, 'managed':True} )
         return lst
 
 
@@ -401,16 +405,36 @@ class SyncWorker(object):
         """
         Start service on host, or locally if host is not given.
         name - name of service to start
-        ip - ip address of host on which service shoult be started
+        ip - ip address of host on which service shoult be started,
+             if not given then worker will be started on localhost.
         """
+        if ip is None:
+            ip = self.intersync.ip
+        self.redirect_or_pass_by_ip(ip)
+
         try:
             svc = self.get_service_ctl(name)
         except KeyError:
-            raise Exception("Nie ma tu takiego")
-        #print "SERVICE START!",
-        #print name,
-        #print ip
+            raise exceptions.ServiceBusException("There is no service [%s] on this host" % name)
+
         svc.start_service()
-        #return True
+        return True
 
 
+    def CTL_service_stop(self, name, ip=None):
+        """
+        Stop one worker with given service name.
+        """
+        if ip is None:
+            ip = self.intersync.ip
+        self.redirect_or_pass_by_ip(ip)
+
+        services = []
+        for uuid, service, ip, port, pid in self.DB.get_local_workers():
+            if service==name:
+                services.append(uuid)
+        if len(services)==0:
+            raise exceptions.ServiceBusException("There is no [%s] service running" % name)
+
+        uuid = random.choice(services)
+        return self.CTL_worker_stop(uuid)

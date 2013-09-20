@@ -5,6 +5,25 @@ from kasaya.conf import settings
 import logging, sys
 
 
+
+class stdLogOut(object):
+    """
+    Catch std out/err and redirects it to log
+    """
+    def __init__(self, logger, level=logging.DEBUG):
+        self.logger = logger
+        self.level = level
+
+    def write(self, msg):
+        msg = msg.strip()
+        if len(msg)>0:
+            self.logger.log(self.level, msg)
+    def flush(self):
+        for handler in self.logger.handlers:
+            handler.flush()
+
+
+
 def setup_logging(name="svbus"):
     logger = logging.getLogger(name)
     # log level
