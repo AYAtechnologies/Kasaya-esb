@@ -5,14 +5,22 @@ from kasaya.conf import settings
 import logging, sys
 
 
+_levels = {
+    'DEBUG':logging.DEBUG,
+    'INFO':logging.INFO,
+    'WARNING':logging.WARNING,
+    'ERROR':logging.ERROR,
+    'CRITICAL':logging.CRITICAL,
+}
+
 
 class stdLogOut(object):
     """
     Catch std out/err and redirects it to log
     """
-    def __init__(self, logger, level=logging.DEBUG):
+    def __init__(self, logger, level="debug"):
         self.logger = logger
-        self.level = level
+        self.level = _levels[level]
 
     def write(self, msg):
         msg = msg.strip()
@@ -24,19 +32,12 @@ class stdLogOut(object):
 
 
 
-def setup_logging(name="svbus"):
+def setup_logging(name):
     logger = logging.getLogger(name)
     # log level
     ll = settings.LOG_LEVEL.upper()
-    levels = {
-        'DEBUG':logging.DEBUG,
-        'INFO':logging.INFO,
-        'WARNING':logging.WARNING,
-        'ERROR':logging.ERROR,
-        'CRITICAL':logging.CRITICAL,
-    }
     try:
-        logger.setLevel(levels[ll])
+        logger.setLevel(_levels[ll])
     except KeyError:
         raise Exception ("Invalid log level in config %s" % ll)
 
@@ -56,4 +57,4 @@ def setup_logging(name="svbus"):
     return logger
 
 
-LOG = setup_logging()
+LOG = setup_logging(settings.LOGGER_NAME)

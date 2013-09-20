@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from kasaya.core.worker import WorkerDaemon
 import sys, os, resource
 
 
@@ -24,10 +23,10 @@ def createDaemon(UMASK=0, MAXFD=1024):
     """
     # first fork
     pid = os.fork()
-    if (pid == 0):  # first child.
+    if (pid == 0): # first child.
         os.setsid()
-        pid = os.fork()  # second child.
-        if (pid == 0): # second child.
+        pid = os.fork() # second child.
+        if (pid == 0): # im second child.
             os.umask(UMASK)
         else:
             os._exit(0)
@@ -38,28 +37,43 @@ def createDaemon(UMASK=0, MAXFD=1024):
 
 
 
-
 if __name__=="__main__":
+
     try:
         retCode = createDaemon()
     except IOError as e:
         # daemon creation failed
         sys.exit(1)
 
-    #from kasaya.core.lib.logger import stdLogOut
-    #import logging
-    #LOG = logging.getLogger("launcher")
-    #LOG.setLevel(logging.DEBUG)
-    #ch = logging.FileHandler("/tmp/daemonize.log", mode='a+', encoding="utf-8")
-    #formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-    #ch.setFormatter(formatter)
-    #LOG.addHandler(ch)
-    #del formatter, ch
-    #sys.stdout = stdLogOut(LOG)
-    #sys.stderr = stdLogOut(LOG)
-
+    # what to run...
     servicename = os.environ['SV_SERVICE_NAME']
     module = os.environ['SV_MODULE_IMPORT']
+
+    # worker settings
+    from kasaya.conf import set_value, settings
+
+    # additional settings
+    for k,v in os.environ.iteritems():
+        if k.startswith("SV_CNF_"):
+            k = k[7:]
+            if len(k)>1:
+                set_value(k, v)
+
+    # setup logging
+    if not settings.LOG_TO_FILE:
+        set_value("LOG_TO_FILE", "1")
+    set_value("LOGGER_NAME", servicename )
+    set_value("LOG_FILE_NAME", os.environ.get('SV_LOG_FILE', "/tmp/service_%s.log" % servicename) )
+
+    from kasaya.core.lib.logger import stdLogOut
+    from kasaya.core.lib import LOG
+
+    # redirect stdout and stderr to log
+    sys.stdout = stdLogOut(LOG, "DEBUG")
+    sys.stderr = stdLogOut(LOG, "ERROR")
+
+    # tadaaam!
+    from kasaya.core.worker import WorkerDaemon
 
     cwd = os.getcwd()
     if not cwd in sys.path:

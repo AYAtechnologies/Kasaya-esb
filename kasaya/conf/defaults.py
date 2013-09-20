@@ -1,6 +1,9 @@
 #coding: utf-8
 from __future__ import unicode_literals
 
+# internal setting, don't change
+LOGGER_NAME = "syncd"
+
 # service bus name
 SERVICE_BUS_NAME = "sb"
 

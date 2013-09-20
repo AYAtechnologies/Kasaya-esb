@@ -54,6 +54,7 @@ class ControlTasks(object):
         result = send_and_receive_response(self.__context, addr, message, settings.SYNC_REPLY_TIMEOUT)
         return result
 
+
     def handle_request(self, message):
         """
         All control requests are handled here.

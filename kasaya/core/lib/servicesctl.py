@@ -5,7 +5,7 @@ from kasaya.conf import settings
 from kasaya.core.lib import LOG
 from kasaya.workers import launcher
 import subprocess, sys, os, codecs
-from ConfigParser import SafeConfigParser
+from ConfigParser import SafeConfigParser, NoSectionError
 
 
 
@@ -134,12 +134,35 @@ class Service(object):
             env[k] = v
 
         # global environment settings
-        for k,v in self.glob_conf.items(self.name):
-            if not k.startswith("env."):
-                continue
-            k = k[4:]
-            if len(k)>0:
-                env[k] = v
+        try:
+            for k,v in self.glob_conf.items(self.name):
+                if not k.startswith("env."):
+                    continue
+                k = k[4:]
+                if len(k)>0:
+                    env[k] = v
+        except NoSectionError:
+            pass
+
+        # extra settings from worker config
+        try:
+            for k,v in self.loc_conf.items("config"):
+                if len(k)>0:
+                    env['SV_CNF_'+k.upper()] = v
+        except NoSectionError:
+            pass
+
+        # extra settings from global config
+        try:
+            for k,v in self.glob_conf.items(self.name):
+                if k.startswith("conf."):
+                    k = k[5:]
+                else:
+                    continue
+                if len(k)>0:
+                    env['SV_CNF_'+k.upper()] = v
+        except NoSectionError:
+            pass
 
         # module name
         modname = self.loc_conf['service|module']
@@ -149,8 +172,8 @@ class Service(object):
 
         # service name
         env['SV_SERVICE_NAME'] = self.name
-        return env
 
+        return env
 
     def start_service(self):
         cmd = [ self.get_python_cmd() ]
