@@ -4,7 +4,7 @@ from __future__ import unicode_literals, print_function
 from kasaya.core.client import control
 from kasaya.conf import load_config_from_file
 import plac
-
+#from pprint import pprint
 
 
 class Jobs(object):
