@@ -335,25 +335,27 @@ class SyncWorker(object):
         """
         List of all services on host
         """
-        print "CTL_services_on_host", uuid
         lst = []
         managed = self.DB.host_services(uuid)
-        #print "!!!!!!!!!", managed
-        from pprint import pprint
-        # online services
+        running = set()
+
         for u,s,i,p, pi in self.DB.workers_on_host(uuid):
-            res = {'uuid':u, 'service':s, 'ip':i, 'port':p, 'pid': pi, 'running':True}
-            pprint(res)
-            #print  managed
-            if s in managed:
-                managed.remove(s)
-            res['managed'] = s in managed
-            #res['managed']= True
+            running.add(s)
+            res = {
+                'uuid':u,
+                'service':s,
+                'ip':i,
+                'port':p,
+                'pid': pi,
+                'running':True,
+                'managed':s in managed,
+            }
             lst.append(res)
 
         # offline services
         for sv in managed:
-            lst.append( {'service':sv,'running':False, 'managed':True} )
+            if not sv in running:
+                lst.append( {'service':sv,'running':False, 'managed':True} )
         return lst
 
 
@@ -401,16 +403,18 @@ class SyncWorker(object):
         """
         Start service on host, or locally if host is not given.
         name - name of service to start
-        ip - ip address of host on which service shoult be started
+        ip - ip address of host on which service shoult be started,
+             if not given then worker will be started on localhost.
         """
+        if ip is None:
+            ip = self.intersync.ip
+        self.redirect_or_pass_by_ip(ip)
+
         try:
             svc = self.get_service_ctl(name)
         except KeyError:
-            raise Exception("Nie ma tu takiego")
-        #print "SERVICE START!",
-        #print name,
-        #print ip
+            raise Exception("There is no service [%s] on this host" % name)
+
         svc.start_service()
-        #return True
 
 
