@@ -8,7 +8,7 @@ import plac
 
 
 class Jobs(object):
-    commands = ['list', 'wstop', 'wstats', 'sstart', 'sstop']
+    commands = ['list', 'wrkstop', 'wrkstats', 'svcstart', 'svcstop']
 
 
     def __init__(self):
@@ -83,7 +83,7 @@ class Jobs(object):
         terminate=("Use pid rather then uuid", "flag"),
         sigkill=("Send SIGKILL (if everything else fails)", "flag")
     )
-    def wstop(self, uuid, terminate=False, sigkill=False):
+    def wrkstop(self, uuid, terminate=False, sigkill=False):
         """
         Send stop signal to worker with specified uuid. If worker is currently
         processing task, it will stop after finishing current job.
@@ -94,7 +94,7 @@ class Jobs(object):
     @plac.annotations(
         uuid=("UUID of worker to show stats")
     )
-    def wstats(self, uuid):
+    def wrkstats(self, uuid):
         """
         Send stop signal to worker with specified uuid. If worker is currently
         processing task, worker will stop after finishing current job.
@@ -122,14 +122,14 @@ class Jobs(object):
         name=("name of the service to start"),
         ip=("IP of host on which service should be started")
     )
-    def sstart(self, name, ip=None):
+    def svcstart(self, name, ip=None):
         res = control.service.start(name, ip)
 
     @plac.annotations(
         servicename=("name of the service to stop"),
         ip=("IP of host on which service should be stopped")
     )
-    def sstop(self, servicename, ip=None):
+    def svcstop(self, servicename, ip=None):
         control.service.stop(servicename, ip)
 
 
