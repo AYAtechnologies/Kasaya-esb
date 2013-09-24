@@ -6,7 +6,7 @@ from kasaya.core.protocol import messages, serialize, deserialize
 from kasaya.core.client.queries import SyncDQuery
 from kasaya.core.lib.comm import send_and_receive_response
 from kasaya.core import exceptions
-from gevent_zeromq import zmq
+import zmq.green as zmq
 
 
 class GenericProxy(MiddlewareCore):

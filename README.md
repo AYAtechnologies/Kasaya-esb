@@ -20,9 +20,8 @@ To install some of required extensions development libraries and additional pack
 
 Python requirements are automatically installed when using pip to install Kasaya-ESB:
 
-    zerorpc
+    pyzmq
     gevent
-    gevent-zeromq
     msgpack-python
     netifaces
     pycrypto

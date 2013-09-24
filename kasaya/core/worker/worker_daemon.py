@@ -9,7 +9,7 @@ from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system
 from worker_reg import worker_methods_db
-from gevent_zeromq import zmq
+import zmq.green as zmq
 from syncclient import SyncClient
 import traceback
 import datetime

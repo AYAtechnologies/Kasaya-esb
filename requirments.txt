@@ -1,6 +1,5 @@
 netifaces
-zerorpc
-gevent-zeromq
+pyzmq
 gevent
 plac
 pycrypto

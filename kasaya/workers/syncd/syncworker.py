@@ -8,8 +8,9 @@ from kasaya.core.lib.comm import RepLoop, send_and_receive_response
 from kasaya.core.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
 from kasaya.core.lib import LOG, servicesctl
 from datetime import datetime, timedelta
-from gevent_zeromq import zmq
+import zmq.green as zmq
 import gevent
+
 from signal import SIGKILL, SIGTERM
 from os import kill
 import random

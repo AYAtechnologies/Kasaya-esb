@@ -3,7 +3,6 @@
 #from __future__ import unicode_literals
 from kasaya.conf import settings
 from gevent import socket
-from gevent_zeromq import zmq
 from kasaya.core.protocol import serialize, deserialize, messages
 from kasaya.core.lib import LOG
 from kasaya.core.exceptions import NotOurMessage

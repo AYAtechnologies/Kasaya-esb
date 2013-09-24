@@ -3,8 +3,8 @@
 from kasaya.conf import settings
 from kasaya.core.protocol import serialize, deserialize, messages
 from kasaya.core.exceptions import ReponseTimeout
-from gevent_zeromq import zmq
 from gevent.coros import Semaphore
+import zmq.green as zmq
 import gevent
 
 

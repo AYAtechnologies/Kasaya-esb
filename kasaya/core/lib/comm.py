@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from gevent_zeromq import zmq
-import gevent
 from kasaya.core.protocol import serialize, deserialize, messages
 from kasaya.core.lib import LOG
 from kasaya.core import exceptions
+import zmq.green as zmq
+import gevent
 import traceback, sys
 
 
