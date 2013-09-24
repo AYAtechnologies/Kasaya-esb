@@ -1,8 +1,15 @@
 #coding: utf-8
-import os
-import defaults
+import os, codecs
+from parsers import load_config_file as __load_config_file
 
-__all__ = ("Config", "settings", "load_config_from_file")
+
+SERVICE_CONFIG_NAME = "service.conf"
+SERVICE_GLOBAL_CONFIG_NAME = "services.conf"
+SYSTEM_KASAYA_CONFIG = "/etc/kasaya/kasaya.conf"
+SYSTEM_SERVICES_CONFIG = "/etc/kasaya/"+SERVICE_GLOBAL_CONFIG_NAME
+
+
+__all__ = ("settings", "load_config_from_file")
 
 
 class SettingsProxy(dict):
@@ -12,29 +19,10 @@ class SettingsProxy(dict):
 settings = SettingsProxy()
 
 
-SYSTEM_CONF_FILE = "/etc/kasaya/kasaya.conf"
-
-
-def _parse_config(filename):
-    """
-    Simple text config parser
-    """
-    res = {}
-    with file(filename,"r") as cnf:
-        for ln in cnf.readlines():
-            ln=ln.strip()
-            if len(ln)<2: continue
-            if ln.startswith("#"): continue
-            try:
-                k,v = ln.split("=",1)
-            except ValueError:
-                continue
-            res[k.rstrip()] = v.strip()
-    return res
-
-
 
 def set_value(k,v):
+    global settings
+    k=k.strip().upper().replace(" ","_")
     if k in settings:
         typ = type( settings[k] )
         # boolean has some special values
@@ -47,34 +35,23 @@ def set_value(k,v):
 
 
 
+def load_defaults():
+    import defaults
+    global settings
+    # loading default settings
+    for k,v in defaults.__dict__.iteritems():
+        if k in defaults.__builtins__:
+            continue
+        if k.startswith("__"):
+            continue
+        settings[k] = v
+
+
+
 def load_config_from_file(filename, optional=False):
-    """
-    Load config and change values to types used in default settings
-    """
-    try:
-        cnf = _parse_config(filename)
-    except IOError as e:
-        if optional:
-            print "Optional config file [%s] not exists. Skipping." % filename
-            return
-        else:
-            print "Config file [%s] not exists. Stopping." % filename
-            import sys
-            sys.exit(1)
-
-    for k,v in cnf.iteritems():
-        set_value(k,v)
+    __load_config_file(filename, "config", optional, set_value )
 
 
-
-# loading default settings
-for k,v in defaults.__dict__.iteritems():
-    if k in defaults.__builtins__:
-        continue
-    if k.startswith("__"):
-        continue
-    settings[k] = v
-
-# loading system settings
-load_config_from_file(SYSTEM_CONF_FILE, optional=True)
+load_defaults()
+load_config_from_file(SYSTEM_KASAYA_CONFIG, optional=True)
 
