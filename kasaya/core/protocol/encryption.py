@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 #coding: utf-8
+from __future__ import division, absolute_import, print_function, unicode_literals
 from Crypto.Cipher import AES
 from Crypto import Random
 import hashlib
 import bz2
+from binascii import hexlify, unhexlify
 
 
 def encrypt_aes(data,passwd):
@@ -14,16 +16,16 @@ def encrypt_aes(data,passwd):
       ogon - ile bajtów z wyniku należy zignorować przy odszyfrowaniu
     """
     # hasło musi mieć 32 bajty aby użyć AES256
-    p = hashlib.sha256(passwd).digest()
+    #p = hashlib.sha256(passwd).digest()
     # IV musi mieć 16 bajtów na wejściu
     rnd = Random.new()
     iv = rnd.read(16)
     # funkcja szyfrująca
-    enc = AES.new(p, AES.MODE_CBC, iv)
+    enc = AES.new(passwd, AES.MODE_CBC, iv)
     # szyfrowanie
-    out=""
-    chunksize = 16 * 32
-    icnt = len(data) / chunksize
+    out=b""
+    chunksize = 16 * 32 # 512
+    icnt = len(data) // chunksize
     pad = len(data) % chunksize
     i = 0
     while icnt>0:
@@ -47,18 +49,18 @@ def decrypt_aes(data,passwd,iv,ogon):
     iv - wektor startowy
     ogon - ile bajtów z końca odrzucić
     """
-    p = hashlib.sha256(passwd).digest()
-    dec = AES.new(p, AES.MODE_CBC, iv)
+    #p = hashlib.sha256(passwd).digest()
+    dec = AES.new(passwd, AES.MODE_CBC, iv)
     # rozszyfrowanie
-    out=""
-    chunksize = 16 * 32
-    icnt = len(data) / chunksize
+    out=b""
+    chunksize = 16 * 32 # 512
+    icnt = len(data) // chunksize
     i = 0
     while icnt>0:
         icnt-=1
         b = dec.decrypt( data[i:i+chunksize] )
         if icnt==0:
-            out += b[:-ogon]
+            out += b[:len(b)-ogon]
         else:
             out += b
         i += chunksize
@@ -102,7 +104,7 @@ def encrypt(data, passwd, checksum=False, compress=False):
         m = hashlib.md5()
         m.update(data)
     res, iv, ogon = encrypt_aes(data, passwd)
-    meta['iv'] = iv.encode("hex")
+    meta['iv'] = hexlify(iv)
     meta['trim'] = str(ogon)
     # po całej operacji dodajemy do hasha iv,
     # tak że nawet dwa identyczne wpisy będą zawierały
@@ -120,7 +122,7 @@ def decrypt(meta, passwd, checksum=False):
     jeśli dane są skompresowane, to informacja o tym musi być zawarta w meta, inaczej nie zostaną rozpakowane
     """
     # rozszyfrowanie danych
-    iv = meta['iv'].decode('hex')
+    iv = unhexlify(meta['iv'])
     ogon = int(meta['trim'])
     data = decrypt_aes(meta['payload'], passwd, iv, ogon)
 
@@ -130,7 +132,7 @@ def decrypt(meta, passwd, checksum=False):
         m.update(data)
         m.update(iv)
         if meta['crc']!=m.hexdigest():
-            raise Exception, "Data corrupted, check password"
+            raise Exception("Data corrupted, check password")
 
     # jeśli dane zostały skompresowne to rozpakowanie
     if 'pack' in meta:

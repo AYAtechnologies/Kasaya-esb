@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
-from __future__ import unicode_literals
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.protocol import serialize, deserialize, messages
 from kasaya.core.lib import LOG
 from kasaya.core import exceptions
@@ -207,17 +207,25 @@ def exception_serialize(exc, internal=None):
     """
     # try to extract traceback
     tb = traceback.format_exc()
-    if not type(tb)==unicode:
+
+    if sys.version_info<(3,0):
+        # python 2
+        if not type(tb)==unicode:
+            try:
+                tb = unicode(tb,"utf-8")
+            except:
+                tb = repr(tb)
+
+        # error message
+        errmsg = exc.message
         try:
-            tb = unicode(tb,"utf-8")
+            errmsg = unicode(errmsg, "utf-8")
         except:
-            tb = repr(tb)
-    # error message
-    errmsg = exc.message
-    try:
-        errmsg = unicode(errmsg, "utf-8")
-    except:
-        errmsg = repr(errmsg)
+            errmsg = repr(errmsg)
+
+    else:
+        # python 3
+        errmsg = str(exc)
 
     if internal is None:
         # try to guess if exception is servicebus internal internal,

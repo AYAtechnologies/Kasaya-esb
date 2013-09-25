@@ -1,6 +1,7 @@
 #coding: utf-8
+import __future__
 import os, codecs
-from parsers import load_config_file as __load_config_file
+from .parsers import load_config_file as __load_config_file
 
 
 SERVICE_CONFIG_NAME = "service.conf"
@@ -36,10 +37,10 @@ def set_value(k,v):
 
 
 def load_defaults():
-    import defaults
+    from . import defaults
     global settings
     # loading default settings
-    for k,v in defaults.__dict__.iteritems():
+    for k,v in defaults.__dict__.items():
         if k in defaults.__builtins__:
             continue
         if k.startswith("__"):

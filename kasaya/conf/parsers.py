@@ -1,7 +1,10 @@
 #coding: utf-8
+import __future__
 import os, codecs
-from ConfigParser import SafeConfigParser, NoSectionError
-#from kasaya.conf import set_value
+try:
+    from ConfigParser import SafeConfigParser, NoSectionError
+except ImportError:
+    from configparser import SafeConfigParser, NoSectionError
 
 
 
@@ -69,7 +72,7 @@ class CombinedConfig(object):
         except IOError as e:
             if optional:
                 if verbose:
-                    print "Optional config file [%s] not exists. Skipping." % filename
+                    print ("Optional config file [%s] not exists. Skipping." % filename)
                 return False
             else:
                 raise e
@@ -126,11 +129,11 @@ def load_config_file(filename, section, optional, set_value, verbose=True):
     except IOError as e:
         if optional:
             if verbose:
-                print "Optional config file [%s] not exists. Skipping." % filename
+                print ("Optional config file [%s] not exists. Skipping." % filename)
             return False
         else:
             if verbose:
-                print "Config file [%s] not exists. Stopping." % filename
+                print ("Config file [%s] not exists. Stopping." % filename)
             import sys
             sys.exit(1)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
-from __future__ import unicode_literals
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.protocol import serialize, deserialize, messages
 from kasaya.core.lib.comm import send_and_receive
 from kasaya.conf import settings

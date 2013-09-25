@@ -1,7 +1,8 @@
 #encoding: utf-8
+from __future__ import division, absolute_import, print_function, unicode_literals
+from .proxies import *
 __author__ = 'wektor'
 
-from proxies import *
 
 class ExecContext(object):
     """

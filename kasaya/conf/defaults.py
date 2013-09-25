@@ -1,5 +1,9 @@
 #coding: utf-8
-from __future__ import unicode_literals
+from __future__ import division, absolute_import, print_function, unicode_literals
+
+# whole service bus internally uses one protocol
+# supported protocols: msgpack, bson
+TRANSPORT_PROTOCOL = "bson"
 
 # internal setting, don't change
 LOGGER_NAME = "syncd"

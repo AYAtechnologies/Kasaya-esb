@@ -19,9 +19,9 @@ class MiddlewareCore(object):
             if not o:
                 o = mo(self)
             if not isinstance(o, MiddlewareImplementationBase):
-                print "Unknown middleware call:", o
+                print ("Unknown middleware call:", o)
                 return
-        print o
+        #print o
         return o
 
     def setup_middleware(self):

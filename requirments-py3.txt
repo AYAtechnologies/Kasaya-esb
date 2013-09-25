@@ -1,0 +1,8 @@
+netifaces-py3
+greenlet
+pyzmq
+git+https://github.com/fantix/gevent.git
+plac
+pycrypto
+msgpack-python
+

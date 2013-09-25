@@ -28,6 +28,28 @@ Python requirements are automatically installed when using pip to install Kasaya
     plac
 
 
+Installation for Python 3
+==========================
+
+system dependencies
+
+    apt-get install python3 python3-setuptools python3-pip
+
+Optionally install virtualenv
+
+    pip3 install virtualenv
+
+Python modules. Until gevent will not support python 3, we use fantix's fork of gevent which work witch python 3.
+
+    netifaces-py3
+    greenlet
+    pyzmq
+    git+https://github.com/fantix/gevent.git
+    plac
+    pycrypto
+    msgpack-python
+
+
 Configuration
 =============
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
-from __future__ import unicode_literals
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.protocol import messages, serialize, deserialize
 from kasaya.core.client.queries import SyncDQuery
@@ -53,7 +53,7 @@ class GenericProxy(MiddlewareCore):
         return res
 
     def __call__(self, *args, **kwargs):
-        print "generic proxy", self._names
+        print ("generic proxy", self._names)
         raise NotImplemented
 
 

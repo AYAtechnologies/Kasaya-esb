@@ -1,6 +1,7 @@
 #coding: utf-8
-from exec_context import ExecContext
-from proxies import async_result
+from __future__ import division, absolute_import, print_function, unicode_literals
+from .exec_context import ExecContext
+from .proxies import async_result
 
 __all__ = ("sync", "async", "register_auth_processor", "async_result")
 

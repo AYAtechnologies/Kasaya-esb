@@ -1,2 +1,3 @@
 #coding: utf-8
-from serializer import *
+import __future__
+from .serializer import *

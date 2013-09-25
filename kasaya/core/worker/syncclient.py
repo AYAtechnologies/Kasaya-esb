@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 #coding: utf-8
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
 from kasaya.core.protocol import serialize, deserialize, messages
 from kasaya.core.exceptions import ReponseTimeout
-from gevent.coros import Semaphore
+#from gevent.coros import Semaphore
 import zmq.green as zmq
 import gevent
-
 
 
 class SyncClient(object):
@@ -28,7 +28,7 @@ class SyncClient(object):
         }
         # connect to zmq
         self.connect()
-        self.SEMA = Semaphore()
+        #self.SEMA = Semaphore()
 
     def connect(self):
         self.ctx = zmq.Context()
@@ -53,10 +53,11 @@ class SyncClient(object):
                 self.sync_sender.recv()
                 return True
         except ReponseTimeout:
-            self.SEMA.acquire()
+            #with Semaphore():
+            #self.SEMA.acquire()
             self.disconnect()
             self.connect()
-            self.SEMA.release()
+            #self.SEMA.release()
             return False
 
     def notify_live(self):

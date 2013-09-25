@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
-from __future__ import unicode_literals
+from __future__ import division, absolute_import, print_function, unicode_literals
 
 # worker join and leave
 WORKER_LIVE = "wrkr/up"
@@ -25,10 +25,4 @@ RESULT = "call/result" # result of synchronous task
 ERROR = "call/error" # exception thrown in task
 # null message
 NOOP = "noop" # null message
-
-
-# TODO: make functions to create more complicated messages
-
-#def make_error_message(exception):
-#    pass
 

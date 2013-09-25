@@ -1,154 +1,133 @@
 #coding: utf-8
+from __future__ import division, absolute_import, print_function, unicode_literals
+from kasaya.core.protocol.encryption import encrypt, decrypt
 from kasaya.conf import settings
 from kasaya.core import exceptions
-import msgpack
-import datetime
-import encryption
 from decimal import Decimal
+#import msgpack
+import datetime
 
 
 __all__ = ("serialize", "deserialize")
 
 
-def encode_ext_types(obj):
-    """
-    Convert unknown for messagepack protocol types to dicts
-    """
-    encoders = {
-        # datetime
-        datetime.datetime: (
-            'datetime',
-            lambda obj:obj.strftime("%Y%m%dT%H:%M:%S.%f")
-        ),
 
-        # date
-        datetime.date: (
-            'date',
-            lambda obj:obj.strftime("%Y%m%d")
-        ),
-
-        # time
-        datetime.time: (
-            'time',
-            lambda obj:obj.strftime("%H:%M:%S.%f")
-        ),
-
-        # timedelta
-        datetime.timedelta: (
-            'timedelta',
-            lambda obj: "%i:%i:%i" % (obj.days, obj.seconds, obj.microseconds)
-        ),
-
-        Decimal: (
-            'decimal',
-            lambda obj: str(obj)
-        )
+def plain_serialize(msg):
+    message = {
+        'ver':1,
+        'sb':settings.SERVICE_BUS_NAME,
+        'payload':msg,
     }
-
-    key = type(obj)#.__class__
-    if key in encoders:
-        n,f = encoders[obj.__class__]
-        return {'__customtype__':n, 'as_str':f(obj) }
-    raise Exception("Encoding of %s is not possible " % key)
-    return obj
+    return data_2_bin(message)
 
 
-
-def decode_obj_types(obj):
-    """
-    Reverse operation for encode_ext_types
-    """
-    decoders = {
-        'datetime':
-            lambda S : datetime.datetime.strptime( S, "%Y%m%dT%H:%M:%S.%f"),
-        'date':
-            lambda S : datetime.datetime.strptime( S, "%Y%m%d").date(),
-        'time':
-            lambda S : datetime.datetime.strptime( S, "%H:%M:%S.%f").time(),
-        'timedelta':
-            lambda S : datetime.timedelta(  **dict( [ (n,int(v)) for n, v in zip(("days","seconds","microseconds"), S.split(":")) ])  ),
-
-        'decimal':
-            lambda S : Decimal(S),
-    }
+def plain_deserialize(msg):
+    data = bin_2_data(msg)
+    # check protocol version
     try:
-        key = obj['__customtype__']
+        if data['ver']!=1:
+            raise exceptions.ServiceBusException("Unknown service bus protocol version")
     except:
-        return obj
+        raise exceptions.MessageCorrupted()
+
+    # is this message coming from our servicebus?
     try:
-        func = decoders[key]
+        if not data['sb'] == settings.SERVICE_BUS_NAME:
+            raise exceptions.NotOurMessage()
     except KeyError:
-        return obj
-    return func(obj['as_str'])
+        raise exceptions.NotOurMessage()
+
+    try:
+        return data['payload']
+    except:
+        raise exceptions.MessageCorrupted()
 
 
 
-def serialize(msg):
-    if settings.ENCRYPTION:
-        msg = msgpack.packb(msg, default=encode_ext_types)
-        meta = encryption.encrypt(msg, settings.PASSWORD, compress=settings.COMPRESSION)
-        meta['ver'] = 1
-        meta['_n_'] = settings.SERVICE_BUS_NAME
-        return msgpack.packb(meta)
-    else:
-        msg['ver'] = 1
-        meta['_n_'] = settings.SERVICE_BUS_NAME
-        msg = msgpack.packb(msg, default=encode_ext_types)
-        return msg
+
+def encrypted_serialize(payload):
+    global __passwd
+    payload = data_2_bin(payload)
+    message = encrypt(payload, __passwd, compress=settings.COMPRESSION)
+    message['ver'] = 1
+    message['sb'] = settings.SERVICE_BUS_NAME
+    return data_2_bin(message)
 
 
+def encrypted_deserialize(msg):
+    global __passwd
+    msg = bin_2_data(msg)
+    # check protocol version
+    try:
+        if msg['ver']!=1:
+            raise exceptions.ServiceBusException("Unknown service bus protocol version")
+    except:
+        raise exceptions.MessageCorrupted()
 
-def deserialize(msg):
-    if settings.ENCRYPTION:
-        # message is encrypted
-        try:
-            msg = msgpack.unpackb(msg)
-        except msgpack.exceptions.UnpackException:
-            raise exceptions.MessageCorrupted()
-
-        # check protocol version
-        try:
-            if msg['ver']!=1:
-                raise exceptions.ServiceBusException("Unknown service bus protocol version")
-        except:
-            raise exceptions.MessageCorrupted()
-
-        # is this message coming from our servicebus?
-        try:
-            if not msg['_n_'] == settings.SERVICE_BUS_NAME:
-                raise exceptions.NotOurMessage()
-        except KeyError:
+    # is this message coming from our servicebus?
+    try:
+        if msg['sb'] != settings.SERVICE_BUS_NAME:
             raise exceptions.NotOurMessage()
+    except KeyError:
+        raise exceptions.NotOurMessage()
 
+    r = decrypt(msg, __passwd)
+    print (r)
+
+    try:
+        msg = decrypt(msg, __passwd)
+    except Exception:
+        raise exceptions.MessageCorrupted()
+
+    # unpack message
+    return bin_2_data(msg)
+
+
+
+
+def prepare_serializer():
+    global __passwd
+    global bin_2_data, data_2_bin
+    global serialize, deserialize
+
+    import hashlib
+    import sys
+
+    if settings.ENCRYPTION:
+        print ("Encryption ON")
+        # python 3 hack on password
         try:
-            msg = encryption.decrypt(msg, settings.PASSWORD)
-        except Exception:
-            raise exceptions.MessageCorrupted()
-
-        # unpack message
-        data = msgpack.unpackb(msg, object_hook=decode_obj_types)
-        return data
+            p = bytes(settings.PASSWORD, "ascii")
+            __passwd = hashlib.sha256(p).digest()
+        except TypeError:
+            p = settings.PASSWORD
+            __passwd = hashlib.sha256(p).digest()
+        serialize = encrypted_serialize
+        deserialize = encrypted_deserialize
+        from binascii import hexlify
+        print ("         ",hexlify(__passwd) )
 
     else:
-        # message is unencrypted
-        try:
-            data = msgpack.unpackb(msg, object_hook=decode_obj_types)
-        except msgpack.exceptions.UnpackException:
-            raise exceptions.MessageCorrupted()
+        print ("No encryption")
+        serialize = plain_serialize
+        deserialize = plain_deserialize
 
-        # check protocol version
-        try:
-            if data['ver']!=1:
-                raise exceptions.ServiceBusException("Unknown service bus protocol version")
-        except:
-            raise exceptions.MessageCorrupted()
+    # transport protocol
+    if settings.TRANSPORT_PROTOCOL=="bson":
+        if sys.version_info<(3,0):
+            print ("PYTHON 2")
+            # python 2 bson
+            from kasaya.core.protocol.transport.tr_bson2 import bin_2_data, data_2_bin
+        else:
+            print ("PYTHON 3")
+            # python 3 bson
+            from kasaya.core.protocol.transport.tr_bson3 import bin_2_data, data_2_bin
 
-        # is this message coming from our servicebus?
-        try:
-            if not data['_n_'] == settings.SERVICE_BUS_NAME:
-                raise exceptions.NotOurMessage()
-        except KeyError:
-            raise exceptions.NotOurMessage()
+    elif settings.TRANSPORT_PROTOCOL=="msgpack":
+        from transport.tr_msgpack import bin_2_data, data_2_bin
 
-        return data
+    else:
+        raise Exception("Unsupported transport protocol %s" % settings.TRANSPORT_PROTOCOL)
 
+
+prepare_serializer()

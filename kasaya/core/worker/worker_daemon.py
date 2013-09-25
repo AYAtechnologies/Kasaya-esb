@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
-from __future__ import unicode_literals
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
 from kasaya.core.lib.binder import bind_socket_to_port_range
 from kasaya.core.protocol import messages
@@ -8,15 +8,14 @@ from kasaya.core.lib.comm import RepLoop, send_and_receive, exception_serialize_
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system
-from worker_reg import worker_methods_db
+from .worker_reg import worker_methods_db
+from .syncclient import SyncClient
 import zmq.green as zmq
-from syncclient import SyncClient
-import traceback
-import datetime
 import gevent
-import uuid
+
+import traceback
+import datetime, uuid, os
 import inspect
-import os
 
 __all__=("WorkerDaemon",)
 

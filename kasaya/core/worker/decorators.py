@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
-from worker_reg import worker_methods_db
+from __future__ import division, absolute_import, print_function, unicode_literals
+from .worker_reg import worker_methods_db
 
 
 class Task(object):

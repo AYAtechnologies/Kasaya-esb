@@ -1,8 +1,9 @@
 #coding: utf-8
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.protocol import messages
 from kasaya.core.client.queries import SyncDQuery
 from kasaya.conf import settings
-from generic_proxy import GenericProxy
+from .generic_proxy import GenericProxy
 
 class SyncProxy(GenericProxy):
     def __call__(self, *args, **kwargs):

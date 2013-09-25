@@ -1,3 +1,4 @@
 #coding: utf-8
-from worker_daemon import WorkerDaemon
-from decorators import Task
+import __future__
+from .worker_daemon import WorkerDaemon
+from .decorators import Task
