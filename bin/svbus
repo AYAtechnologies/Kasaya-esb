@@ -3,7 +3,7 @@
 from __future__ import unicode_literals, print_function
 from kasaya.core.client import control
 from kasaya.conf import load_config_from_file
-import plac
+import plac, datetime
 #from pprint import pprint
 
 
@@ -104,11 +104,14 @@ class Jobs(object):
             print ("Worker not found (uuid: %s)" % uuid)
             return
 
+        uptime = str( datetime.timedelta(seconds=res['uptime'] ) )
+
         ln = "{0:>26}: {1}"
         print (ln.format("service name",res['service']))
         addr = "%s:%i" % (res['ip'], res['port'])
         print ( ln.format("address", addr) )
         print ( ln.format("used memory", "{:,} KB".format(res['mem_total'])) )
+        print ( ln.format("uptime", uptime) )
         ttot = res['task_err'] + res['task_ctl'] + res['task_succ']
         print ( ln.format("total processed tasks", ttot) )
         print ( ln.format("successfull tasks", res['task_succ']) )
