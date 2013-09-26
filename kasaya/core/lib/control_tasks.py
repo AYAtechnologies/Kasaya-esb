@@ -71,9 +71,9 @@ class ControlTasks(object):
             raise exceptions.MethodNotFound("Control method %s not exists" % method)
 
         # fill missing parameters
-        if not 'args' in message:
+        if 'args' not in message:
             message['args'] = []
-        if not 'kwargs' in message:
+        if 'kwargs' not in message:
             message['kwargs'] = {}
 
         try:

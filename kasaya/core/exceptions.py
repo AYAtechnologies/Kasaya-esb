@@ -5,6 +5,12 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 class ServiceBusException(Exception):
     pass
 
+class SerializationError(ServiceBusException):
+    """
+    Serialization of data to transfer fails. Probably used transport desn't support used data type.
+    """
+    pass
+
 
 class NotOurMessage(ServiceBusException):
     pass

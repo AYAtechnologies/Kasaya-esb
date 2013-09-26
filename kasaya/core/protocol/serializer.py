@@ -18,7 +18,10 @@ def plain_serialize(msg):
         'sb':settings.SERVICE_BUS_NAME,
         'payload':msg,
     }
-    return data_2_bin(message)
+    try:
+        return data_2_bin(message)
+    except Exception as e:
+        raise exceptions.SerializationError("Serialization error")
 
 
 def plain_deserialize(msg):
@@ -47,7 +50,10 @@ def plain_deserialize(msg):
 
 def encrypted_serialize(payload):
     global __passwd
-    payload = data_2_bin(payload)
+    try:
+        payload = data_2_bin(payload)
+    except Exception as e:
+        raise exceptions.SerializationError("Serialization error")
     message = encrypt(payload, __passwd, compress=settings.COMPRESSION)
     message['ver'] = 1
     message['sb'] = settings.SERVICE_BUS_NAME

@@ -97,14 +97,22 @@ class RepLoop(BaseLoop):
         self.SOCK.send( serialize(noop) )
 
     def send(self, message):
-        self.SOCK.send( serialize(message) )
+        try:
+            packet = serialize(message)
+        except exceptions.SerializationError as e:
+            try:
+                packet = exception_serialize_internal( str(e) )
+                packet = serialize(packet)
+            except:
+                self.send_noop()
+                return
+        self.SOCK.send( packet )
 
 
     def loop(self):
         while self.is_running:
             # receive data
             msgdata = self.SOCK.recv()
-
             # deserialize
             try:
                 msgdata = deserialize(msgdata)
@@ -260,7 +268,7 @@ def exception_deserialize(msg):
     #If message doesn't contains exception, then result will be None.
     """
     if msg['internal']:
-        e = ServiceBusException(msg['description'])
+        e = exceptions.ServiceBusException(msg['description'])
     else:
         e = Exception(msg['description'])
     try:

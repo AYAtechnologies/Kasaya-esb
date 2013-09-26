@@ -3,4 +3,5 @@ pyzmq
 gevent
 plac
 pycrypto
-msgpack-python
+# msgpack-python
+bson

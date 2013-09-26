@@ -184,8 +184,11 @@ class WorkerDaemon(MiddlewareCore):
         """
         Return current worker stats
         """
+        LOG.debug("robie...")
         now = datetime.datetime.now()
+        LOG.debug("...cholernego...")
         uptime = now - self._start_time
+        LOG.debug("...statsa!")
         return {
             "task_succ" : self._tasks_succes,
             "task_err"  : self._tasks_error,
