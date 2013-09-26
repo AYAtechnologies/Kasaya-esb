@@ -3,7 +3,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 
 # whole service bus internally uses one protocol
 # supported protocols: msgpack, bson
-TRANSPORT_PROTOCOL = "bson"
+TRANSPORT_PROTOCOL = "pickle"
 
 # internal setting, don't change
 LOGGER_NAME = "syncd"

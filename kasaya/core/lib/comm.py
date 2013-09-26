@@ -7,6 +7,7 @@ from kasaya.core import exceptions
 import zmq.green as zmq
 import gevent
 import traceback, sys
+from binascii import hexlify
 
 
 
@@ -125,7 +126,7 @@ class RepLoop(BaseLoop):
             except Exception as e:
                 self.send_noop()
                 LOG.warning("Message deserialisation error")
-                LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % msgdata[:1024].encode("hex"))
+                LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % hexlify(msgdata[:1024]))
                 continue
 
             try:

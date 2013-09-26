@@ -104,8 +104,8 @@ def encrypt(data, passwd, checksum=False, compress=False):
         m = hashlib.md5()
         m.update(data)
     res, iv, ogon = encrypt_aes(data, passwd)
-    meta['iv'] = hexlify(iv)
-    meta['trim'] = str(ogon)
+    meta['iv'] = iv
+    meta['trim'] = ogon
     # po całej operacji dodajemy do hasha iv,
     # tak że nawet dwa identyczne wpisy będą zawierały
     # różnych hash
@@ -122,9 +122,7 @@ def decrypt(meta, passwd, checksum=False):
     jeśli dane są skompresowane, to informacja o tym musi być zawarta w meta, inaczej nie zostaną rozpakowane
     """
     # rozszyfrowanie danych
-    iv = unhexlify(meta['iv'])
-    ogon = int(meta['trim'])
-    data = decrypt_aes(meta['payload'], passwd, iv, ogon)
+    data = decrypt_aes(meta['payload'], passwd, meta['iv'], meta['trim'])
 
     # kontrola CRC
     if checksum:

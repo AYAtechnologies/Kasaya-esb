@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasatest/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasa33/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasatest/bin/python
 from __future__ import division, absolute_import, print_function, unicode_literals
 import unittest, os
 # misc
@@ -82,7 +82,7 @@ class SerializerTests(unittest.TestCase):
         result2 = deserialize(result1)
         self.assertEqual(result2, msg)
 
-    def _test_plain(self):
+    def test_plain(self):
         """
         Check Crypto library with AES
         """
