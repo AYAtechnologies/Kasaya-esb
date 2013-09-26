@@ -1,6 +1,6 @@
 #!/home/moozg/venvs/kasatest/bin/python
-#!/home/moozg/venvs/kasa33/bin/python
 #coding: utf-8
+#!/home/moozg/venvs/kasa33/bin/python
 from __future__ import division, absolute_import, print_function, unicode_literals
 import unittest, os
 # misc
@@ -75,7 +75,8 @@ class SerializerTests(unittest.TestCase):
         msg = {
             "field_1":12345678,
             "field_2":"trololo",
-            "flo":274.123
+            "flo":274.123,
+            "żółw":"zażółć gęślą jaźń"
         }
         result1 = serialize(msg)
         result2 = deserialize(result1)
@@ -90,7 +91,8 @@ class SerializerTests(unittest.TestCase):
         msg = {
             "field_1":12345678,
             "field_2":"trololo",
-            "flo":274.123
+            "flo":274.123,
+            "żółw":"zażółć gęślą jaźń"
         }
         result1 = serialize(msg)
         result2 = deserialize(result1)

@@ -22,7 +22,6 @@ class ExecContext(object):
 
     def _make_proxy(self, name):
         proxy = self._proxy[name]()
-        #print proxy
         proxy._top = proxy # << zrobić tutaj weakref aby zlikwidować cykliczne odwołanie do samego siebie
         proxy._context = self._context
         proxy._timeout = self._timeout
@@ -32,9 +31,7 @@ class ExecContext(object):
         if itemname.startswith("_"):
             return super(ExecContext, self).__getattribute__(itemname)
         if itemname in self._proxy.keys():
-            #print itemname
             proxy = self._make_proxy(itemname)
-            #proxy._names.append(itemname)
         else:
             proxy = self._make_proxy(self._default_proxy)
             proxy._names.append(itemname)

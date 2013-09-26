@@ -72,7 +72,6 @@ def encrypted_deserialize(msg):
         raise exceptions.NotOurMessage()
 
     r = decrypt(msg, __passwd)
-    print (r)
 
     try:
         msg = decrypt(msg, __passwd)
@@ -94,8 +93,6 @@ def prepare_serializer():
     import sys
 
     if settings.ENCRYPTION:
-        print ("Encryption ON")
-        # python 3 hack on password
         try:
             p = bytes(settings.PASSWORD, "ascii")
             __passwd = hashlib.sha256(p).digest()
@@ -105,21 +102,17 @@ def prepare_serializer():
         serialize = encrypted_serialize
         deserialize = encrypted_deserialize
         from binascii import hexlify
-        print ("         ",hexlify(__passwd) )
 
     else:
-        print ("No encryption")
         serialize = plain_serialize
         deserialize = plain_deserialize
 
     # transport protocol
     if settings.TRANSPORT_PROTOCOL=="bson":
         if sys.version_info<(3,0):
-            print ("PYTHON 2")
             # python 2 bson
             from kasaya.core.protocol.transport.tr_bson2 import bin_2_data, data_2_bin
         else:
-            print ("PYTHON 3")
             # python 3 bson
             from kasaya.core.protocol.transport.tr_bson3 import bin_2_data, data_2_bin
 

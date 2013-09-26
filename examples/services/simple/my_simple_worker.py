@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #coding: utf-8
-from kasaya.core.worker import Task
+from kasaya import Task
 import time
 
 @Task(name="print_foo")

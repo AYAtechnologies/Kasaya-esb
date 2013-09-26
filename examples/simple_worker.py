@@ -2,9 +2,11 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import load_config_from_file
-from kasaya.core.worker import Task
+from kasaya import Task
+
 
 import time
+
 
 @Task(name="print_foo")
 def print_foo(param):
@@ -34,10 +36,8 @@ def wrong_task(param):
     return param / 0
 
 
-from kasaya.core.worker import WorkerDaemon
-
-
 if __name__=="__main__":
+    from kasaya import WorkerDaemon
     load_config_from_file("example.conf", optional=True)
     daemon = WorkerDaemon("myservice")
     daemon.run()

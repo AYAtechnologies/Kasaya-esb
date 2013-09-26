@@ -8,6 +8,13 @@ from kasaya.core.lib.comm import send_and_receive_response
 from kasaya.core import exceptions
 import zmq.green as zmq
 
+# on python 2 we need to fix some strings to unicode
+# this is required to work with python 3 workers called with python 2 clients
+import sys
+_namefix = sys.version_info<(3,0)
+del sys
+
+
 
 class GenericProxy(MiddlewareCore):
     """
@@ -31,6 +38,7 @@ class GenericProxy(MiddlewareCore):
 
     def __getattr__(self, itemname):
         if itemname.startswith("_"):
+            # zbędne
             return super(GenericProxy, self).__getattribute__(itemname)
         #M = GenericProxy(top=self._top)
         self._names.append(itemname)
@@ -47,6 +55,10 @@ class GenericProxy(MiddlewareCore):
         return addr
 
     def _send_message(self, addr, msg):
+        global _namefix
+        if _namefix:
+            msg['service'] = unicode(msg['service'],'ascii')
+            msg['method'] = [ unicode(m,"ascii") for m in msg['method']]
         msg = self.prepare_message(msg) # _middleware hook
         res = send_and_receive_response(self._z_context, addr, msg, 30)
         res = self.postprocess_message(res) # _middleware hook

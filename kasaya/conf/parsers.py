@@ -1,5 +1,5 @@
 #coding: utf-8
-import __future__
+from __future__ import division, absolute_import, print_function, unicode_literals
 import os, codecs
 try:
     from ConfigParser import SafeConfigParser, NoSectionError

@@ -44,6 +44,7 @@ class AsyncProxy(GenericProxy):
         }
         return self._send_message(addr, msg)
 
+
 def async_result(task_id, context):
     #execute_sync_task(method, context, args, kwargs, addr = None)
     m = [settings.ASYNC_DAEMON_SERVICE, "get_task_result"]
@@ -51,6 +52,7 @@ def async_result(task_id, context):
     s._names = m
     s._context = context
     return s(task_id)
+
 
 class ControlProxy(GenericProxy):
     def __call__(self, *args, **kwargs):

@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 from kasaya.conf import load_config_from_file
 #from kasaya.core import client
-from kasaya.core.client import sync, async, control, trans
+from kasaya import sync, async, control, trans
 
 if __name__=="__main__":
     load_config_from_file("example.conf", optional=True)
