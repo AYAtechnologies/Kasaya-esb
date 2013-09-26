@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
-import sys, os, resource
+import sys, os
 
 
 
 def close_all_fds():
+    """
+    Theoretically this should be called when daemonizing process,
+    but it just kills daemon without any notification what goes wrong,
+    so we never use this function in our code.
+    """
+    import resource
     maxfd = resource.getrlimit(resource.RLIMIT_NOFILE)[1]
     if (maxfd == resource.RLIM_INFINITY):
         maxfd = MAXFD
@@ -18,7 +24,7 @@ def close_all_fds():
 
 def createDaemon(UMASK=0, MAXFD=1024):
     """
-    function is based on this receipe:
+    this function is based on this receipe:
     http://code.activestate.com/recipes/278731-creating-a-daemon-the-python-way/
     """
     # first fork
@@ -32,7 +38,7 @@ def createDaemon(UMASK=0, MAXFD=1024):
             os._exit(0)
     else:
         os._exit(0)
-    # close_all_fds() # <- this function kill daemon
+    # close_all_fds() # <- this function will kill your daemon silently
     return 0
 
 
@@ -53,7 +59,7 @@ if __name__=="__main__":
     from kasaya.conf import set_value, settings
 
     # additional settings
-    for k,v in os.environ.iteritems():
+    for k,v in os.environ.items():
         if k.startswith("SV_CNF_"):
             k = k[7:]
             if len(k)>1:
@@ -72,8 +78,8 @@ if __name__=="__main__":
     sys.stdout = stdLogOut(LOG, "DEBUG")
     sys.stderr = stdLogOut(LOG, "ERROR")
 
-    # tadaaam!
-    from kasaya.core.worker import WorkerDaemon
+    # import daemon and start working
+    from kasaya import WorkerDaemon
 
     cwd = os.getcwd()
     if not cwd in sys.path:
