@@ -1,5 +1,5 @@
 #coding: utf-8
-from __future__ import unicode_literals
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
 from kasaya.core.protocol import messages
 from kasaya.core import exceptions
@@ -60,6 +60,7 @@ class SyncWorker(object):
         self.ctl.register_task("worker.stats",  self.CTL_worker_stats)
         self.ctl.register_task("service.start", self.CTL_service_start)
         self.ctl.register_task("service.stop",  self.CTL_service_stop)
+        self.ctl.register_task("host.rescan",   self.CTL_host_rescan)
 
 
     def get_sync_address(self, ip):
@@ -112,9 +113,19 @@ class SyncWorker(object):
         """
         List of local services available
         """
-        if rescan or (self.__services is None):
+        if self.__services is None:
             self.__services = servicesctl.local_services()
-        return self.__services.keys()
+            res = self.__services.keys()
+            rescan = None
+
+        if rescan:
+            self.__services = servicesctl.local_services()
+            res = self.__services.keys()
+            self.DB.host_update_services( self.DAEMON.uuid, res )
+            return res
+
+        res = self.__services.keys()
+        return res
 
 
     def local_services_stats(self):
@@ -124,6 +135,7 @@ class SyncWorker(object):
         of workers currently running for this service.
         """
         svlist = self.local_services_list()
+        print ("svlist",svlist)
         result = {}
         # list of running workers
         for wrk in self.DB.get_local_workers():
@@ -439,3 +451,15 @@ class SyncWorker(object):
 
         uuid = random.choice(services)
         return self.CTL_worker_stop(uuid)
+
+
+    def CTL_host_rescan(self, ip=None):
+        """
+        Rescan services available on local host
+        """
+        if ip is None:
+            ip = self.intersync.ip
+        self.redirect_or_pass_by_ip(ip)
+        svl = self.local_services_list(rescan=True)
+        print (svl)
+

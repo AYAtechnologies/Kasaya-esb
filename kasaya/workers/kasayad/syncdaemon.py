@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #coding: utf-8
-from __future__ import unicode_literals
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
 from kasaya.core.lib import LOG, system
-from syncworker import SyncWorker
+from .syncworker import SyncWorker
 import gevent, uuid
 
 
@@ -47,7 +47,7 @@ class SyncDaemon(object):
         """
         backend = settings.SYNC_DB_BACKEND
         if backend=="memory":
-            from db.memsqlite import MemoryDB
+            from .db.memsqlite import MemoryDB
             return MemoryDB()
         raise Exception("Unknown database backend: %s" % backend)
 
@@ -65,7 +65,7 @@ class SyncDaemon(object):
         """
         backend = settings.SYNC_BACKEND
         if backend=="udp-broadcast":
-            from broadcast.udp import UDPBroadcast
+            from .broadcast.udp import UDPBroadcast
             return UDPBroadcast(server=self)
         raise Exception("Unknown broadcast backend: %s" % backend)
 

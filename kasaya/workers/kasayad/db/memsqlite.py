@@ -115,6 +115,31 @@ class MemoryDB(BaseDB):
 
     # global network state
 
+    def host_add_service(self, host_uuid, sname):
+        """
+        Dodanie serwisu do hosta
+        """
+        self.cur.execute(
+            "INSERT INTO services ('host_uuid','name') VALUES (?,?)",
+            (host_uuid, sname))
+
+    def host_del_service(self, host_uuid, sname):
+        """
+        Usunięcie serwisu z hosta
+        """
+        self.cur.execute(
+            "DELETE FROM services WHERE host_uuid=? AND name=?",
+            (host_uuid, sname) )
+
+    def host_clear_services(self, host_uuid):
+        """
+        Usunięcie wszystkich serwisów z serwera
+        """
+        self.cur.execute(
+            "DELETE FROM services WHERE host_uuid=?",
+            [host_uuid] )
+
+
     def host_register(self, host_uuid, hostname, addr, services=None):
         # sprawdzenie czy worker istnieje w bazie
         self.SEMA.acquire()
@@ -133,16 +158,12 @@ class MemoryDB(BaseDB):
         self.cur.execute(
             "INSERT INTO hosts ('uuid','addr','hostname') VALUES (?,?,?)",
             (host_uuid, addr, hostname))
-        # services available on host
-        if not services is None:
-            for name in services:
-                self.cur.execute(
-                    "INSERT INTO services ('host_uuid','name') VALUES (?,?)",
-                    (host_uuid, name))
         self.__db.commit()
         self.SEMA.release()
+        # services available on host
+        if not services is None:
+            self.host_update_services(host_uuid, services)
         return True
-
 
     def host_unregister(self, uuid):
         """
@@ -167,9 +188,7 @@ class MemoryDB(BaseDB):
             "DELETE FROM hosts WHERE uuid=?",
             [uuid] )
         # usunięcie wpisów o serwisach
-        self.cur.execute(
-            "DELETE FROM services WHERE host_uuid=?",
-            [uuid] )
+        self.host_clear_services(uuid)
         self.__db.commit()
         self.SEMA.release()
 
@@ -186,6 +205,23 @@ class MemoryDB(BaseDB):
         self.SEMA.release()
         res = [ l[0] for l in lst ]
         return res
+
+
+    def host_update_services(self, host_uuid, services):
+        """
+        Aktualizacja listy wbudowanych serwisów
+        """
+        newset = set(services)
+        todel = set()
+        for s in self.host_services(host_uuid):
+            if s in newset:
+                newset.discard(s)
+            else:
+                todel.add(s)
+        for s in newset:
+            self.host_add_service(host_uuid, s)
+        for s in todel:
+            self.host_del_service(host_uuid, s)
 
 
     # raportowanie stanu sieci

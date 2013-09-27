@@ -2,7 +2,7 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from kasaya.conf import load_config_from_file
-from kasaya.workers.syncd import SyncDaemon
+from kasaya.workers.kasayad import SyncDaemon
 
 
 if __name__=="__main__":

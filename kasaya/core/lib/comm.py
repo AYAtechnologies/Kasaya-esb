@@ -97,6 +97,7 @@ class RepLoop(BaseLoop):
         noop = {"message":messages.NOOP}
         self.SOCK.send( serialize(noop) )
 
+
     def send(self, message):
         try:
             packet = serialize(message)
@@ -120,7 +121,7 @@ class RepLoop(BaseLoop):
 
             except exceptions.NotOurMessage:
                 # not our servicebus message
-                self.SOCK.send(b"")
+                self.send_noop()
                 continue
 
             except Exception as e:
@@ -132,6 +133,7 @@ class RepLoop(BaseLoop):
             try:
                 msg = msgdata['message']
             except KeyError:
+                self.send_noop()
                 LOG.debug("Decoded message is incomplete. Message dump: %s" % repr(msgdata) )
                 continue
 
@@ -150,10 +152,10 @@ class RepLoop(BaseLoop):
                 result = handler(msgdata)
             except Exception as e:
                 result = exception_serialize(e, False)
+                self.send(result)
                 LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
                 LOG.debug("Message dump: %s" % repr(msgdata) )
                 LOG.debug(result['traceback'])
-                self.send(result)
                 continue
 
             # send result

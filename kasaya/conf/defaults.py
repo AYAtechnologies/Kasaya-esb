@@ -97,4 +97,4 @@ USE_AUTH_SERVICE = False
 USE_LOG_SERVICE = False
 
 # User workers directory
-USER_WORKERS_DIR = "/opt/services"
+LOCAL_WORKERS_DIR = "/opt/services"

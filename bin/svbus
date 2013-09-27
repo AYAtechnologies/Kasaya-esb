@@ -8,7 +8,7 @@ import plac, datetime
 
 
 class Jobs(object):
-    commands = ['list', 'wrkstop', 'wrkstats', 'svcstart', 'svcstop']
+    commands = ['list', 'rescan', 'wrkstop', 'wrkstats', 'svcstart', 'svcstop']
 
 
     def __init__(self):
@@ -120,20 +120,39 @@ class Jobs(object):
         print ( ln.format("non existing method calls", res['task_nonx']) )
 
 
-
     @plac.annotations(
         name=("name of the service to start"),
         ip=("IP of host on which service should be started")
     )
     def svcstart(self, name, ip=None):
+        """
+        Start service on current host or on remote host with given ip address
+        """
         res = control.service.start(name, ip)
+
 
     @plac.annotations(
         servicename=("name of the service to stop"),
         ip=("IP of host on which service should be stopped")
     )
     def svcstop(self, servicename, ip=None):
+        """
+        Stop one service with given name on current host,
+        or on remote host if IP parameter is given.
+        """
         control.service.stop(servicename, ip)
+
+
+    @plac.annotations(
+        ip=("IP of host on which service should be rescanned")
+    )
+    def rescan(self, ip=None):
+        """
+        Force kasaya daemon to rescan available services.
+        This allow to add or remove available services on host
+        on the fly, without restarting kasaya daemon.
+        """
+        control.host.rescan(ip)
 
 
 if __name__=="__main__":

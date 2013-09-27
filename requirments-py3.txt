@@ -4,5 +4,5 @@ pyzmq
 git+https://github.com/fantix/gevent.git
 plac
 pycrypto
-# msgpack-python
+msgpack-python
 
