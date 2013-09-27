@@ -4,6 +4,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.conf import settings
 from kasaya.core.lib import LOG, system
 from .syncworker import SyncWorker
+from .db.netstatedb import NetworkStateDB
 import gevent, uuid
 
 
@@ -14,7 +15,8 @@ class SyncDaemon(object):
         self.uuid = str( uuid.uuid4() )
         LOG.info("Starting local sync daemon with uuid: [%s]" % self.uuid)
         # uruchomienie bazy danych
-        self.DB = self.setup_db()
+        #self.DB = self.setup_db()
+        self.DB = NetworkStateDB()
         # broadcaster is not used with distributed database backend
         if not self.DB.replaces_broadcast:
             self.BC = self.setup_broadcaster()
@@ -33,23 +35,23 @@ class SyncDaemon(object):
         """
         LOG.info("Stopping local sync daemon")
         self.notify_syncd_stop(self.uuid, local=True)
-        self.DB.close()
         self.WORKER.close()
+        self.DB.close()
         self.BC.close()
 
 
     # setting up daemon
 
 
-    def setup_db(self):
-        """
-        konfiguracja bazy danych
-        """
-        backend = settings.SYNC_DB_BACKEND
-        if backend=="memory":
-            from .db.memsqlite import MemoryDB
-            return MemoryDB()
-        raise Exception("Unknown database backend: %s" % backend)
+    #def setup_db(self):
+    #    """
+    #    konfiguracja bazy danych
+    #    """
+    #    backend = settings.SYNC_DB_BACKEND
+    #    if backend=="memory":
+    #        from .db.memsqlite import MemoryDB
+    #        return MemoryDB()
+    #    raise Exception("Unknown database backend: %s" % backend)
 
 
     def setup_worker(self):
