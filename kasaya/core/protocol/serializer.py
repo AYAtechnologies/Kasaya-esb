@@ -10,8 +10,8 @@ import datetime
 
 
 __all__ = ("serialize", "deserialize")
-__headersize = 30
-__headerfmt = b"!6s h L 16s H"
+__headersize = 31
+__headerfmt = b"!6s h L 16s ? H"
 
 
 def make_header(busname, version, size, trim, iv=b""):
@@ -26,11 +26,12 @@ def make_header(busname, version, size, trim, iv=b""):
             version, # protocol version
             size, # size of data in packet
             iv, # initial vector
+            False, # compression
             trim)
+
 
 def decode_header(packet):
     return struct.unpack( __headerfmt, packet)
-
 
 
 def plain_serialize(msg):
@@ -49,7 +50,7 @@ def plain_deserialize(msg):
     if len(msg)<__headersize:
         raise exceptions.MessageCorrupted()
 
-    busname, ver, psize, iv, trim = decode_header(msg[:__headersize])
+    busname, ver, psize, iv, cmpr, trim = decode_header(msg[:__headersize])
 
     if ver!=1:
         raise exceptions.ServiceBusException("Unknown service bus protocol version")
@@ -96,7 +97,7 @@ def encrypted_deserialize(msg):
     if len(msg)<__headersize:
         raise exceptions.MessageCorrupted()
 
-    busname, ver, psize, iv, trim = decode_header(msg[:__headersize])
+    busname, ver, psize, iv, cmpr, trim = decode_header(msg[:__headersize])
 
     # check protocol version
     if ver!=1:
