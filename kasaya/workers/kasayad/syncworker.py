@@ -32,9 +32,6 @@ class RedirectRequiredEx(RedirectRequiredToAddr):
 
 
 class SyncWorker(object):
-    """
-    Główna klasa syncd która nasłuchuje na lokalnych socketach i od lokalnych workerów i klientów.
-    """
 
     def __init__(self, server, database, broadcaster):
         self.DAEMON = server
@@ -62,6 +59,14 @@ class SyncWorker(object):
         self.ctl.register_task("service.stop",  self.CTL_service_stop)
         self.ctl.register_task("host.rescan",   self.CTL_host_rescan)
 
+
+    @property
+    def replaces_broadcast(self):
+        return self.DB.replaces_broadcast
+
+    @property
+    def own_ip(self):
+        return self.intersync.ip
 
     def get_sync_address(self, ip):
         return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
@@ -161,7 +166,8 @@ class SyncWorker(object):
 
     def handle_worker_live(self, msg):
         """
-        Worker notify about himself
+        Receive worker's ping singnal.
+        This function is triggered only by local worker.
         """
         now = datetime.now()
         uuid = msg['uuid']
@@ -173,15 +179,15 @@ class SyncWorker(object):
         try:
             png = self.__pingdb[addr]
         except KeyError:
-            # service is already unknown
-            self.worker_start(uuid, svce, ip, port, pid, True)
+            # worker is unknown
+            self.worker_start(uuid, svce, ip, port, pid)
             return
 
         if png['s']!=svce:
             # different service under same address!
             LOG.error("Service [%s] expected on address [%s], but [%s] appeared. Removing old, registering new." % (png['s'], addr, svce))
             self.worker_stop(ip, port, True)
-            self.worker_start(uuid, svce, ip, port, pid, True)
+            self.worker_start(uuid, svce, ip, port, pid)
             return
 
         # update heartbeats
@@ -193,7 +199,7 @@ class SyncWorker(object):
         """
         Worker is going down
         """
-        self.worker_stop( msg['ip'], msg['port'], True )
+        self.worker_stop( msg['ip'], msg['port'] )
 
     def handle_name_query(self, msg):
         """
@@ -226,12 +232,13 @@ class SyncWorker(object):
     # worker state changes
     # ------------------------------
 
-    def worker_start(self, uuid, service, ip, port, pid, local):
+    def worker_start(self, uuid, service, ip, port, pid=0):
         """
         Handle joining to network by worker (local or blobal)
         """
-        succ = self.DB.worker_register(uuid, service, ip,port, pid, local)
+        succ = self.DB.worker_register(uuid, service, ip, port,pid)
         addr = ip+":"+str(port)
+        local = ip==self.own_ip
         if succ:
             if local:
                 LOG.info("Local worker [%s] started, address [%s]" % (service, addr) )
@@ -246,29 +253,27 @@ class SyncWorker(object):
 
         # rozesłanie informacji w sieci jeśli nastąpi lokalna zmiana stanu
         if succ and local:
-            self.BC.send_worker_live(uuid, service, ip,port, pid)
+            self.BC.send_worker_live(uuid, service, ip,port)
 
 
-    def worker_stop(self, ip, port, local):
+    def worker_stop(self, ip, port):
         """
         Handle worker leaving network (local or global)
         """
-        service = self.DB.worker_unregister(ip,port)
+        self.DB.worker_unregister(ip,port)
         addr = ip+":"+str(port)
-        if service:
-            if local:
-                LOG.info("Local worker stopped, address [%s]" % addr )
-            else:
-                LOG.info("Remote worker stopped, address [%s]" % addr )
+        local = ip==self.own_ip
         if local:
-            # dodanie serwisu do bazy z czasami pingów
+            LOG.info("Local worker stopped, address [%s]" % addr )
+            # usunięcie wpisu z listy pingów
             try:
                 del self.__pingdb[addr]
             except KeyError:
                 pass
-        # rozesłanie informacji w sieci jeśli nastąpi lokalna zmiana stanu
-        if local:
+            # send information to all network about stopping worker
             self.BC.send_worker_stop(ip,port)
+        else:
+            LOG.info("Remote worker stopped, address [%s]" % addr )
 
 
     def request_workers_broadcast(self):
@@ -276,9 +281,9 @@ class SyncWorker(object):
         Send to all local workers request for registering in network.
         Its used after new host start.
         """
-        for uuid, service, ip, port, pid in self.DB.get_local_workers():
+        for w in self.DB.worker_list_local():
             gevent.sleep(0.4)
-            self.BC.send_worker_live(uuid, service, ip,port, pid)
+            self.BC.send_worker_live(w['uuid'], w['name'], w['ip'], w['port'])
 
 
     # heartbeat
@@ -296,7 +301,7 @@ class SyncWorker(object):
             # unregister all dead workers
             while len(unreglist)>0:
                 ip,port = unreglist.pop().split(":")
-                self.worker_stop(ip,int(port), True)
+                self.worker_stop(ip,int(port))
 
             gevent.sleep(settings.WORKER_HEARTBEAT)
 
@@ -313,7 +318,7 @@ class SyncWorker(object):
         """
         if ip is None:
             raise exceptions.ServiceBusException("Unknown address")
-        ownip = self.intersync.ip==ip
+        ownip = ip==self.own_ip
         if not ownip:
             raise RedirectRequiredEx(ip)
 
@@ -422,7 +427,7 @@ class SyncWorker(object):
              if not given then worker will be started on localhost.
         """
         if ip is None:
-            ip = self.intersync.ip
+            ip = self.own_ip
         self.redirect_or_pass_by_ip(ip)
 
         try:
@@ -439,7 +444,7 @@ class SyncWorker(object):
         Stop one worker with given service name.
         """
         if ip is None:
-            ip = self.intersync.ip
+            ip = self.own_ip
         self.redirect_or_pass_by_ip(ip)
 
         services = []
@@ -458,7 +463,7 @@ class SyncWorker(object):
         Rescan services available on local host
         """
         if ip is None:
-            ip = self.intersync.ip
+            ip = self.own_ip
         self.redirect_or_pass_by_ip(ip)
         svl = self.local_services_list(rescan=True)
         print (svl)

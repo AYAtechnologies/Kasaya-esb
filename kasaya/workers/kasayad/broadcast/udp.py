@@ -16,12 +16,15 @@ class UDPLoop(object):
 
     def __init__(self):
         self.is_running = True
+        self.own_ip = None
         self._msgdb = {}
         self.port = settings.BROADCAST_PORT
         self.SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.SOCK.bind(('',settings.BROADCAST_PORT))
         self.SOCK.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
+    def set_own_ip(self, ip):
+        self.own_ip = ip
 
     def stop(self):
         """
@@ -39,6 +42,9 @@ class UDPLoop(object):
         while self.is_running:
             # receive data
             msgdata, addr = self.SOCK.recvfrom(4096)
+            # skip own broadcast messages
+            if addr[0]==self.own_ip:
+                continue
             # deserialize
             try:
                 msgdata = deserialize(msgdata)
@@ -101,10 +107,10 @@ class UDPBroadcast(UDPLoop):
 
 
     def handle_worker_join(self, msgdata):
-        self.SRV.WORKER.worker_start(msgdata['uuid'], msgdata['service'], msgdata['ip'], msgdata['port'], msgdata['pid'], False )
+        self.SRV.WORKER.worker_start(msgdata['uuid'], msgdata['service'], msgdata['ip'], msgdata['port'] )
 
     def handle_worker_leave(self, msgdata):
-        self.SRV.WORKER.worker_stop(msgdata['ip'], msgdata['port'], False )
+        self.SRV.WORKER.worker_stop(msgdata['ip'], msgdata['port'] )
 
     def handle_host_join(self, msgdata):
         self.SRV.notify_syncd_start( msgdata['uuid'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
@@ -127,17 +133,17 @@ class UDPBroadcast(UDPLoop):
 
     # broadcast specific messages
 
-    def send_worker_live(self, uuid, service, ip,port, pid):
+    def send_worker_live(self, uuid, service, ip,port):
         """
-        Send information to other hosts about new worker
+        Send information to other hosts about running worker
         """
         msg = {
             "message" : messages.WORKER_LIVE,
             "uuid" : uuid,
             "ip" : ip,
             "port": port,
-            "service" : service,
-            "pid": pid
+            "service" : service#,
+            #"pid": pid
             }
         self.broadcast_message(msg)
 

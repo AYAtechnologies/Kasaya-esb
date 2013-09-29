@@ -7,6 +7,9 @@ class FakeBroadcast(object):
     def __init__(self):
         pass
 
+    def set_own_ip(self, ip):
+        pass
+
     def run_listener(self):
         pass
 

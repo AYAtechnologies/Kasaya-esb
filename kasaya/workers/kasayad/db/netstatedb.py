@@ -5,59 +5,90 @@ from kasaya.conf import settings
 
 
 
-
 class NetworkStateDB(object):
+
+    replaces_broadcast = False
 
     def __init__(self):
         if settings.SYNC_DB_BACKEND=="memory":
             from . import memsqlite
-            self.DB = memsqlite.MemoryDB()
+            self.LLDB = memsqlite.MemoryDB()
         else:
             raise Exception("Unknown database backend: %s" % backend)
 
-        self.DB.connect()
-        #self.DB.add_collection("hosts")
-        #self.DB.add_collection("workers")
-        #self.DB.add_collection("services")
+        self.LLDB.connect()
+        #self.LLDB.add_collection("hosts")
+        #self.LLDB.add_collection("workers")
+        #self.LLDB.add_collection("services")
+
+    def set_own_ip(self,ip):
+        self.LLDB.set_own_ip(ip)
 
     def close(self):
-        self.DB.close()
+        self.LLDB.close()
 
 
     # ---- high level database functions
 
+    # hosts
+
+    def host_register(self, host_uuid, hostname, addr, services=None):
+        # check if host is already registered
+        he = self.LLDB.host_exist(host_uuid=host_uuid, addr=addr)
+        if he is not None:
+            # if current host has different UUID,
+            # then previous was stopped and this is new instance
+            # we unregister previous instance before register new one
+            if he['uuid']!=host_uuid:
+                self.host_unregister(host_uuid)
+        # register host
+        self.LLDB.host_add(host_uuid, addr, hostname)
+        # register services
+        self.service_update_list(host_uuid, services)
 
 
-    def worker_register(self, worker_uuid, service_name, ip,port, pid, localservice):
+
+    def host_unregister(self, host_uuid):
+        """
+        Wyrejestrowanie hosta z bazy.
+          Zwraca True jeśli wyrejestrowano workera,
+          False jeśli workera nie było w bazie
+        """
+        # remove all services for host
+        for s in self.LLDB.service_list(host_uuid):
+            self.LLDB.service_del(host_uuid, s)
+        # remove host
+        self.LLDB.host_del(host_uuid)
+        #return {"addr":res[2],"hostname":res[1]}
+
+
+    # services
+
+
+
+    # workers
+
+    def worker_register(self, worker_uuid, service_name, ip, port, pid):
         """
         Zarejestrowanie workera w bazie.
-          name - nazwa serwisu
-          addr - adres ip:port workera
-          localservice - worker jest na lokalnym hoście
+          worker_uuid - uuid workera
+          service_name - nazwa serwisu
+          ip, port - adres ip:port workera
 
           wynikiem jest:
           True - jeśli nowy worker został zarejestrowany
           False - jesli worker już istnieje w bazie
-
-          jeśli worker istnieje, ale nie zgadzają się dane z istniejącymi w bazie
-          należy rzucić wyjątek DBException
         """
         # sprawdzenie czy worker istnieje w bazie
-        self.cur.execute(
-            "SELECT * FROM workers WHERE uuid=?",
-            [worker_uuid] )
-        res = self.cur.fetchone()
-        # worker już jest zarejestrowany
-        if not res is None:
-            #uu, sv, ad, lc = res
-            if (res[0]==worker_uuid):
+        for w in self.LLDB.worker_list(ip):
+            if w['uuid']==worker_uuid:
+                # already registered
                 return False
-        self.worker_unregister(ip,port)
-        # dodanie nowego workera do bazy
-        self.cur.execute(
-            "INSERT INTO workers ('uuid','ip','port', 'service','pid', 'local') VALUES (?,?,?,?,?,?)",
-            (worker_uuid, ip,port, service_name, pid, localservice))
-        self.__db.commit()
+            if (w['ip']==ip) and (w['port']==port):
+                # another worker under same address, unregister existing
+                self.worker_unregister(ip, port)
+
+        self.LLDB.worker_add(worker_uuid, service_name, ip, port, pid)
         return True
 
 
@@ -67,19 +98,16 @@ class NetworkStateDB(object):
           Zwraca True jeśli wyrejestrowano workera,
           False jeśli workera nie było w bazie
         """
-        self.cur.execute(
-            "SELECT * FROM workers WHERE ip=? AND port=?",
-            [ip,port] )
-        res = self.cur.fetchone()
-        # worker nie istnieje
-        if res==None:
-            return False
-        # wykasowanie
-        self.cur.execute(
-            "DELETE FROM workers WHERE ip=? AND port=?",
-            [ip,port] )
-        self.__db.commit()
-        return True
+        self.LLDB.worker_del(ip,port)
+
+
+
+    # ----------------
+
+    def worker_list_local(self):
+        for w in self.LLDB.worker_list_local():
+            yield w
+
 
 
     def get_workers_for_service(self, service_name):
@@ -92,16 +120,6 @@ class NetworkStateDB(object):
         lst = self.cur.fetchall()
         return lst
 
-
-    def get_local_workers(self):
-        """
-        Return list of live workers on local host
-        """
-        self.cur.execute(
-            "SELECT uuid,service,ip,port,pid FROM workers WHERE local=?",
-            [True] )
-        lst = self.cur.fetchall()
-        return lst
 
 
     # global network state
@@ -131,52 +149,6 @@ class NetworkStateDB(object):
             [host_uuid] )
 
 
-    def host_register(self, host_uuid, hostname, addr, services=None):
-        # sprawdzenie czy worker istnieje w bazie
-        self.cur.execute(
-            "SELECT * FROM hosts WHERE uuid=?",
-            [host_uuid] )
-        res = self.cur.fetchone()
-        # host już jest zarejestrowany
-        if not res is None:
-            #uu, sv, ad, lc = res
-            if (res[0]==host_uuid):
-                return False
-        # dodanie nowego hosta do bazy
-        self.cur.execute(
-            "INSERT INTO hosts ('uuid','addr','hostname') VALUES (?,?,?)",
-            (host_uuid, addr, hostname))
-        self.__db.commit()
-        # services available on host
-        if not services is None:
-            self.host_update_services(host_uuid, services)
-        return True
-
-    def host_unregister(self, uuid):
-        """
-        Wyrejestrowanie hosta z bazy.
-          Zwraca True jeśli wyrejestrowano workera,
-          False jeśli workera nie było w bazie
-        """
-        self.cur.execute(
-            "SELECT * FROM hosts WHERE uuid=?",
-            [uuid] )
-        res = self.cur.fetchone()
-
-        # host nie istnieje
-        if res==None:
-            return False
-
-        # wykasowanie istniejącego
-        self.cur.execute(
-            "DELETE FROM hosts WHERE uuid=?",
-            [uuid] )
-        # usunięcie wpisów o serwisach
-        self.host_clear_services(uuid)
-        self.__db.commit()
-
-        return {"addr":res[2],"hostname":res[1]}
-
 
     def host_services(self, uuid):
         """
@@ -188,21 +160,26 @@ class NetworkStateDB(object):
         return res
 
 
-    def host_update_services(self, host_uuid, services):
-        """
-        Aktualizacja listy wbudowanych serwisów
-        """
-        newset = set(services)
-        todel = set()
-        for s in self.host_services(host_uuid):
-            if s in newset:
-                newset.discard(s)
-            else:
-                todel.add(s)
-        for s in newset:
-            self.host_add_service(host_uuid, s)
-        for s in todel:
-            self.host_del_service(host_uuid, s)
+
+    def service_update_list(self, host_uuid, services):
+        pass
+
+
+#    def host_update_services(self, host_uuid, services):
+#        """
+#        Aktualizacja listy wbudowanych serwisów
+#        """
+#        newset = set(services)
+#        todel = set()
+#        for s in self.host_services(host_uuid):
+#            if s in newset:
+#                newset.discard(s)
+#            else:
+#                todel.add(s)
+#        for s in newset:
+#            self.host_add_service(host_uuid, s)
+#        for s in todel:
+#            self.host_del_service(host_uuid, s)
 
 
     # raportowanie stanu sieci

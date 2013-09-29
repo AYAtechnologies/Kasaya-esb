@@ -8,7 +8,7 @@ from .db.netstatedb import NetworkStateDB
 import gevent, uuid
 
 
-class SyncDaemon(object):
+class KasayaDaemon(object):
 
     def __init__(self):
         self.hostname = system.get_hostname()
@@ -25,6 +25,8 @@ class SyncDaemon(object):
             self.BC = FakeBroadcast()
         # uruchomienie workera
         self.WORKER = self.setup_worker()
+        self.DB.set_own_ip(self.WORKER.own_ip)
+        self.BC.set_own_ip(self.WORKER.own_ip)
 
 
 
@@ -41,17 +43,6 @@ class SyncDaemon(object):
 
 
     # setting up daemon
-
-
-    #def setup_db(self):
-    #    """
-    #    konfiguracja bazy danych
-    #    """
-    #    backend = settings.SYNC_DB_BACKEND
-    #    if backend=="memory":
-    #        from .db.memsqlite import MemoryDB
-    #        return MemoryDB()
-    #    raise Exception("Unknown database backend: %s" % backend)
 
 
     def setup_worker(self):

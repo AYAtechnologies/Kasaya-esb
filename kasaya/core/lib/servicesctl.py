@@ -16,7 +16,7 @@ class Service(object):
 
     def __init__(self, directory):
         # worker directory
-        self.directory = os.path.join(settings.USER_WORKERS_DIR, directory)
+        self.directory = os.path.join(settings.LOCAL_WORKERS_DIR, directory)
 
         # load config
         CNF = CombinedConfig()
@@ -27,7 +27,7 @@ class Service(object):
             os.path.join(self.directory, SERVICE_CONFIG_NAME),
             globmode=False, optional=False )
         CNF.load_config(
-            os.path.join(settings.USER_WORKERS_DIR, SERVICE_GLOBAL_CONFIG_NAME),
+            os.path.join(settings.LOCAL_WORKERS_DIR, SERVICE_GLOBAL_CONFIG_NAME),
             globmode=True, optional=True)
 
         # service name and module
@@ -132,7 +132,7 @@ def local_services():
     """
     Return list of local services
     """
-    #cnfame = os.path.join( settings['USER_WORKERS_DIR'], SERVICE_GLOBAL_CONFIG_NAME )
+    #cnfame = os.path.join( settings['LOCAL_WORKERS_DIR'], SERVICE_GLOBAL_CONFIG_NAME )
     #if os.path.exists(cnfame):
     #    config = KasayaConfigParser(cnfame)
     #else:
@@ -157,7 +157,7 @@ def local_services():
 #        result[s.name] = s
 
     # user services
-    dname = os.path.abspath( settings.USER_WORKERS_DIR )
+    dname = os.path.abspath( settings.LOCAL_WORKERS_DIR )
     if not os.path.exists(dname):
         return result
 
