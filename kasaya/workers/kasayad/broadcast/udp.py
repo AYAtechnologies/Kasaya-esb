@@ -98,25 +98,28 @@ class UDPLoop(object):
 class UDPBroadcast(UDPLoop):
 
     def __init__(self, server):
-        self.SRV = server
+        self.DAEMON = server
         super(UDPBroadcast, self).__init__()
         self.register_message(messages.WORKER_LIVE, self.handle_worker_join)
         self.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
         self.register_message(messages.HOST_JOIN, self.handle_host_join)
         self.register_message(messages.HOST_LEAVE, self.handle_host_leave)
-
+        self.register_message(messages.HOST_REFRESH, self.handle_host_refresh)
 
     def handle_worker_join(self, msgdata):
-        self.SRV.WORKER.worker_start(msgdata['uuid'], msgdata['service'], msgdata['ip'], msgdata['port'] )
+        self.DAEMON.WORKER.worker_start(msgdata['uuid'], msgdata['service'], msgdata['ip'], msgdata['port'] )
 
     def handle_worker_leave(self, msgdata):
-        self.SRV.WORKER.worker_stop(msgdata['ip'], msgdata['port'] )
+        self.DAEMON.WORKER.worker_stop(msgdata['ip'], msgdata['port'] )
 
     def handle_host_join(self, msgdata):
-        self.SRV.notify_kasayad_start( msgdata['uuid'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
+        self.DAEMON.notify_kasayad_start( msgdata['uuid'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
 
     def handle_host_leave(self, msgdata):
-        self.SRV.notify_kasayad_stop(msgdata['uuid'])
+        self.DAEMON.notify_kasayad_stop(msgdata['uuid'])
+
+    def handle_host_refresh(self, msgdata):
+        self.DAEMON.notify_kasayad_refresh(msgdata['uuid'], msgdata['services'])
 
 
     # sending broadcast

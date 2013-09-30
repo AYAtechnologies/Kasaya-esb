@@ -8,6 +8,7 @@ WORKER_LEAVE = "wrkr/stop"
 # join and leave network by syncd
 HOST_JOIN = "host/up"
 HOST_LEAVE = "host/stop"
+HOST_REFRESH = "host/refr"
 # local heartbeat messages
 PING = "wrkr/ping"
 PONG = "wrkr/pong"

@@ -114,6 +114,14 @@ class KasayaDaemon(object):
                 a,h = str(res['addr']), res['hostname']
                 LOG.info("Remote kasaya daemon [%s] stopped, addres [%s], uuid [%s]" % (h, a, uuid))
 
+    def notify_kasayad_refresh(self, uuid, serivces, local=False):
+        """
+        Received information on host changes
+        """
+        pass
+        print ("KASAYAD change",local, services)
+
+
     # main loop
     def run(self):
         self.notify_kasayad_self_start()

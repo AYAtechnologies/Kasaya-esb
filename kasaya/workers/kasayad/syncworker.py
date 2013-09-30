@@ -47,6 +47,7 @@ class SyncWorker(object):
         self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
         self.queries.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
         self.queries.register_message(messages.CTL_CALL, self.handle_local_control_request)
+        #self.queries.register_message(messages.HOST_REFRESH, self.handle_host)
         # sync <--> sync communication
         self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
@@ -457,6 +458,8 @@ class SyncWorker(object):
         if ip is None:
             ip = self.own_ip
         self.redirect_or_pass_by_ip(ip)
-        svl = self.local_services_list(rescan=True)
-        print (svl)
+        svlist = self.local_services_list(rescan=True)
+        # send nwe list of services to kasaya daemon instance
+        self.DAEMON.notify_kasayad_refresh(self.DAEMON.uuid, svlist, True)
+
 
