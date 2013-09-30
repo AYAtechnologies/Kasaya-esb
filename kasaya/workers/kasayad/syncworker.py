@@ -22,8 +22,8 @@ __all__=("SyncWorker",)
 def _ip_to_sync_addr(ip):
     return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
 
-def _ip_port_to_worker_addr(ip,port):
-    return "tcp://%s:%i" % (ip,port)
+def _worker_addr( wrkr ):
+    return "tcp://%s:%i" % (wrkr['ip'],wrkr['port'])
 
 class RedirectRequiredEx(RedirectRequiredToAddr):
     def __init__(self, ip):
@@ -91,7 +91,7 @@ class SyncWorker(object):
         sock = context.socket(zmq.REP)
         addr = _ip_to_sync_addr( get_bind_address(settings.SYNCD_CONTROL_BIND) )
         sock.bind(addr)
-        LOG.debug("Connected inter-sync dialog socket %s" % addr)
+        LOG.debug("Connected inter-kasaya dialog socket %s" % addr)
         return sock, addr
 
 
@@ -126,7 +126,7 @@ class SyncWorker(object):
         if rescan:
             self.__services = servicesctl.local_services()
             res = self.__services.keys()
-            self.DB.host_update_services( self.DAEMON.uuid, res )
+            self.DB.service_update_list( self.DAEMON.uuid, res )
             return res
 
         res = self.__services.keys()
@@ -211,8 +211,8 @@ class SyncWorker(object):
             a = None
             p = None
         else:
-            a = res[0]
-            p = res[1]
+            a = res['ip']
+            p = res['port']
         return {
             'message':messages.WORKER_ADDR,
             'service':name,
@@ -283,7 +283,7 @@ class SyncWorker(object):
         """
         for w in self.DB.worker_list_local():
             gevent.sleep(0.4)
-            self.BC.send_worker_live(w['uuid'], w['name'], w['ip'], w['port'])
+            self.BC.send_worker_live(w['uuid'], w['service'], w['ip'], w['port'])
 
 
     # heartbeat
@@ -342,11 +342,10 @@ class SyncWorker(object):
         """
         lst = []
         # all syncd hosts
-        for u,a,h in self.DB.host_list():
-            ln = {'uuid':u, 'addr':a, 'hostname':h}
+        for hst in self.DB.host_list():
             # workers on host
-            ln ['services'] = self.CTL_services_on_host(u)
-            lst.append( ln )
+            hst ['services'] = self.CTL_services_on_host( hst['uuid'] )
+            lst.append( hst )
         return lst
 
 
@@ -356,22 +355,15 @@ class SyncWorker(object):
         List of all services on host
         """
         lst = []
-        managed = self.DB.host_services(uuid)
+        managed = set()
+        for s in self.DB.service_list(uuid):
+            managed.add(s['service'])
         running = set()
-
-        for u,s,i,p, pi in self.DB.workers_on_host(uuid):
-            running.add(s)
-            res = {
-                'uuid':u,
-                'service':s,
-                'ip':i,
-                'port':p,
-                'pid': pi,
-                'running':True,
-                'managed':s in managed,
-            }
-            lst.append(res)
-
+        for wnfo in self.DB.worker_list(uuid):
+            running.add(wnfo['service'])
+            wnfo['running'] = True
+            wnfo['managed'] = wnfo['service'] in managed
+            lst.append(wnfo)
         # offline services
         for sv in managed:
             if not sv in running:
@@ -383,8 +375,8 @@ class SyncWorker(object):
         """
         Send stop signal to worker
         """
-        ip,port,pid = self.DB.worker_ip_port_by_uuid(uuid, pid=True)
-        self.redirect_or_pass_by_ip(ip)
+        wrkr = self.DB.worker_get(uuid)
+        self.redirect_or_pass_by_ip( wrkr['ip'] )
 
         if terminate:
             signal = SIGTERM
@@ -394,7 +386,7 @@ class SyncWorker(object):
             kill(pid, signal)
             return True
         else:
-            addr = _ip_port_to_worker_addr(ip,port)
+            addr = _worker_addr(wrkr)
             msg = {
                 'message':messages.CTL_CALL,
                 'method':['stop']
@@ -407,10 +399,10 @@ class SyncWorker(object):
         """
         Return full stats of worker
         """
-        ip,port = self.DB.worker_ip_port_by_uuid(uuid)
-        self.redirect_or_pass_by_ip(ip)
+        wrkr = self.DB.worker_get(uuid)
+        self.redirect_or_pass_by_ip( wrkr['ip'] )
         # call worker for stats
-        addr = _ip_port_to_worker_addr(ip,port)
+        addr = _worker_addr(wrkr)
         msg = {
             'message':messages.CTL_CALL,
             'method':['stats']
@@ -442,20 +434,20 @@ class SyncWorker(object):
     def CTL_service_stop(self, name, ip=None):
         """
         Stop one worker with given service name.
+        name - name of service to stop
         """
         if ip is None:
             ip = self.own_ip
         self.redirect_or_pass_by_ip(ip)
 
         services = []
-        for uuid, service, ip, port, pid in self.DB.get_local_workers():
-            if service==name:
-                services.append(uuid)
+        for wrk in self.DB.worker_list_local():
+            if wrk['service']==name:
+                services.append(wrk['uuid'])
         if len(services)==0:
             raise exceptions.ServiceBusException("There is no [%s] service running" % name)
-
-        uuid = random.choice(services)
-        return self.CTL_worker_stop(uuid)
+        for u in services:
+            self.CTL_worker_stop(u)
 
 
     def CTL_host_rescan(self, ip=None):

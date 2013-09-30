@@ -138,7 +138,6 @@ def local_services():
     #else:
     #    config = None
     result = {}
-
 #    # internal services
 #    if settings.USE_ASYNC_SERVICE:
 #        s = Service("asyncd", config)

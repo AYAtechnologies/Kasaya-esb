@@ -13,7 +13,7 @@ class KasayaDaemon(object):
     def __init__(self):
         self.hostname = system.get_hostname()
         self.uuid = str( uuid.uuid4() )
-        LOG.info("Starting local sync daemon with uuid: [%s]" % self.uuid)
+        LOG.info("Starting local kasaya daemon with uuid: [%s]" % self.uuid)
         # uruchomienie bazy danych
         #self.DB = self.setup_db()
         self.DB = NetworkStateDB()
@@ -35,8 +35,8 @@ class KasayaDaemon(object):
         Notifies network about shutting down, closes database
         and all used sockets.
         """
-        LOG.info("Stopping local sync daemon")
-        self.notify_syncd_stop(self.uuid, local=True)
+        LOG.info("Stopping local kasaya daemon")
+        self.notify_kasayad_stop(self.uuid, local=True)
         self.WORKER.close()
         self.DB.close()
         self.BC.close()
@@ -65,45 +65,43 @@ class KasayaDaemon(object):
 
     # global network changes
 
-    def notify_syncd_start(self, uuid, hostname, addr, services, local=False):
+    def notify_kasayad_start(self, uuid, hostname, ip, services, local=False):
         """
-        Send information about startup of host to all other hosts in network
+        Send information about startup of host to all other hosts in network.
         """
-        succ = self.DB.host_register(uuid, hostname, addr, services)
-        self.WORKER.request_workers_broadcast()
+        isnew = self.DB.host_register(uuid, hostname, ip, services)
         if local:
-            # it is ourself starting, send broadcast about this
-            self.BC.send_host_start(uuid, hostname, addr, services)
-        else:
+            # it is ourself starting, send broadcast to other kasaya daemons
+            self.BC.send_host_start(uuid, hostname, ip, services)
+
+        if isnew:
+            # new kasayad
+            # send request to local workers to send immadiately ping broadcast
+            # to inform new kasaya daemon about self
+            self.WORKER.request_workers_broadcast()
             # it's remote host starting, information is from broadcast
-            if succ:
-                a = str(addr)
-                LOG.info("Remote sync host [%s] started, address [%s], uuid [%s]" % (hostname, a, uuid) )
-
-        # if registered new syncd AND it's not local host, then
-        # it must be new host in network, which don't know other hosts.
-        # We send again registering information about self syncd instance.
-        if succ and (not local):
+            LOG.info("Remote kasaya daemon [%s] started, address [%s], uuid [%s]" % (hostname, ip, uuid) )
+            # if registered new kasayad AND it's not local host, then
+            # it must be new host in network, which don't know other hosts.
+            # We send again registering information about self syncd instance.
             gevent.sleep(0.5)
-            self.notify_syncd_self_start()
+            self.notify_kasayad_self_start()
 
 
-    def notify_syncd_self_start(self):
+    def notify_kasayad_self_start(self):
         """
         send information about self start to all hosts
         """
-        addr = self.WORKER.intersync.address
-        addr = addr.split(":")[1].lstrip("/")
-        self.notify_syncd_start(
+        self.notify_kasayad_start(
             self.uuid,
             self.hostname,
-            addr,
+            self.WORKER.own_ip,
             self.WORKER.local_services_list(),
             local=True,
         )
 
 
-    def notify_syncd_stop(self, uuid, local=False):
+    def notify_kasayad_stop(self, uuid, local=False):
         """
         Send information about shutdown to all hosts in network
         """
@@ -114,11 +112,11 @@ class KasayaDaemon(object):
         else:
             if not res is None:
                 a,h = str(res['addr']), res['hostname']
-                LOG.info("Remote sync host [%s] stopped, addres [%s], uuid [%s]" % (h, a, uuid))
+                LOG.info("Remote kasaya daemon [%s] stopped, addres [%s], uuid [%s]" % (h, a, uuid))
 
     # main loop
     def run(self):
-        self.notify_syncd_self_start()
+        self.notify_kasayad_self_start()
         try:
             loops = self.WORKER.get_loops()
             loops.append(self.BC.loop)

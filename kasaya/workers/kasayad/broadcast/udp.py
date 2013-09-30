@@ -113,10 +113,10 @@ class UDPBroadcast(UDPLoop):
         self.SRV.WORKER.worker_stop(msgdata['ip'], msgdata['port'] )
 
     def handle_host_join(self, msgdata):
-        self.SRV.notify_syncd_start( msgdata['uuid'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
+        self.SRV.notify_kasayad_start( msgdata['uuid'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
 
     def handle_host_leave(self, msgdata):
-        self.SRV.notify_syncd_stop(msgdata['uuid'])
+        self.SRV.notify_kasayad_stop(msgdata['uuid'])
 
 
     # sending broadcast
@@ -126,7 +126,6 @@ class UDPBroadcast(UDPLoop):
         """
         Wysłanie komunikatu do wszystkich workerów w sieci
         """
-        #print "sending broadcast", msg
         msg = serialize(msg)
         self.SOCK.sendto(msg, ('<broadcast>', self.port) )
 

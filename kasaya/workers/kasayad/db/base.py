@@ -16,8 +16,8 @@ class BaseDB(object):
     # reprezentować identyczny stan.
     replaces_broadcast = False
 
-    def set_own_ip(self, ip):
-        self.own_ip=ip
+    #def set_own_ip(self, ip):
+    #    self.own_ip=ip
 
     def connect(self):
         pass
@@ -30,30 +30,30 @@ class BaseDB(object):
     # -------------------------
 
 
-    def host_add(self, uuid, addr, hostname):
+    def host_add(self, uuid, ip, hostname):
         raise NotImplemented()
 
+    def host_get(self, uuid):
+        raise NotImplemented()
 
     def host_del(self, uuid):
         raise NotImplemented()
 
-
     def host_list(self):
         raise NotImplemented()
 
-
-    def host_exist(self, host_uuid=None, addr=None):
+    def host_exist(self, host_uuid=None, ip=None):
         """
         Check if host exists in database.
         """
-        if host_uuid == addr == None:
+        if host_uuid == ip == None:
             return None
         for h in self.host_list():
             if host_uuid is not None:
                 if h['uuid']==host_uuid:
                     return h
-            if addr is not None:
-                if h['addr']==addr:
+            if ip is not None:
+                if h['ip']==ip:
                     return h
 
 
@@ -73,11 +73,16 @@ class BaseDB(object):
         raise NotImplemented()
 
 
+
     # workers
     # -------------------------
 
 
     def worker_add(self, worker_uuid, name, ip, port, pid):
+        raise NotImplemented()
+
+
+    def worker_get(self, worker_uuid):
         raise NotImplemented()
 
 
@@ -87,11 +92,6 @@ class BaseDB(object):
 
     def worker_list(self, ip):
         raise NotImplemented()
-
-
-    def worker_list_local(self):
-        for w in self.worker_list(self.own_ip):
-            yield w
 
     def worker_exist(self, worker_uuid):
         raise NotImplemented()

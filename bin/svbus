@@ -24,7 +24,7 @@ class Jobs(object):
         """
         List all hosts and workers running in service bus
         """
-        hostline     = "  {service: >{ws}}  {addr: <{wa}} (hostname: {hostname})"
+        hostline     = "  {service: >{ws}}  {ip: <{wi}} (hostname: {hostname})"
         workerline   = "  {service: >{ws}}  on port: {port} {extra}"
         inactiveline = "  {service: >{ws}}  off"
 
@@ -36,10 +36,10 @@ class Jobs(object):
         hosts = control.svbus.status()
 
         # maximum length of names
-        whst, wadr, wsvc = 5,0,0
+        whst, wip, wsvc = 5,0,0
         for h in hosts:
             whst = max(whst, len(h['hostname']) )
-            wadr = max(wadr, len(h['addr']) )
+            wip  = max(wip, len(h['ip']) )
             for s in h['services']:
                 wsvc = max(wsvc, len(s['service']) )
 
@@ -47,7 +47,7 @@ class Jobs(object):
         hcnt, wcnt = 0,0
         for h in hosts:
             hcnt += 1
-            print ( hostline.format(wh=whst, wa=wadr, ws=wsvc, service="SYNCD", **h) )
+            print ( hostline.format(wh=whst, wi=wip, ws=wsvc, service="SYNCD", **h) )
 
             inact = []
             for w in h['services']:
