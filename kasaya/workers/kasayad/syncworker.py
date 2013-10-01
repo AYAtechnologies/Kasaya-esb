@@ -20,7 +20,7 @@ __all__=("SyncWorker",)
 
 
 def _ip_to_sync_addr(ip):
-    return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
+    return "tcp://%s:%i" % (ip, settings.KASAYAD_CONTROL_PORT)
 
 def _worker_addr( wrkr ):
     return "tcp://%s:%i" % (wrkr['ip'],wrkr['port'])
@@ -41,14 +41,14 @@ class SyncWorker(object):
         self.__pingdb = {}
         # cache
         self.__services = None
-        # local workers <--> local sync communication
+        # local workers <--> local kasayad communication
         self.queries = RepLoop(self._connect_queries_loop, context=self.context)
         self.queries.register_message(messages.WORKER_LIVE, self.handle_worker_live)
         self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
         self.queries.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
         self.queries.register_message(messages.CTL_CALL, self.handle_local_control_request)
         #self.queries.register_message(messages.HOST_REFRESH, self.handle_host)
-        # sync <--> sync communication
+        # kasayad <--> kasayad communication
         self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
         # service control tasks
@@ -115,50 +115,59 @@ class SyncWorker(object):
         ]
 
 
+    # local services management
+    # -------------------------
+
+
+    #def local_services_scan(self):
+
+
+
     def local_services_list(self, rescan=False):
         """
-        List of local services available
+        List of available local services.
+        If rescan bring changes, then database and broadcast will be triggered.
         """
-        if self.__services is None:
+        scan = rescan or (self.__services is None)
+        if scan:
             self.__services = servicesctl.local_services()
-            res = self.__services.keys()
-            rescan = None
-
+        lst = self.__services.keys()
         if rescan:
-            self.__services = servicesctl.local_services()
-            res = self.__services.keys()
-            self.DB.service_update_list( self.DAEMON.uuid, res )
-            return res
-
-        res = self.__services.keys()
-        return res
+            uuid = self.DAEMON.uuid
+            changes = self.DB.service_update_list(uuid, lst)
+            if changes:
+                self.DAEMON.notify_kasayad_refresh(uuid, lst, local=True)
+        return lst
 
 
-    def local_services_stats(self):
-        """
-        List of all services on localhost including inactive.
-        result is dict, key is service name, value is number
-        of workers currently running for this service.
-        """
-        svlist = self.local_services_list()
-        print ("svlist",svlist)
-        result = {}
-        # list of running workers
-        for wrk in self.DB.get_local_workers():
-            name = wrk[1]
-            if not name in result:
-                result[name] = {'count':0,'uuid':[]}
-            result[name]['count'] += 1
-            result[name]['uuid'].append(wrk[0])
-        # add inactive services
-        for svc in self.__services:
-            if svc in result:
-                continue
-            result[svc] = {'count':0,'uuid':[]}
-        return result
+#    def local_services_stats(self):
+#        """
+#        List of all services on localhost including inactive.
+#        result is dict, key is service name, value is number
+#        of workers currently running for this service.
+#        """
+#        svlist = self.local_services_list()
+#        print ("svlist",svlist)
+#        result = {}
+#        # list of running workers
+#        for wrk in self.DB.get_local_workers():
+#            name = wrk[1]
+#            if not name in result:
+#                result[name] = {'count':0,'uuid':[]}
+#            result[name]['count'] += 1
+#            result[name]['uuid'].append(wrk[0])
+#        # add inactive services
+#        for svc in self.__services:
+#            if svc in result:
+#                continue
+#            result[svc] = {'count':0,'uuid':[]}
+#        return result
 
 
     def get_service_ctl(self, name):
+        """
+        Return ServiceCtl object for given service name
+        """
         return self.__services[name]
 
 
@@ -434,7 +443,7 @@ class SyncWorker(object):
 
     def CTL_service_stop(self, name, ip=None):
         """
-        Stop one worker with given service name.
+        Stop all workers serving given service.
         name - name of service to stop
         """
         if ip is None:
@@ -460,6 +469,6 @@ class SyncWorker(object):
         self.redirect_or_pass_by_ip(ip)
         svlist = self.local_services_list(rescan=True)
         # send nwe list of services to kasaya daemon instance
-        self.DAEMON.notify_kasayad_refresh(self.DAEMON.uuid, svlist, True)
+        #self.DAEMON.notify_kasayad_refresh(self.DAEMON.uuid, svlist, True)
 
 

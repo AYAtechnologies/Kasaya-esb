@@ -6,7 +6,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 TRANSPORT_PROTOCOL = "pickle"
 
 # internal setting, don't change
-LOGGER_NAME = "syncd"
+LOGGER_NAME = "kasaya"
 
 # service bus name
 SERVICE_BUS_NAME = "sb"
@@ -56,12 +56,12 @@ SYNC_BACKEND = "udp-broadcast"
 # należy podać numer portu na którym nasłuchuje serwer
 BROADCAST_PORT = 4040
 # port na którym prowadzona jest synchronizacja pomiędzy serwerami syncd i zarządzanie siecią
-SYNCD_CONTROL_PORT = 4041
+KASAYAD_CONTROL_PORT = 4041
 SYNCD_CONTROL_BIND = "AUTO"
 
 # stan sieci może być przechowywany w lokalnej bazie danych, jeśli
 ## przemyśleć to
-SYNC_DB_BACKEND = "memory"
+KASAYAD_DB_BACKEND = "memory"
 
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
 ASYNC_DAEMON_SERVICE = "async_daemon"

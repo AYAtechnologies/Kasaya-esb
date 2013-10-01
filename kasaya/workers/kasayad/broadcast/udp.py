@@ -119,7 +119,7 @@ class UDPBroadcast(UDPLoop):
         self.DAEMON.notify_kasayad_stop(msgdata['uuid'])
 
     def handle_host_refresh(self, msgdata):
-        self.DAEMON.notify_kasayad_refresh(msgdata['uuid'], msgdata['services'])
+        self.DAEMON.notify_kasayad_refresh(msgdata['uuid'], services=msgdata['services'])
 
 
     # sending broadcast
@@ -160,7 +160,6 @@ class UDPBroadcast(UDPLoop):
             }
         self.broadcast_message(msg)
 
-
     def send_host_start(self, uuid, hostname, address=None, services=None):
         msg = {
             "message" : messages.HOST_JOIN,
@@ -176,4 +175,13 @@ class UDPBroadcast(UDPLoop):
             "message" : messages.HOST_LEAVE,
             "uuid" : uuid
             }
+        self.broadcast_message(msg)
+
+    def send_host_refresh(self, uuid, services=None):
+        msg = {
+            "message" : messages.HOST_REFRESH,
+            "uuid" : uuid
+        }
+        if services:
+            msg["services"] = services
         self.broadcast_message(msg)

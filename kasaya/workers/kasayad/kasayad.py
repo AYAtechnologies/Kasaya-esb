@@ -114,12 +114,24 @@ class KasayaDaemon(object):
                 a,h = str(res['addr']), res['hostname']
                 LOG.info("Remote kasaya daemon [%s] stopped, addres [%s], uuid [%s]" % (h, a, uuid))
 
-    def notify_kasayad_refresh(self, uuid, serivces, local=False):
+
+    def notify_kasayad_refresh(self, uuid, services=None, local=False):
         """
         Received information on host changes
         """
-        pass
-        print ("KASAYAD change",local, services)
+        if services is not None:
+            slst = ", ".join(services)
+            if local:
+                # local changes require broadcast new service status
+                self.BC.send_host_refresh(self.uuid, services=services)
+                LOG.info("Local service list changed [%s]" % slst)
+            else:
+                # remote host services requires daabase update
+                # local updates are entered to database
+                # before notify_kasayad_refresh is called
+                self.DB.service_update_list(self.uuid, services)
+                LOG.info("Remote host service list changed [%s]" % slst)
+
 
 
     # main loop

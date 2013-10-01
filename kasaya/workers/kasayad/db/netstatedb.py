@@ -11,7 +11,7 @@ class NetworkStateDB(object):
     replaces_broadcast = False
 
     def __init__(self):
-        if settings.SYNC_DB_BACKEND=="memory":
+        if settings.KASAYAD_DB_BACKEND=="memory":
             from . import memsqlite
             self.LLDB = memsqlite.MemoryDB()
         else:
@@ -83,32 +83,6 @@ class NetworkStateDB(object):
     # services
 
 
-
-    def service_update_list(self, host_uuid, services):
-        """
-        Aktualizacja listy wbudowanych serwisów
-        """
-        newset = set(services)
-        todel = set()
-        for s in self.service_list(host_uuid):
-            name = s['service']
-            if name in newset:
-                newset.discard(name)
-            else:
-                todel.add(name)
-        changes = 0
-        for s in newset:
-            self.service_add(host_uuid, s)
-            changes+=1
-        for s in todel:
-            self.service_del(host_uuid, s)
-            changes+=1
-        return changes>0
-
-
-
-    # global network state
-
     def service_add(self, host_uuid, sname):
         """
         Dodanie serwisu do hosta
@@ -134,6 +108,27 @@ class NetworkStateDB(object):
         """
         for s in self.LLDB.service_list(uuid):
             yield s
+
+    def service_update_list(self, host_uuid, services):
+        """
+        Aktualizacja listy wbudowanych serwisów
+        """
+        newset = set(services)
+        todel = set()
+        for s in self.service_list(host_uuid):
+            name = s['service']
+            if name in newset:
+                newset.discard(name)
+            else:
+                todel.add(name)
+        changes = 0
+        for s in newset:
+            self.service_add(host_uuid, s)
+            changes+=1
+        for s in todel:
+            self.service_del(host_uuid, s)
+            changes+=1
+        return changes>0
 
 
 
