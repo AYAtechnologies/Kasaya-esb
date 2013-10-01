@@ -44,8 +44,10 @@ def setup_logging(name):
     # wyjście
     if settings.LOG_TO_FILE:
         # logowanie do pliku
+        print "LOG TO FILE"
         ch = logging.FileHandler(settings.LOG_FILE_NAME, encoding="utf-8")
     else:
+        print "LOG TO screen"
         # logowanie na wyjście
         ch = logging.StreamHandler(stream=sys.stderr)
 

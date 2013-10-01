@@ -4,11 +4,25 @@ from __future__ import unicode_literals, print_function
 from kasaya import control
 from kasaya.conf import load_config_from_file
 import plac, datetime
-#from pprint import pprint
+import os
+
+
+def run_kasaya_daemon():
+    """
+    Kasaya daemon is not regular kasaya service, it must be run in special way.
+    This funcion is doing it.
+    """
+    from kasaya.core.lib.servicesctl import Service
+    from kasaya.workers import kasayad
+    pth = os.path.dirname(kasayad.__file__)
+    srv = Service(pth, kasayad_mode=True)
+    srv.start_service()
+
+
 
 
 class Jobs(object):
-    commands = ['list', 'rescan', 'wrkstop', 'wrkstats', 'svcstart', 'svcstop']
+    commands = ['boot', 'list', 'rescan', 'wrkstop', 'wrkstats', 'svcstart', 'svcstop']
 
 
     def __init__(self):
@@ -153,6 +167,15 @@ class Jobs(object):
         on the fly, without restarting kasaya daemon.
         """
         control.host.rescan(ip)
+
+
+    @plac.annotations( )
+    def boot(self):
+        """
+        Start local instance of kasaya daemon.
+        """
+        run_kasaya_daemon()
+
 
 
 if __name__=="__main__":

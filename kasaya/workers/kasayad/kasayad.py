@@ -144,3 +144,5 @@ class KasayaDaemon(object):
             gevent.joinall(loops)
         finally:
             self.close()
+
+

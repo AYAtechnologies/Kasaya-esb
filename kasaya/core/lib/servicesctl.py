@@ -14,25 +14,35 @@ class UnknownServiceMode(Exception): pass
 
 class Service(object):
 
-    def __init__(self, directory):
+    def __init__(self, directory, kasayad_mode=False):
         # worker directory
         self.directory = os.path.join(settings.LOCAL_WORKERS_DIR, directory)
 
         # load config
         CNF = CombinedConfig()
+        # system config
         CNF.load_config(
             SYSTEM_SERVICES_CONFIG,
             globmode=True, optional=True )
-        CNF.load_config(
-            os.path.join(self.directory, SERVICE_CONFIG_NAME),
-            globmode=False, optional=False )
-        CNF.load_config(
-            os.path.join(settings.LOCAL_WORKERS_DIR, SERVICE_GLOBAL_CONFIG_NAME),
-            globmode=True, optional=True)
+        if not kasayad_mode:
+            # service own config
+            CNF.load_config(
+                os.path.join(self.directory, SERVICE_CONFIG_NAME),
+                globmode=False, optional=False )
+            # local host all services config
+            CNF.load_config(
+                os.path.join(settings.LOCAL_WORKERS_DIR, SERVICE_GLOBAL_CONFIG_NAME),
+                globmode=True, optional=True)
 
         # service name and module
-        self.name = CNF['service|name']
-        self.mode = CNF['service|mode']
+        if kasayad_mode:
+            # kasayad
+            self.name = "kasayad"
+            self.mode = "python"
+        else:
+            # normal service worker
+            self.name = CNF['service|name']
+            self.mode = CNF['service|mode']
         # language
         if self.mode in (None, "python"):
             self.mode="python2"
@@ -41,9 +51,15 @@ class Service(object):
             e.service = self.name
             e.mode = self.mode
             raise e
-        CNF.service(self.name) # change parser mode
-        self.module = CNF['service|module']
 
+        if kasayad_mode:
+            # kasayad
+            CNF.service("kasayad") # change parser mode
+            self.module = ""
+        else:
+            # regular worker
+            CNF.service(self.name) # change parser mode
+            self.module = CNF['service|module']
 
         if self.mode.startswith("python"):
             # virtualenv dir is used only with python
@@ -73,6 +89,8 @@ class Service(object):
         # special settings
         self.env['SV_SERVICE_NAME'] = self.name
         self.env['SV_MODULE_IMPORT'] = self.module
+        if kasayad_mode:
+            self.env['SV_KASAYAD_MODE'] = "yes"
 
 
     def get_start_command(self):

@@ -54,7 +54,13 @@ if __name__=="__main__":
     # what to run...
     servicename = os.environ['SV_SERVICE_NAME']
     module = os.environ['SV_MODULE_IMPORT']
-
+    try:
+        kasayad_mode = os.environ['SV_KASAYAD_MODE'].strip().lower().startswith("y")
+    except:
+        kasayad_mode = False
+    import sys
+    for k,v in os.environ.items():
+        print ("      ",k,v)
     # worker settings
     from kasaya.conf import set_value, settings
 
@@ -66,26 +72,32 @@ if __name__=="__main__":
                 set_value(k, v)
 
     # setup logging
-    if not settings.LOG_TO_FILE:
-        set_value("LOG_TO_FILE", "1")
+    #if not settings.LOG_TO_FILE:
+    set_value("LOG_TO_FILE", "1")
     set_value("LOGGER_NAME", servicename )
     set_value("LOG_FILE_NAME", os.environ.get('SV_LOG_FILE', "/tmp/service_%s.log" % servicename) )
-
+    print (os.environ.get('SV_LOG_FILE', "/tmp/service_%s.log" % servicename) )
     from kasaya.core.lib.logger import stdLogOut
     from kasaya.core.lib import LOG
-
+    LOG.info("cyce")
     # redirect stdout and stderr to log
     sys.stdout = stdLogOut(LOG, "DEBUG")
     sys.stderr = stdLogOut(LOG, "ERROR")
 
-    # import daemon and start working
-    from kasaya import WorkerDaemon
+    if kasayad_mode:
+        # starting kasaya daemon
+        from kasaya.workers.kasayad import KasayaDaemon
+        daemon = KasayaDaemon()
+        daemon.run()
+        LOG.info("KASAYAAAAA")
+    else:
+        # starting regular worker
+        from kasaya import WorkerDaemon
+        cwd = os.getcwd()
+        if not cwd in sys.path:
+            sys.path.append(cwd)
+        __import__(module)
 
-    cwd = os.getcwd()
-    if not cwd in sys.path:
-        sys.path.append(cwd)
-    __import__(module)
-
-    worker = WorkerDaemon(servicename)
-    worker.run()
+        worker = WorkerDaemon(servicename)
+        worker.run()
 
