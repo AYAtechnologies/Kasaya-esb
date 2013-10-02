@@ -59,8 +59,7 @@ if __name__=="__main__":
     except:
         kasayad_mode = False
     import sys
-    for k,v in os.environ.items():
-        print ("      ",k,v)
+
     # worker settings
     from kasaya.conf import set_value, settings
 
@@ -76,20 +75,20 @@ if __name__=="__main__":
     set_value("LOG_TO_FILE", "1")
     set_value("LOGGER_NAME", servicename )
     set_value("LOG_FILE_NAME", os.environ.get('SV_LOG_FILE', "/tmp/service_%s.log" % servicename) )
-    print (os.environ.get('SV_LOG_FILE', "/tmp/service_%s.log" % servicename) )
     from kasaya.core.lib.logger import stdLogOut
     from kasaya.core.lib import LOG
-    LOG.info("cyce")
+
     # redirect stdout and stderr to log
     sys.stdout = stdLogOut(LOG, "DEBUG")
     sys.stderr = stdLogOut(LOG, "ERROR")
 
+    LOG.stetupLogger()
     if kasayad_mode:
+        LOG.info("KASAYAAAAA")
         # starting kasaya daemon
         from kasaya.workers.kasayad import KasayaDaemon
         daemon = KasayaDaemon()
         daemon.run()
-        LOG.info("KASAYAAAAA")
     else:
         # starting regular worker
         from kasaya import WorkerDaemon

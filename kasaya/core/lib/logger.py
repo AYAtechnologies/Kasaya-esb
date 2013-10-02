@@ -32,31 +32,43 @@ class stdLogOut(object):
 
 
 
-def setup_logging(name):
-    logger = logging.getLogger(name)
-    # log level
-    ll = settings.LOG_LEVEL.upper()
-    try:
-        logger.setLevel(_levels[ll])
-    except KeyError:
-        raise Exception ("Invalid log level in config %s" % ll)
+class LogProxy(object):
 
-    # wyjście
-    if settings.LOG_TO_FILE:
-        # logowanie do pliku
-        print "LOG TO FILE"
-        ch = logging.FileHandler(settings.LOG_FILE_NAME, encoding="utf-8")
-    else:
-        print "LOG TO screen"
-        # logowanie na wyjście
-        ch = logging.StreamHandler(stream=sys.stderr)
+    def __init__(self):
+        self.stetupLogger()
 
-    # format wyjścia
-    formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s: %(message)s')
-    ch.setFormatter(formatter)
+    def stetupLogger(self, name=None):
+        if name is None:
+            name = settings.LOGGER_NAME
 
-    logger.addHandler(ch)
-    return logger
+        logger = logging.getLogger(name)
+
+        # log level
+        ll = settings.LOG_LEVEL.upper()
+        try:
+            logger.setLevel(_levels[ll])
+        except KeyError:
+            raise Exception ("Invalid log level in config %s" % ll)
+
+        # wyjście
+        if settings.LOG_TO_FILE:
+            # logowanie do pliku
+            ch = logging.FileHandler(settings.LOG_FILE_NAME, encoding="utf-8")
+        else:
+            # logowanie na wyjście
+            ch = logging.StreamHandler(stream=sys.stderr)
+
+        # format wyjścia
+        formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+        ch.setFormatter(formatter)
+
+        logger.addHandler(ch)
+        self._log = logger
 
 
-LOG = setup_logging(settings.LOGGER_NAME)
+    def __getattr__(self, a):
+        return self._log.__getattribute__(a)
+
+
+
+LOG = LogProxy()#setup_logging(settings.LOGGER_NAME)
