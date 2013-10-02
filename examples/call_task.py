@@ -21,8 +21,8 @@ if __name__=="__main__":
         t.myservice.do_work("parameter", 2, foo=456, baz=True)
         t.myservice.another_task("important parameter")
 
-    sync.myservice.long_task(0.4)
-    sync.myservice.long_task(4)
+    print sync.myservice.long_task(0.4)
+    print sync.myservice.long_task(4)
 
     try:
         sync.myservice.wrong(234)

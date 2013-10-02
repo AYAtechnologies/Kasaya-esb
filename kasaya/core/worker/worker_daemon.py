@@ -176,7 +176,7 @@ class WorkerDaemon(MiddlewareCore):
         except TaskTimeout as e:
             # timeout exceeded
             self._tasks_error += 1
-            task['res_err'] += 1
+            task['res_tout'] += 1
             err = exception_serialize(e, internal=False)
             LOG.info("Task [%s] timeout (after %i s)." % (funcname, tout) )
             return err

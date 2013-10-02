@@ -34,14 +34,14 @@ def fiku(a,b=None,foo=None, baz=None):
     print("another_task")
 
 
-@Task(name="long_task", timeout=1)
+@Task(name="long_task", timeout=3)
 def long_task(a):
     """
     I'm sleepy...
     """
     print ("sleeping:", a)
     time.sleep(float(a))
-    return ("waked up after "+str(a))
+    return "waked up after "+str(a)
 
 
 @Task(name="wrong")

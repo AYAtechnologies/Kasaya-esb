@@ -9,7 +9,7 @@ class WorkerMethodsDB(object):
     def __init__(self):
         self.db = {}
 
-    def register_method(self, name, func, timeout):
+    def register_task(self, name, func, timeout):
         # task name
         if name is None:
             name = func.__name__
@@ -31,10 +31,11 @@ class WorkerMethodsDB(object):
             doc = doc.strip()
         taskdata = {
             'func' : func,
-            'doc' : doc,
-            'timeout' : timeout,
-            'res_succ' : 0,
-            'res_err' : 0,
+            'doc' : doc, # docstring
+            'timeout' : timeout, # timeout in seconds
+            'res_succ' : 0, # successful calls
+            'res_err' : 0,  # error finishing calls
+            'res_tout' : 0, # timed out calls
         }
 
         self.db[name] = taskdata
