@@ -6,15 +6,10 @@ from .worker_reg import worker_methods_db
 
 class Task(object):
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, timeout=None):
         self.name = name
+        self.timeout = timeout
 
     def __call__(self, func):
-        worker_methods_db.register_method(self.name, func)
-
-        return func # nie dekorujemy
-
-#        def wrap(request, *args, **kwargs):
-#            return func(request, *args, **kwargs)
-#
-#        return wrap
+        worker_methods_db.register_method(self.name, func, self.timeout)
+        return func

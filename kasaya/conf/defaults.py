@@ -47,6 +47,9 @@ SYNC_REPLY_TIMEOUT = 2
 WORKER_MIN_PORT = 5000
 WORKER_MAX_PORT = 6000
 
+# use monkey-patching from gevent on workers
+WORKER_MONKEY = True
+
 # konfiguracja name(?) serwera
 # możliwe:
 #  udp-broadcast, rijak,... cośtam cośtam
@@ -66,8 +69,7 @@ KASAYAD_DB_BACKEND = "memory"
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
 ASYNC_DAEMON_SERVICE = "async_daemon"
 
-
-MIDDLEWARE_CLASSES = ["auth"]
+#MIDDLEWARE_CLASSES = ["auth"]
 
 # logowanie do pliku
 LOG_TO_FILE = False

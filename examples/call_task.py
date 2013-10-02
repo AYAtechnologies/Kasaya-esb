@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-
 from kasaya.conf import load_config_from_file
-#from kasaya.core import client
 from kasaya import sync, async, control, trans
+
 
 if __name__=="__main__":
     load_config_from_file("example.conf", optional=True)
@@ -21,6 +20,9 @@ if __name__=="__main__":
     with trans(("dupa","jasiu")) as t:
         t.myservice.do_work("parameter", 2, foo=456, baz=True)
         t.myservice.another_task("important parameter")
+
+    sync.myservice.long_task(0.4)
+    sync.myservice.long_task(4)
 
     try:
         sync.myservice.wrong(234)

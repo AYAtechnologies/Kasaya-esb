@@ -71,7 +71,6 @@ if __name__=="__main__":
                 set_value(k, v)
 
     # setup logging
-    #if not settings.LOG_TO_FILE:
     set_value("LOG_TO_FILE", "1")
     set_value("LOGGER_NAME", servicename )
     set_value("LOG_FILE_NAME", os.environ.get('SV_LOG_FILE', "/tmp/service_%s.log" % servicename) )
@@ -84,7 +83,6 @@ if __name__=="__main__":
 
     LOG.stetupLogger()
     if kasayad_mode:
-        LOG.info("KASAYAAAAA")
         # starting kasaya daemon
         from kasaya.workers.kasayad import KasayaDaemon
         daemon = KasayaDaemon()
@@ -96,7 +94,6 @@ if __name__=="__main__":
         if not cwd in sys.path:
             sys.path.append(cwd)
         __import__(module)
-
         worker = WorkerDaemon(servicename)
         worker.run()
 

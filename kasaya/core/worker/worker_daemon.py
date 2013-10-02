@@ -8,10 +8,12 @@ from kasaya.core.lib.comm import RepLoop, send_and_receive, exception_serialize_
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system
+from kasaya.core import exceptions
 from .worker_reg import worker_methods_db
 from .syncclient import SyncClient
 import zmq.green as zmq
 import gevent
+import gevent.monkey
 
 import traceback
 import datetime, uuid, os
@@ -19,8 +21,8 @@ import inspect
 
 __all__=("WorkerDaemon",)
 
-#import gevent.monkey;
-#gevent.monkey.patch_all()
+
+class TaskTimeout(Exception): pass
 
 
 class WorkerDaemon(MiddlewareCore):
@@ -51,6 +53,9 @@ class WorkerDaemon(MiddlewareCore):
         self._tasks_nonex = 0 # non existing tasks called
         self._tasks_control = 0 # control tasks received
         self._start_time = datetime.datetime.now() # time of worker start
+
+        if settings.WORKER_MONKEY:
+            gevent.monkey.patch_all()
 
 
     def connect(self, context):
@@ -99,17 +104,17 @@ class WorkerDaemon(MiddlewareCore):
     # --------------------
 
 
-    def expose_method(self, method_name):
-        if getattr(self, method_name):
-            # this must be a defined method - attribute error raises when trying to expose method that doesnt exist
-            self.exposed_methods.append(method_name)
-
-    def expose_all(self):
-        exposed = []
-        for name, val in inspect.getmembers(self):
-            if inspect.ismethod(val) and not name.startswith("_"):
-                exposed.append(name)
-        self.exposed_methods += exposed
+#    def expose_method(self, method_name):
+#        if getattr(self, method_name):
+#            # this must be a defined method - attribute error raises when trying to expose method that doesnt exist
+#            self.exposed_methods.append(method_name)
+#
+#    def expose_all(self):
+#        exposed = []
+#        for name, val in inspect.getmembers(self):
+#            if inspect.ismethod(val) and not name.startswith("_"):
+#                exposed.append(name)
+#        self.exposed_methods += exposed
 
 
     def handle_sync_call(self, msgdata):
@@ -134,36 +139,54 @@ class WorkerDaemon(MiddlewareCore):
     def run_task(self, funcname, args, kwargs):
         funcname = ".".join( funcname )
 
-        # TODO: Fix method finde because it's ugly
         # find task in worker db
-        self_func = getattr(self, funcname, None)
-        if self_func is not None and funcname in self.exposed_methods:
-            func = self_func
-            # doesnt work - dont know why
-            # if funcname in worker_methods_db:
-            #     print "Warning ", funcname, "in self.exposed_methods and in worker_functions"
-        else:
-            try:
-                func = worker_methods_db[funcname]
-                self._tasks_succes += 1
-            except KeyError:
-                self._tasks_nonex += 1
-                LOG.info("Unknown worker task called [%s]" % funcname)
-                return exception_serialize_internal( 'Method %s not found' % funcname )
+        #self_func = getattr(self, funcname, None)
+        #if self_func is not None and funcname in self.exposed_methods:
+        #    func = self_func
+        #    # doesnt work - dont know why
+        #    # if funcname in worker_methods_db:
+        #    #     print "Warning ", funcname, "in self.exposed_methods and in worker_functions"
+        #else:
+        try:
+            task = worker_methods_db[funcname]
+        except KeyError:
+            self._tasks_nonex += 1
+            LOG.info("Unknown worker task called [%s]" % funcname)
+            return exception_serialize_internal( 'Method %s not found' % funcname )
 
         # try to run function and catch exceptions
         try:
-            result = func(*args, **kwargs)
+            func = task['func']
+            tout = task['timeout']
+            if tout is None:
+                # call task without timeout
+                result = func(*args, **kwargs)
+            else:
+                # call task with timeout
+                with gevent.Timeout(tout, TaskTimeout):
+                    result = func(*args, **kwargs)
+            self._tasks_succes += 1
+            task['res_succ'] += 1
+
             return {
                 'message' : messages.RESULT,
                 'result' : result
             }
 
+        except TaskTimeout as e:
+            # timeout exceeded
+            self._tasks_error += 1
+            task['res_err'] += 1
+            err = exception_serialize(e, internal=False)
+            LOG.info("Task [%s] timeout (after %i s)." % (funcname, tout) )
+            return err
+
         except Exception as e:
             # exception occured
             self._tasks_error += 1
+            task['res_err'] += 1
             err = exception_serialize(e, internal=False)
-            LOG.info("Worker function [%s] exception [%s]. Message: %s" % (funcname, err['name'], err['description']) )
+            LOG.info("Task [%s] exception [%s]. Message: %s" % (funcname, err['name'], err['description']) )
             LOG.debug(err['traceback'])
             return err
 
