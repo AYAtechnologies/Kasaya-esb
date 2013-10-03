@@ -46,6 +46,7 @@ class WorkerDaemon(MiddlewareCore):
         self.ctl = ControlTasks( self.loop.get_context() )
         self.ctl.register_task("stop", self.CTL_stop )
         self.ctl.register_task("stats", self.CTL_stats )
+        self.ctl.register_task("tasks", self.CTL_methods )
         # stats
         #self._sb_errors = 0 # internal service bus errors
         self._tasks_succes = 0 # succesfully processed tasks
@@ -222,3 +223,21 @@ class WorkerDaemon(MiddlewareCore):
             "uptime"    : uptime,
         }
 
+    def CTL_methods(self):
+        """
+        List all exposed methods by worker
+        """
+        lst = []
+        tasks = worker_methods_db.tasks()
+        tasks.sort()
+        for name in tasks:
+            nfo = worker_methods_db[name]
+            res = {
+                'name' : name,
+                'doc' : nfo['doc'],
+                'timeout' : nfo['timeout'],
+                'anonymous' : nfo['anon'],
+                'permissions' : nfo['perms']
+            }
+            lst.append(res)
+        return lst
