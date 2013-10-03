@@ -172,8 +172,7 @@ def prepare_serializer():
             from kasaya.core.protocol.transport.tr_bson2 import bin_2_data, data_2_bin
 
     elif settings.TRANSPORT_PROTOCOL=="msgpack":
-        from transport.tr_msgpack import bin_2_data, data_2_bin
-
+        from kasaya.core.protocol.transport.tr_msgpack import bin_2_data, data_2_bin
     else:
         raise Exception("Unsupported transport protocol %s" % settings.TRANSPORT_PROTOCOL)
 

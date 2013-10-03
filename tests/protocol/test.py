@@ -1,14 +1,14 @@
-#!/home/moozg/venvs/kasa33/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasatest/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasa33/bin/python
 from __future__ import division, absolute_import, print_function, unicode_literals
 import unittest, os
 # misc
-from kasaya.conf import set_value
+from kasaya.conf import set_value, settings
 from binascii import hexlify, unhexlify
 # tested modules
 from Crypto.Cipher import AES
-from encryption import encrypt_aes, decrypt_aes, encrypt, decrypt
+from kasaya.core.protocol.encryption import encrypt_aes, decrypt_aes, encrypt, decrypt
 
 
 # sample data
@@ -65,39 +65,47 @@ class SerializerTests(unittest.TestCase):
         set_value("PASSWORD","absolute_secret_password")
         set_value("COMPRESSION","no")
         set_value("ENCRYPTION","yes")
+        # skip messagepack testing, because it's fucked up by design
+        self.transports = ("pickle","bson",)#"msgpack")
+
+
+    def _single_test(self, serialize, deserialize):
+        msg = {
+            "field_1":12345678,
+            "field_2":"trololo",
+            "flo":274.123,
+            "żółw":"zażółć gęślą jaźń",
+            b"bin":b"fooo"
+        }
+        result1 = serialize(msg)
+        result2 = deserialize(result1)
+        self.assertEqual(result2, msg)
+
 
     def test_encrypted(self):
         """
         Check Crypto library with AES
         """
-        from serializer import encrypted_serialize as serialize
-        from serializer import encrypted_deserialize as deserialize
-        msg = {
-            "field_1":12345678,
-            "field_2":"trololo",
-            "flo":274.123,
-            "żółw":"zażółć gęślą jaźń"
-        }
-        result1 = serialize(msg)
-        result2 = deserialize(result1)
-        self.assertEqual(result2, msg)
+        from kasaya.core.protocol.serializer import encrypted_serialize as serialize
+        from kasaya.core.protocol.serializer import encrypted_deserialize as deserialize
+        from kasaya.core.protocol.serializer import prepare_serializer
+        for tr in self.transports:
+            set_value("TRANSPORT_PROTOCOL", tr)
+            prepare_serializer()
+            self._single_test(serialize, deserialize)
 
     def test_plain(self):
         """
         Check Crypto library with AES
         """
-        from serializer import plain_serialize as serialize
-        from serializer import plain_deserialize as deserialize
-        msg = {
-            "field_1":12345678,
-            "field_2":"trololo",
-            "flo":274.123,
-            "żółw":"zażółć gęślą jaźń"
-        }
-        result1 = serialize(msg)
-        result2 = deserialize(result1)
+        from kasaya.core.protocol.serializer import plain_serialize as serialize
+        from kasaya.core.protocol.serializer import plain_deserialize as deserialize
+        from kasaya.core.protocol.serializer import prepare_serializer
+        for tr in self.transports:
+            set_value("TRANSPORT_PROTOCOL", tr)
+            prepare_serializer()
+            self._single_test(serialize, deserialize)
 
-        self.assertEqual(result2, msg)
 
 
 if __name__ == '__main__':
