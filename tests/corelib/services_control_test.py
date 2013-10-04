@@ -14,10 +14,6 @@ class ConfigTest(unittest.TestCase):
         wipeout all settings
         """
         settings.clear()
-        #set_value("PASSWORD","absolute_secret_password")
-        #set_value("COMPRESSION","no")
-        #set_value("ENCRYPTION","yes")
-        #
         self.test_root = os.path.dirname(__file__)
         self.test_etc = os.path.join(self.test_root, "etc")
 
@@ -31,15 +27,14 @@ class ConfigTest(unittest.TestCase):
         load_config_from_file (conf.SYSTEM_KASAYA_CONFIG, optional=True)
 
 
-    def test_default_config_loader(self):
-        settings.clear()
-        load_defaults()
 
+    def test_default_config_loader(self):
+        load_defaults()
         # force float data
         settings['FLOAT_DATA'] = 1.0
         settings['DECIMAL_DATA'] = Decimal("1")
         # load prepared config
-        load_config_from_file( os.path.join(self.test_etc, "kasaya.conf"), optional=False)
+        load_config_from_file( os.path.join(self.test_etc, "test.conf"), optional=False)
 
         # default data types conversion
         self.assertEqual(settings.WORKER_POOL_SIZE, 5)
@@ -52,6 +47,26 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual( type(settings.FLOAT_DATA), float )
         self.assertEqual( settings.DECIMAL_DATA, Decimal("10.000123") )
         self.assertEqual( type(settings.DECIMAL_DATA), Decimal )
+
+        set_value("FLOAT_DATA", "5")
+        self.assertEqual( settings.FLOAT_DATA, 5.0 )
+        set_value("DECIMAL_DATA", "9.002")
+        self.assertEqual( settings.DECIMAL_DATA, Decimal("9.002") )
+
+        for y in ("yes","Yes","TAK","1","True","true"):
+            set_value("ENCRYPTION", y)
+            self.assertEqual( settings.ENCRYPTION, True )
+
+        for n in ("no","No","","żółw"):
+            set_value("ENCRYPTION", n)
+            self.assertEqual( settings.ENCRYPTION, False )
+
+
+
+    def test_multiple_config(self):
+        pass
+
+
 
 
 if __name__ == '__main__':

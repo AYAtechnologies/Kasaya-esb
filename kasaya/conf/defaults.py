@@ -62,8 +62,7 @@ BROADCAST_PORT = 4040
 KASAYAD_CONTROL_PORT = 4041
 SYNCD_CONTROL_BIND = "AUTO"
 
-# stan sieci może być przechowywany w lokalnej bazie danych, jeśli
-## przemyśleć to
+# stan sieci może być przechowywany w lokalnej bazie danych
 KASAYAD_DB_BACKEND = "memory"
 
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
