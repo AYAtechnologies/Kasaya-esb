@@ -17,6 +17,7 @@ class UDPLoop(object):
     def __init__(self):
         self.is_running = True
         self.own_ip = None
+        self.uuid = None
         self._msgdb = {}
         self.port = settings.BROADCAST_PORT
         self.SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -54,6 +55,14 @@ class UDPLoop(object):
                 LOG.warning("Message from broadcast deserialisation error")
                 LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % msgdata[:1024].encode("hex"))
                 continue
+
+            # own broadcast from another interface
+            try:
+                if msgdata['suuid'] == self.uuid:
+                    continue
+            except KeyError:
+                continue
+
             # message type
             try:
                 msg = msgdata['message']
@@ -99,6 +108,7 @@ class UDPBroadcast(UDPLoop):
 
     def __init__(self, server):
         self.DAEMON = server
+        self.uuid = server.uuid
         super(UDPBroadcast, self).__init__()
         self.register_message(messages.WORKER_LIVE, self.handle_worker_join)
         self.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
@@ -129,6 +139,7 @@ class UDPBroadcast(UDPLoop):
         """
         Wysłanie komunikatu do wszystkich workerów w sieci
         """
+        msg['suuid'] = self.uuid
         msg = serialize(msg)
         self.SOCK.sendto(msg, ('<broadcast>', self.port) )
 
