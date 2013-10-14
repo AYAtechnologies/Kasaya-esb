@@ -101,6 +101,16 @@ class UDPLoop(object):
                 LOG.debug(tback)
                 del excname, tback, errmsg
 
+    def broadcast_message(self, msg):
+        """
+        Wysłanie komunikatu do wszystkich workerów w sieci
+        """
+        msg['suuid'] = self.uuid
+        msg = serialize(msg)
+        self.SOCK.sendto(msg, ('<broadcast>', self.port) )
+
+
+
 
 
 
@@ -130,18 +140,6 @@ class UDPBroadcast(UDPLoop):
 
     def handle_host_refresh(self, msgdata):
         self.DAEMON.notify_kasayad_refresh(msgdata['uuid'], services=msgdata['services'])
-
-
-    # sending broadcast
-
-
-    def broadcast_message(self, msg):
-        """
-        Wysłanie komunikatu do wszystkich workerów w sieci
-        """
-        msg['suuid'] = self.uuid
-        msg = serialize(msg)
-        self.SOCK.sendto(msg, ('<broadcast>', self.port) )
 
 
     # broadcast specific messages

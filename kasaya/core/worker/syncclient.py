@@ -24,7 +24,8 @@ class SyncClient(object):
             "port" : port,
             "uuid" : uuid,
             "service" : servicename,
-            "pid": pid
+            "pid": pid,
+            "status": 0,
         }
         # connect to zmq
         self.connect()
@@ -60,7 +61,8 @@ class SyncClient(object):
             #self.SEMA.release()
             return False
 
-    def notify_live(self):
+    def notify_live(self, status):
+        self.__pingmsg['status'] = status
         return self.send(self.__pingmsg)
 
     def notify_stop(self):

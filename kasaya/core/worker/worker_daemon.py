@@ -30,6 +30,13 @@ class WorkerDaemon(MiddlewareCore):
     def __init__(self, servicename):
         self.uuid = str(uuid.uuid4())
         self.servicename = servicename
+        # worker status
+        # 0 - initialized
+        # 1 - starting
+        # 2 - working
+        # 3 - stopping
+        # 4 - dead
+        self.status = 0
         LOG.info("Starting worker daemon, service [%s], uuid: [%s]" % (self.servicename, self.uuid) )
         self.loop = RepLoop(self.connect)
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
@@ -45,6 +52,7 @@ class WorkerDaemon(MiddlewareCore):
         # control tasks
         self.ctl = ControlTasks( self.loop.get_context() )
         self.ctl.register_task("stop", self.CTL_stop )
+        self.ctl.register_task("start", self.CTL_start )
         self.ctl.register_task("stats", self.CTL_stats )
         self.ctl.register_task("tasks", self.CTL_methods )
         # stats
@@ -65,8 +73,9 @@ class WorkerDaemon(MiddlewareCore):
         return sock, addr
 
     def run(self):
+        self.status = 1
         LOG.debug("Sending notification to local sync daemon. Service [%s] starting on address [%s]" % (self.servicename, self.loop.address))
-        self.SYNC.notify_live()
+        self.SYNC.notify_live(self.status)
         self.setup_middleware()
         self.__greens = []
         self.__greens.append( gevent.spawn(self.loop.loop) )
@@ -79,6 +88,7 @@ class WorkerDaemon(MiddlewareCore):
 
     def stop(self):
         self.__hbloop = False
+        self.status = 3
         LOG.debug("Sending stop notification. Address [%s]" % self.loop.address)
         self.SYNC.notify_stop()
         self.loop.stop()
@@ -90,6 +100,7 @@ class WorkerDaemon(MiddlewareCore):
     def close(self):
         self.loop.close()
         self.SYNC.close()
+        self.status=4
 
 
 
@@ -98,35 +109,33 @@ class WorkerDaemon(MiddlewareCore):
 
     def heartbeat_loop(self):
         while self.__hbloop:
-            self.SYNC.notify_live()
+            self.SYNC.notify_live(self.status)
             gevent.sleep(settings.WORKER_HEARTBEAT)
 
 
     # --------------------
 
 
-#    def expose_method(self, method_name):
-#        if getattr(self, method_name):
-#            # this must be a defined method - attribute error raises when trying to expose method that doesnt exist
-#            self.exposed_methods.append(method_name)
-#
-#    def expose_all(self):
-#        exposed = []
-#        for name, val in inspect.getmembers(self):
-#            if inspect.ismethod(val) and not name.startswith("_"):
-#                exposed.append(name)
-#        self.exposed_methods += exposed
-
-
     def handle_sync_call(self, msgdata):
+        """
+        This is main function to process all requests.
+        """
         name = msgdata['service']
-        msgdata = self.prepare_message(msgdata)
+        # not our task
+        if name!=self.servicename:
+            raise exceptions.ServiceBusException("Wrong service task received %s" % str(service) )
+
+        # not in working state
+        if self.status!=2:
+            raise exceptions.ServiceBusException("Worker is currently offline")
+
+        #msgdata = self.prepare_message(msgdata)
         result = self.run_task(
             funcname = msgdata['method'],
             args = msgdata['args'],
             kwargs = msgdata['kwargs']
         )
-        result = self.postprocess_message(result)
+        #result = self.postprocess_message(result)
         return result
 
 
@@ -141,13 +150,6 @@ class WorkerDaemon(MiddlewareCore):
         funcname = ".".join( funcname )
 
         # find task in worker db
-        #self_func = getattr(self, funcname, None)
-        #if self_func is not None and funcname in self.exposed_methods:
-        #    func = self_func
-        #    # doesnt work - dont know why
-        #    # if funcname in worker_methods_db:
-        #    #     print "Warning ", funcname, "in self.exposed_methods and in worker_functions"
-        #else:
         try:
             task = worker_methods_db[funcname]
         except KeyError:
@@ -200,9 +202,21 @@ class WorkerDaemon(MiddlewareCore):
         """
         Stop request. Finish current task and shutdown.
         """
+        self.status = 3
         g = gevent.Greenlet(self.stop)
         g.start_later(2)
         return True
+
+    def CTL_start(self):
+        """
+        Set status of worker as running. This allow to process tasks
+        """
+        if self.status==1:
+            self.status = 2
+            LOG.info("Received status: running.")
+            return True
+        return False
+
 
     def CTL_stats(self):
         """
@@ -241,3 +255,10 @@ class WorkerDaemon(MiddlewareCore):
             }
             lst.append(res)
         return lst
+
+
+    def CTL_middleware_list(self, midlist):
+        """
+        Register middleware list for worker
+        """
+        pass

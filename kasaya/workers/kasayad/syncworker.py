@@ -242,9 +242,23 @@ class SyncWorker(object):
     # worker state changes
     # ------------------------------
 
+    def after_worker_start(self, uuid, service, ip, port):
+        # send information on worker start
+        addr = _worker_addr({'ip':ip, 'port':port})
+        msg = {
+            'message':messages.CTL_CALL,
+            'method':['start']
+        }
+        res = send_and_receive_response(self.context, addr, msg)
+        LOG.debug("Local worker [%s] on [%s] is now running" % (service, addr) )
+
+        # broadcast new worker state
+        self.BC.send_worker_live(uuid, service, ip, port)
+
+
     def worker_start(self, uuid, service, ip, port, pid=0):
         """
-        Handle joining to network by worker (local or blobal)
+        Handle joining to network by worker (local or global)
         """
         succ = self.DB.worker_register(uuid, service, ip, port,pid)
         addr = ip+":"+str(port)
@@ -261,9 +275,11 @@ class SyncWorker(object):
                 't' : datetime.now(),
             }
 
-        # rozesłanie informacji w sieci jeśli nastąpi lokalna zmiana stanu
+        # przygotowanie lokalnego workera i rozesłanie informacji w sieci jeśli nastąpi zmiana stanu
         if succ and local:
-            self.BC.send_worker_live(uuid, service, ip,port)
+            # run worker and notify network
+            g = gevent.Greenlet(self.after_worker_start, uuid, service, ip, port)
+            g.start()
 
 
     def worker_stop(self, ip, port):
