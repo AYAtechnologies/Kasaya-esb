@@ -10,9 +10,6 @@ import traceback
 
 
 class UDPLoop(object):
-    """
-    PullLoop is receiving only loop for messages.
-    """
 
     def __init__(self):
         self.is_running = True
