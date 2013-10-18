@@ -4,6 +4,7 @@ from distutils.core import setup
 import os
 
 
+
 def package_finder(dirname, onlypackgages=True, destdir=None):
     global packages, package_dir
     for dirpath, dirnames, filenames in os.walk(dirname):
@@ -38,17 +39,15 @@ setup(
     version = version,
     packages = packages,
     package_dir = package_dir,
-    data_files = [
-        ("config", ["examples/example.conf"]),
-    ],
+    #data_files = [
+    #    ("config", ["examples/example.conf"]),
+    #],
     # tools
     scripts=['bin/svbus'],
     # requirments
     install_requires = [
-        #'pyzmq>=13.0',
+        'pyzmq>=13.0',
         'gevent',
-        'gevent-zeromq',
-        'msgpack-python',
         'netifaces',
         'plac',
         'pycrypto',
@@ -60,4 +59,3 @@ setup(
     author = "AYA Technologies",
     author_email = "kb@ayatechnologies.net",
 )
-

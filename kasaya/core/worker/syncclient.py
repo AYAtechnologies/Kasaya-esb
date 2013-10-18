@@ -2,9 +2,9 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
-from kasaya.core.protocol import serialize, deserialize, messages
+from kasaya.core.protocol import Serializer, messages
 from kasaya.core.exceptions import ReponseTimeout
-#from gevent.coros import Semaphore
+from gevent.coros import Semaphore
 import zmq.green as zmq
 import gevent
 
@@ -29,7 +29,8 @@ class SyncClient(object):
         }
         # connect to zmq
         self.connect()
-        #self.SEMA = Semaphore()
+        self.serializer = Serializer()
+        self.SEMA = Semaphore()
 
     def connect(self):
         self.ctx = zmq.Context()
@@ -48,17 +49,17 @@ class SyncClient(object):
         """
         Send message request to syncd. Return True if success, False if delivery failed.
         """
-        self.sync_sender.send( serialize(msg) )
+        self.sync_sender.send( self.serializer.serialize(msg) )
         try:
             with gevent.Timeout(settings.SYNC_REPLY_TIMEOUT, ReponseTimeout):
                 self.sync_sender.recv()
                 return True
         except ReponseTimeout:
-            #with Semaphore():
-            #self.SEMA.acquire()
-            self.disconnect()
-            self.connect()
-            #self.SEMA.release()
+            with Semaphore():
+                #self.SEMA.acquire()
+                self.disconnect()
+                self.connect()
+                #self.SEMA.release()
             return False
 
     def notify_live(self, status):

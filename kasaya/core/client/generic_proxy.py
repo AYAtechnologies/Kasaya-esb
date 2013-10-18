@@ -2,8 +2,8 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.middleware.core import MiddlewareCore
-from kasaya.core.protocol import messages, serialize, deserialize
-from kasaya.core.client.queries import SyncDQuery
+from kasaya.core.protocol import messages, Serializer
+from kasaya.core.client.queries import SyncQuery
 from kasaya.core.lib.comm import send_and_receive_response
 from kasaya.core import exceptions
 import zmq.green as zmq
@@ -25,6 +25,7 @@ class GenericProxy(MiddlewareCore):
 
     def __init__(self, top=None):
         super(GenericProxy, self).__init__()
+        self.sync_query = SyncQuery()
         self._top = top
         self._names = []
         self._method = None
@@ -46,7 +47,7 @@ class GenericProxy(MiddlewareCore):
 
     def find_worker(self, method):
         srvce = method[0]
-        msg = SyncDQuery.query( srvce )
+        msg = self.sync_query.query( srvce )
         if not msg['message']==messages.WORKER_ADDR:
             raise exceptions.ServiceBusException("Wrong response from sync server")
         if msg['ip'] is None:

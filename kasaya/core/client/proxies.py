@@ -1,9 +1,11 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.protocol import messages
-from kasaya.core.client.queries import SyncDQuery
 from kasaya.conf import settings
 from .generic_proxy import GenericProxy
+
+__all__ = ("SyncProxy", "AsyncProxy", "ControlProxy", "TransactionProxy", "async_result")
+
 
 class SyncProxy(GenericProxy):
     def __call__(self, *args, **kwargs):
@@ -55,6 +57,7 @@ def async_result(task_id, context):
 
 
 class ControlProxy(GenericProxy):
+
     def __call__(self, *args, **kwargs):
         method = self._names
         context = self._context
@@ -67,7 +70,7 @@ class ControlProxy(GenericProxy):
         }
         # wysłanie żądania
         #print "Control task: ", msg
-        msgbody = SyncDQuery.control_task(msg)
+        msgbody = self.sync_query.control_task(msg)
         msg = msgbody['message']
         if msg==messages.RESULT:
             return msgbody['result']

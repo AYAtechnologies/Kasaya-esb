@@ -3,7 +3,7 @@
 #from __future__ import unicode_literals
 from kasaya.conf import settings
 from gevent import socket
-from kasaya.core.protocol import serialize, deserialize, messages
+from kasaya.core.protocol import Serializer, messages
 from kasaya.core.lib import LOG
 from kasaya.core.exceptions import NotOurMessage
 import traceback
@@ -20,6 +20,7 @@ class UDPLoop(object):
         self.SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.SOCK.bind(('',settings.BROADCAST_PORT))
         self.SOCK.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.serializer = Serializer()
 
     def set_own_ip(self, ip):
         self.own_ip = ip
@@ -45,7 +46,7 @@ class UDPLoop(object):
                 continue
             # deserialize
             try:
-                msgdata = deserialize(msgdata)
+                msgdata = self.serializer.deserialize(msgdata)
             except NotOurMessage:
                 continue
             except Exception:
@@ -103,7 +104,7 @@ class UDPLoop(object):
         Wysłanie komunikatu do wszystkich workerów w sieci
         """
         msg['suuid'] = self.uuid
-        msg = serialize(msg)
+        msg = self.serializer.serialize(msg)
         self.SOCK.sendto(msg, ('<broadcast>', self.port) )
 
 

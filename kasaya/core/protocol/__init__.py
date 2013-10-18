@@ -1,3 +1,2 @@
 #coding: utf-8
-import __future__
-from .serializer import *
+from .serializer import SingletonSerializer as Serializer

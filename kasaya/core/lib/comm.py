@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
-from kasaya.core.protocol import serialize, deserialize, messages
+from kasaya.core.protocol import Serializer, messages
 from kasaya.core.lib import LOG
 from kasaya.core import exceptions
 import zmq.green as zmq
@@ -27,6 +27,7 @@ class BaseLoop(object):
         if len(addr)==3:
             self.ip = addr[1].lstrip("/")
             self.port = int(addr[2])
+        self.serializer = Serializer()
 
     def get_context(self):
         return self.__context
@@ -66,7 +67,7 @@ class PullLoop(BaseLoop):
 
             # deserialize
             try:
-                msgdata = deserialize(msgdata)
+                msgdata = self.serializer.deserialize(msgdata)
                 msg = msgdata['message']
             except Exception as e:
                 continue
@@ -95,16 +96,16 @@ class RepLoop(BaseLoop):
 
     def send_noop(self):
         noop = {"message":messages.NOOP}
-        self.SOCK.send( serialize(noop) )
+        self.SOCK.send( self.serializer.serialize(noop) )
 
 
     def send(self, message):
         try:
-            packet = serialize(message)
+            packet = self.serializer.serialize(message)
         except exceptions.SerializationError as e:
             try:
                 packet = exception_serialize_internal( str(e) )
-                packet = serialize(packet)
+                packet = self.serializer.serialize(packet)
             except:
                 self.send_noop()
                 return
@@ -117,7 +118,7 @@ class RepLoop(BaseLoop):
             msgdata = self.SOCK.recv()
             # deserialize
             try:
-                msgdata = deserialize(msgdata)
+                msgdata = self.serializer.deserialize(msgdata)
 
             except exceptions.NotOurMessage:
                 # not our servicebus message
@@ -172,9 +173,16 @@ def send_and_receive(context, address, message, timeout=10):
     message - message payload (will be automatically serialized)
     timeout - time in seconds after which TimeoutError will be raised
     """
+    global serializer
+    try:
+        S = serializer
+    except NameError:
+        serializer = Serializer()
+        S = serializer
+
     SOCK = context.socket(zmq.REQ)
     SOCK.connect(address)
-    SOCK.send( serialize(message) )
+    SOCK.send( serializer.serialize(message) )
     if timeout is None:
         # don't use timeout
         # it's dangerous, can lock client permanently
@@ -188,7 +196,7 @@ def send_and_receive(context, address, message, timeout=10):
         except exceptions.ReponseTimeout:
             SOCK.close()
             raise exceptions.ReponseTimeout("Response timeout")
-    res = deserialize(res)
+    res = serializer.deserialize(res)
     SOCK.close()
     return res
 

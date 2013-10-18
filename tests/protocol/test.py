@@ -58,7 +58,6 @@ class EncryptionTests(unittest.TestCase):
             self.assertEqual(data, result2)
 
 
-
 class SerializerTests(unittest.TestCase):
 
     def setUp(self):
@@ -68,8 +67,7 @@ class SerializerTests(unittest.TestCase):
         # skip messagepack testing, because it's fucked up by design
         self.transports = ("pickle","bson",)#"msgpack")
 
-
-    def _single_test(self, serialize, deserialize):
+    def _single_test(self, S, trans, enc):
         msg = {
             "field_1":12345678,
             "field_2":"trololo",
@@ -77,35 +75,42 @@ class SerializerTests(unittest.TestCase):
             "żółw":"zażółć gęślą jaźń",
             b"bin":b"fooo"
         }
-        result1 = serialize(msg)
-        result2 = deserialize(result1)
-        self.assertEqual(result2, msg)
+        result1 = S.serialize(msg)
+        result2 = S.deserialize(result1)
+        txt = "Serialization / deserialization failed. Transport %s." % trans
+        if enc:
+            txt += "Encrypted"
+        else:
+            txt += "Unencrypted"
+        self.assertEqual(msg, result2, txt)
 
 
-    def test_encrypted(self):
-        """
-        Check Crypto library with AES
-        """
-        from kasaya.core.protocol.serializer import encrypted_serialize as serialize
-        from kasaya.core.protocol.serializer import encrypted_deserialize as deserialize
-        from kasaya.core.protocol.serializer import prepare_serializer
-        for tr in self.transports:
-            set_value("TRANSPORT_PROTOCOL", tr)
-            prepare_serializer()
-            self._single_test(serialize, deserialize)
+    def test_singleton_serializer(self):
+        from kasaya.core.protocol import Serializer
+        s1 = Serializer(silentinit=True)
+        s2 = Serializer(silentinit=True)
+        self.assertIs(s1, s2, "Singleton not working, different instances od Serializer class")
+
 
     def test_plain(self):
-        """
-        Check Crypto library with AES
-        """
-        from kasaya.core.protocol.serializer import plain_serialize as serialize
-        from kasaya.core.protocol.serializer import plain_deserialize as deserialize
-        from kasaya.core.protocol.serializer import prepare_serializer
-        for tr in self.transports:
-            set_value("TRANSPORT_PROTOCOL", tr)
-            prepare_serializer()
-            self._single_test(serialize, deserialize)
+        from kasaya.core.protocol.serializer import ConfiguredSerializer
+        set_value("ENCRYPTION","no")
+        for trans in self.transports:
+            set_value("TRANSPORT_PROTOCOL",trans)
+            S = ConfiguredSerializer(silentinit=True)
+            self.assertEqual(S.serialize, S._plain_serialize)
+            self.assertEqual(S.deserialize, S._plain_deserialize)
+            self._single_test(S, trans, False)
 
+    def test_encrypted(self):
+        from kasaya.core.protocol.serializer import ConfiguredSerializer
+        set_value("ENCRYPTION","yes")
+        for trans in self.transports:
+            set_value("TRANSPORT_PROTOCOL",trans)
+            S = ConfiguredSerializer(silentinit=True)
+            self.assertEqual(S.serialize, S._encrypted_serialize)
+            self.assertEqual(S.deserialize, S._encrypted_deserialize)
+            self._single_test(S, trans, False)
 
 
 if __name__ == '__main__':
