@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from kasaya.conf import load_config_from_file
+#from kasaya.conf import load_config_from_file
 from kasaya import sync, async, control, trans
 
 
 if __name__=="__main__":
-    load_config_from_file("example.conf", optional=True)
+    #load_config_from_file("example.conf", optional=True)
 
     # wywołanie synchroniczne, anonimowe
     res = sync.myservice.do_work("parameter", 1, foo=123, baz=True )

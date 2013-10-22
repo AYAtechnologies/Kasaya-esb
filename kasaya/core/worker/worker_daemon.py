@@ -25,11 +25,21 @@ __all__=("WorkerDaemon",)
 class TaskTimeout(Exception): pass
 
 
+
 class WorkerDaemon(MiddlewareCore):
 
-    def __init__(self, servicename):
+    def __init__(self, servicename=None, load_config=True):
         self.uuid = str(uuid.uuid4())
+
+        # config loader
+        if servicename is None:
+            load_config = True
+        if load_config:
+            LOG.info("Loading service.conf")
+            if servicename is None:
+                servicename = self.__load_config()
         self.servicename = servicename
+
         # worker status
         # 0 - initialized
         # 1 - starting
@@ -67,12 +77,49 @@ class WorkerDaemon(MiddlewareCore):
             gevent.monkey.patch_all()
 
 
+    def __load_config(self):
+        """
+        This function is used only if servicename is not given, and
+        daemon is not started by kasaya daemon.
+        """
+        from kasaya.conf import load_worker_settings, set_value
+        try:
+            config = load_worker_settings("service.conf")
+        except IOError:
+            import sys
+            LOG.critical("File 'service.conf' not found, unable to start service.")
+            sys.exit(1)
+
+        for k,v in config['config'].items():
+            set_value(k, v)
+
+        for k,v in config['env'].items():
+            os.environ[k.upper()] = v
+
+        # service name
+        svcc = config['service']
+        svname = svcc['name']
+        LOG.info("Service config loaded. Service name: %s" % svname)
+
+        # set flag to load tasks automatically
+        self.__auto_load_tasks_module = svcc['module']
+
+        return svname
+
+    def __load_modules(self):
+        try:
+            modn = self.__auto_load_tasks_module
+        except AttributeError:
+            return
+        __import__(modn)
+
     def connect(self, context):
         sock = context.socket(zmq.REP)
         addr = bind_socket_to_port_range(sock, settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
         return sock, addr
 
     def run(self):
+        self.__load_modules()
         self.status = 1
         LOG.debug("Sending notification to local sync daemon. Service [%s] starting on address [%s]" % (self.servicename, self.loop.address))
         self.SYNC.notify_live(self.status)

@@ -120,7 +120,7 @@ class CombinedConfig(object):
 
 
 
-def load_config_file(filename, section, optional, set_value, verbose=True):
+def load_settings_from_config_file(filename, section, optional, set_value, verbose=True):
     """
     Load config and change values to types used in default settings
     """

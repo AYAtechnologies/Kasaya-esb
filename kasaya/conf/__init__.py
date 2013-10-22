@@ -1,7 +1,7 @@
 #coding: utf-8
-import __future__
+from __future__ import division, absolute_import, print_function, unicode_literals
 import os, codecs
-from .parsers import load_config_file as __load_config_file
+from .parsers import load_settings_from_config_file, KasayaConfigParser, NoSectionError
 
 
 SERVICE_CONFIG_NAME = "service.conf"
@@ -48,11 +48,45 @@ def load_defaults():
         settings[k] = v
 
 
+def load_worker_settings(filename):
+    """
+    Simple function loading settings for service. Used for manual start of service.
+    """
+    env = {}
+    conf = {}
+    svc = {}
+    cnf = KasayaConfigParser(filename)
 
-def load_config_from_file(filename, optional=False):
-    __load_config_file(filename, "config", optional, set_value )
+    # service settings
+    try:
+        for k,v in cnf.items("service"):
+            svc[k] = v
+    except NoSectionError:
+        pass
+
+    # config
+    try:
+        for k,v in cnf.items("config"):
+            conf[k] = v
+    except NoSectionError:
+        pass
+
+    # environment
+    try:
+        for k,v in cnf.items("env"):
+            env[k] = v
+    except NoSectionError:
+        pass
+
+    return {'config':conf, 'service':svc, 'env':env}
+
+
+
+#def load_config_from_file(filename, optional=False):
+    #__load_config_section_from_file(filename, "config", optional, set_value )
 
 
 load_defaults()
-load_config_from_file(SYSTEM_KASAYA_CONFIG, optional=True)
+# load kasaya settings from system file
+load_settings_from_config_file(SYSTEM_KASAYA_CONFIG, "config", True, set_value)
 

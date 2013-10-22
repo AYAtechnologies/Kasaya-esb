@@ -113,8 +113,6 @@ class Service(object):
             raise NotImplemented("this should never occur")
 
 
-
-
     def start_service(self):
         po = subprocess.Popen(
             self.get_start_command(),

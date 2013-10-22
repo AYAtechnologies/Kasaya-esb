@@ -2,7 +2,6 @@
 #coding: utf-8
 from __future__ import unicode_literals, print_function
 from kasaya import control
-from kasaya.conf import load_config_from_file
 import plac, datetime
 import os
 
@@ -24,11 +23,8 @@ def run_kasaya_daemon():
 class Jobs(object):
     commands = ['boot', 'list', 'rescan', 'wrkstop', 'wrkstats', 'svcstart', 'svcstop']
 
-
-    def __init__(self):
-        pass
-    #    load_config_from_file("examples/kasaya.conf")
-
+    #def __init__(self):
+    #    pass
 
     @plac.annotations(
         u=("Show UUID identifiers", "flag"),

@@ -42,7 +42,6 @@ def createDaemon(UMASK=0, MAXFD=1024):
     return 0
 
 
-
 if __name__=="__main__":
 
     try:
@@ -94,6 +93,6 @@ if __name__=="__main__":
         if not cwd in sys.path:
             sys.path.append(cwd)
         __import__(module)
-        worker = WorkerDaemon(servicename)
+        worker = WorkerDaemon(servicename, False)
         worker.run()
 
