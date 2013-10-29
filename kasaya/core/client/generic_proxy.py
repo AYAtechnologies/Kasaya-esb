@@ -31,6 +31,7 @@ class GenericProxy(MiddlewareCore):
         self._method = None
         self._context = []
         self._z_context = zmq.Context()
+        self.allow_method_mocking = True # do odczytania z configa ale nie wiem jak
 
     def initialize(self, method, context):
         self._names = method

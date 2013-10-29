@@ -14,6 +14,10 @@ class SyncProxy(GenericProxy):
         """
         method = self._names
         context = self._context
+        if self.allow_method_mocking:
+            m = '.'.join(method)
+            if m in self._mock_methods:
+                return self._mock_methods[m](*args, **kwargs)
         addr = self.find_worker(method)
         # zbudowanie komunikatu
         msg = {

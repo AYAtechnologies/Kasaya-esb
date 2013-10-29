@@ -19,12 +19,17 @@ class ExecContext(object):
             "control": ControlProxy,
             "trans": TransactionProxy
         }
+        self._mock_methods = {}
+
+    def _set_mock_method(self, methodname, method):
+        self._mock_methods[methodname] = method
 
     def _make_proxy(self, name):
         proxy = self._proxy[name]()
         proxy._top = proxy # << zrobić tutaj weakref aby zlikwidować cykliczne odwołanie do samego siebie
         proxy._context = self._context
         proxy._timeout = self._timeout
+        proxy._mock_methods = self._mock_methods
         return proxy
 
     def __getattribute__(self, itemname):
