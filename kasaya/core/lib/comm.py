@@ -4,33 +4,51 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.core.protocol import Serializer, messages
 from kasaya.core.lib import LOG
 from kasaya.core import exceptions
-import zmq.green as zmq
-import gevent
-import traceback, sys
+#from kasaya.conf import settings
 from binascii import hexlify
+import traceback, sys, os
+from gevent.server import StreamServer
+from gevent import socket
+import gevent
 
 
 
-class BaseLoop(object):
+def decode_addr(addr):
+    if addr.startswith("ipc://"):
+        return ( 'ipc', addr[6:], socket.AF_UNIX, socket.SOCK_STREAM )
+    elif addr.startswith("tcp://"):
+        addr = addr[6:]
+        addr,port = addr.split(':',1)
+        port = int(port.rstrip("/"))
+        return ( 'tcp', (addr, port), socket.AF_INET, socket.SOCK_STREAM )
 
-    def __init__(self, connector, context=None):
+
+class MessageLoop(object):
+
+    def __init__(self, address, maxport=None, backlog=50):
         self.is_running = True
         self._msgdb = {}
-        if context is None:
-            self.__context = zmq.Context()
-        else:
-            self.__context = context
         # bind to socket
-        self.SOCK, addr = connector(self.__context)
-        self.address = addr
-        addr = addr.split(":")
-        if len(addr)==3:
-            self.ip = addr[1].lstrip("/")
-            self.port = int(addr[2])
+        self.socket_type, addr, so1, so2 = decode_addr(address)
+        sock = socket.socket(so1, so2)
+        #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if self.socket_type=="ipc":
+            os.unlink(addr)
+            sock.setblocking(0)
+        sock.bind(addr)
+        sock.listen(backlog)
+        self.SERVER = StreamServer(sock, self.handler)
+        # current address
+        if self.socket_type=="tcp":
+            self.ip, self.port = self.SERVER.address
+            self.address = "tcp://%s:%i" % (self.ip, self.port)
+        elif self.socket_type=="ipc":
+            self.address = "ipc://%s" % addr
+        # serialization
         self.serializer = Serializer()
 
-    def get_context(self):
-        return self.__context
+    #def _connect(self, addr, port, maxport=None):
+        #self.SOCK, addr# = connector(self.__context)
 
     def stop(self):
         """
@@ -39,7 +57,12 @@ class BaseLoop(object):
         self.is_running = False
 
     def close(self):
-        self.SOCK.close()
+        #self.SOCK.close()
+        pass
+
+    def loop(self):
+        self.SERVER.serve_forever()
+
 
     def register_message(self, message, func, raw_msg_response=False):
         """
@@ -50,56 +73,72 @@ class BaseLoop(object):
         """
         self._msgdb[message]=(func, raw_msg_response)
 
-    def loop(self):
-        raise NotImplemented("loop method must be implemented when BaseLoop is inherited")
+    def handler(self, SOCK, address):
+        print ("connection from", repr(address) )
+        # receive data
+        msgdata = b""
+        while True:
+            data = SOCK.recv(4096)
+            if not data:
+                break
+            msgdata += data
+
+        # deserialize
+        try:
+            msgdata = self.serializer.deserialize(msgdata)
+
+        except exceptions.NotOurMessage:
+            # not our servicebus message
+            self.send_noop()
+            return
+
+        except Exception as e:
+            self.send_noop(SOCK)
+            LOG.warning("Message deserialisation error")
+            LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % hexlify(msgdata[:1024]))
+            return
+
+        try:
+            msg = msgdata['message']
+        except KeyError:
+            self.send_noop(SOCK)
+            LOG.debug("Decoded message is incomplete. Message dump: %s" % repr(msgdata) )
+            return
+
+        # find handler
+        try:
+            handler, rawmsg = self._msgdb[ msg ]
+        except KeyError:
+            # unknown messages are ignored
+            self.send_noop(SOCK)
+            LOG.warning("Unknown message received [%s]" % msg)
+            LOG.debug("Message body dump:\n%s" % repr(msgdata) )
+            return
+
+        # run handler
+        try:
+            result = handler(msgdata)
+        except Exception as e:
+            result = exception_serialize(e, False)
+            self.send(SOCK, result)
+            LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
+            LOG.debug("Message dump: %s" % repr(msgdata) )
+            LOG.debug(result['traceback'])
+            return
+
+        # send result
+        if rawmsg:
+            self.send(SOCK, result )
+        else:
+            self.send(SOCK, {"message":messages.RESULT, "result":result } )
 
 
-
-class PullLoop(BaseLoop):
-    """
-    PullLoop is receiving only loop for messages.
-    """
-
-    def loop(self):
-        while self.is_running:
-            # receive data
-            msgdata = self.SOCK.recv()
-
-            # deserialize
-            try:
-                msgdata = self.serializer.deserialize(msgdata)
-                msg = msgdata['message']
-            except Exception as e:
-                continue
-
-            # find handler
-            try:
-                handler = self._msgdb[ msg ]
-            except KeyError:
-                # unknown messages are ignored silently
-                continue
-
-            # run handler
-            try:
-                handler(msgdata)
-            except Exception as e:
-                # ignore exceptions
-                continue
-
-
-
-
-class RepLoop(BaseLoop):
-    """
-    pętla nasłuchująca na sockecie typu REP (odpowiedzi na REQ).
-    """
-
-    def send_noop(self):
+    def send_noop(self, SOCK):
         noop = {"message":messages.NOOP}
-        self.SOCK.send( self.serializer.serialize(noop) )
+        SOCK.send( self.serializer.serialize(noop) )
 
 
-    def send(self, message):
+    def send(self, SOCK, message):
         try:
             packet = self.serializer.serialize(message)
         except exceptions.SerializationError as e:
@@ -109,64 +148,11 @@ class RepLoop(BaseLoop):
             except:
                 self.send_noop()
                 return
-        self.SOCK.send( packet )
+        SOCK.sendall( packet )
 
 
-    def loop(self):
-        while self.is_running:
-            # receive data
-            msgdata = self.SOCK.recv()
-            # deserialize
-            try:
-                msgdata = self.serializer.deserialize(msgdata)
 
-            except exceptions.NotOurMessage:
-                # not our servicebus message
-                self.send_noop()
-                continue
-
-            except Exception as e:
-                self.send_noop()
-                LOG.warning("Message deserialisation error")
-                LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % hexlify(msgdata[:1024]))
-                continue
-
-            try:
-                msg = msgdata['message']
-            except KeyError:
-                self.send_noop()
-                LOG.debug("Decoded message is incomplete. Message dump: %s" % repr(msgdata) )
-                continue
-
-            # find handler
-            try:
-                handler, rawmsg = self._msgdb[ msg ]
-            except KeyError:
-                # unknown messages are ignored
-                self.send_noop()
-                LOG.warning("Unknown message received [%s]" % msg)
-                LOG.debug("Message body dump:\n%s" % repr(msgdata) )
-                continue
-
-            # run handler
-            try:
-                result = handler(msgdata)
-            except Exception as e:
-                result = exception_serialize(e, False)
-                self.send(result)
-                LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
-                LOG.debug("Message dump: %s" % repr(msgdata) )
-                LOG.debug(result['traceback'])
-                continue
-
-            # send result
-            if rawmsg:
-                self.send( result )
-            else:
-                self.send( {"message":messages.RESULT, "result":result } )
-
-
-def send_and_receive(context, address, message, timeout=10):
+def send_and_receive(address, message, timeout=10):
     """
     context - ZMQ context
     address - full ZMQ destination address (eg: tcp://127.0.0.1:1234)
@@ -174,25 +160,45 @@ def send_and_receive(context, address, message, timeout=10):
     timeout - time in seconds after which TimeoutError will be raised
     """
     global serializer
+    timeout=3
     try:
         S = serializer
     except NameError:
         serializer = Serializer()
         S = serializer
 
-    SOCK = context.socket(zmq.REQ)
-    SOCK.connect(address)
-    SOCK.send( serializer.serialize(message) )
+    #gevent.socket
+    typ, addr, so1, so2 = decode_addr(address)
+    SOCK = socket.socket(so1,so2)
+    SOCK.connect(addr)
+    # send message
+    print ("send...")
+    SOCK.sendall( serializer.serialize(message) )
+    # receive response
     if timeout is None:
+        res = b""
+        while True:
+            data = SOCK.recv(4096)
+            if not data:
+                break
+            res += data
+
         # don't use timeout
         # it's dangerous, can lock client permanently
         # if sender die before sending any response
-        res = SOCK.recv()
+
+        #res = SOCK.recv()
     else:
         # throw exception after timeout and close socket
         try:
             with gevent.Timeout(timeout, exceptions.ReponseTimeout):
-                res = SOCK.recv()
+                res = b""
+                while True:
+                    data = SOCK.recv(4096)
+                    print (".")
+                    if not data:
+                        break
+                    res += data
         except exceptions.ReponseTimeout:
             SOCK.close()
             raise exceptions.ReponseTimeout("Response timeout")
@@ -201,7 +207,7 @@ def send_and_receive(context, address, message, timeout=10):
     return res
 
 
-def send_and_receive_response(context, address, message, timeout=10):
+def send_and_receive_response(address, message, timeout=10):
     """
     j.w. ale dekoduje wynik i go zwraca, lub rzuca otrzymany w wiadomości exception
     """

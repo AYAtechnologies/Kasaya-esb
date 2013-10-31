@@ -22,10 +22,9 @@ class RedirectRequiredToAddr(Exception):
 
 class ControlTasks(object):
 
-    def __init__(self, context, allow_redirect=False):
+    def __init__(self, allow_redirect=False):
         self.__ctltasks = {}
         self.__allow_redirect = allow_redirect
-        self.__context = context
 
 
     def register_task(self, method, func):
@@ -51,7 +50,7 @@ class ControlTasks(object):
             # message is still delivered to wrong host we raise exception.
             raise ServiceBusException("Message redirection fail")
         message['redirected'] = True
-        result = send_and_receive_response(self.__context, addr, message, settings.SYNC_REPLY_TIMEOUT)
+        result = send_and_receive_response(addr, message, settings.SYNC_REPLY_TIMEOUT)
         return result
 
 

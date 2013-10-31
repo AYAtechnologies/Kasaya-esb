@@ -3,12 +3,11 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.conf import settings
 from kasaya.core.protocol import messages
 from kasaya.core import exceptions
-from kasaya.core.lib.binder import get_bind_address
-from kasaya.core.lib.comm import RepLoop, send_and_receive_response
+#from kasaya.core.lib.binder import get_bind_address
+from kasaya.core.lib.comm import MessageLoop, send_and_receive_response
 from kasaya.core.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
 from kasaya.core.lib import LOG, servicesctl
 from datetime import datetime, timedelta
-import zmq.green as zmq
 import gevent
 
 from signal import SIGKILL, SIGTERM
@@ -31,50 +30,8 @@ class RedirectRequiredEx(RedirectRequiredToAddr):
 
 
 
-class SyncWorker(object):
-
-    def __init__(self, server, database, broadcaster):
-        self.DAEMON = server
-        self.DB = database
-        self.BC = broadcaster
-        self.context = zmq.Context()
-        self.__pingdb = {}
-        # cache
-        self.__services = None
-        # local workers <--> local kasayad communication
-        self.queries = RepLoop(self._connect_queries_loop, context=self.context)
-        self.queries.register_message(messages.WORKER_LIVE, self.handle_worker_live)
-        self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
-        self.queries.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
-        self.queries.register_message(messages.CTL_CALL, self.handle_local_control_request)
-        #self.queries.register_message(messages.HOST_REFRESH, self.handle_host)
-        # kasayad <--> kasayad communication
-        self.intersync = RepLoop(self._connect_inter_sync_loop, context=self.context)
-        self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
-        # service control tasks
-        self.ctl = ControlTasks(self.context, allow_redirect=True)
-        self.ctl.register_task("svbus.status",  self.CTL_global_services)
-        self.ctl.register_task("worker.stop",   self.CTL_worker_stop)
-        self.ctl.register_task("worker.stats",  self.CTL_worker_stats)
-        self.ctl.register_task("service.start", self.CTL_service_start)
-        self.ctl.register_task("service.stop",  self.CTL_service_stop)
-        self.ctl.register_task("host.rescan",   self.CTL_host_rescan)
-
-
-    @property
-    def replaces_broadcast(self):
-        return self.DB.replaces_broadcast
-
-    @property
-    def own_ip(self):
-        return self.intersync.ip
-
-    def get_sync_address(self, ip):
-        return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
-
-
     # socket connectors
-
+'''
     def _connect_queries_loop(self, context):
         """
         connect local queries loop
@@ -94,6 +51,47 @@ class SyncWorker(object):
         sock.bind(addr)
         LOG.debug("Connected inter-kasaya dialog socket %s" % addr)
         return sock, addr
+'''
+
+class SyncWorker(object):
+
+    def __init__(self, server, database, broadcaster):
+        self.DAEMON = server
+        self.DB = database
+        self.BC = broadcaster
+        self.__pingdb = {}
+        # cache
+        self.__services = None
+        # local workers <--> local kasayad communication
+        self.queries = MessageLoop( 'ipc://'+settings.SOCK_QUERIES )
+        self.queries.register_message(messages.WORKER_LIVE, self.handle_worker_live)
+        self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
+        self.queries.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
+        self.queries.register_message(messages.CTL_CALL, self.handle_local_control_request)
+        #self.queries.register_message(messages.HOST_REFRESH, self.handle_host)
+        # kasayad <--> kasayad communication
+        self.intersync = MessageLoop( 'tcp://0.0.0.0:'+str(settings.KASAYAD_CONTROL_PORT) )#+settings.SYNCD_CONTROL_BIND )
+        self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
+        # service control tasks
+        self.ctl = ControlTasks(allow_redirect=True)
+        self.ctl.register_task("svbus.status",  self.CTL_global_services)
+        self.ctl.register_task("worker.stop",   self.CTL_worker_stop)
+        self.ctl.register_task("worker.stats",  self.CTL_worker_stats)
+        self.ctl.register_task("service.start", self.CTL_service_start)
+        self.ctl.register_task("service.stop",  self.CTL_service_stop)
+        self.ctl.register_task("host.rescan",   self.CTL_host_rescan)
+
+
+    @property
+    def replaces_broadcast(self):
+        return self.DB.replaces_broadcast
+
+    @property
+    def own_ip(self):
+        return self.intersync.ip
+
+    def get_sync_address(self, ip):
+        return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
 
 
     # closing and quitting

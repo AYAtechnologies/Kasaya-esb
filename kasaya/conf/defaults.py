@@ -29,7 +29,7 @@ SOCK_QUERIES = "/tmp/esb_queries.sock"
 #  "AUTO" - podpięty do pierwszego interfejsu nie-lokalnego (zwykle eth0)
 BIND_WORKER_TO = "AUTO"
 
-WORKER_POOL_SIZE = 10
+MAX_CONCURRENT_CONNECTIONS = 1000
 
 # HEARBEAT
 
@@ -46,6 +46,8 @@ SYNC_REPLY_TIMEOUT = 2
 # zakres portów do automatycznej alokacji dla workerów
 WORKER_MIN_PORT = 5000
 WORKER_MAX_PORT = 6000
+
+SOCKET_BACKLOG = 50
 
 # use monkey-patching from gevent on workers
 WORKER_MONKEY = True

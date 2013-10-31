@@ -37,13 +37,16 @@ def set_value(k,v):
 
 
 def load_defaults():
-    from . import defaults
     global settings
+    from . import defaults
+    exclude = set( ('absolute_import', 'division', 'print_function', 'unicode_literals') )
     # loading default settings
     for k,v in defaults.__dict__.items():
         if k in defaults.__builtins__:
             continue
         if k.startswith("__"):
+            continue
+        if k in exclude:
             continue
         settings[k] = v
 

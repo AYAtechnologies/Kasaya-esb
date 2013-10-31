@@ -4,7 +4,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.conf import settings
 from kasaya.core.lib.binder import bind_socket_to_port_range
 from kasaya.core.protocol import messages
-from kasaya.core.lib.comm import RepLoop, send_and_receive, exception_serialize_internal, exception_serialize
+from kasaya.core.lib.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system
@@ -48,7 +48,10 @@ class WorkerDaemon(MiddlewareCore):
         # 4 - dead
         self.status = 0
         LOG.info("Starting worker daemon, service [%s], uuid: [%s]" % (self.servicename, self.uuid) )
-        self.loop = RepLoop(self.connect)
+        adr = "tcp://127.0.0.1:"+str(settings.WORKER_MIN_PORT)
+        self.loop = MessageLoop(adr)#"127.0.0.1", settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
+        #addr = bind_socket_to_port_range(sock,)
+
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
         self.SYNC = SyncClient(servicename, self.loop.ip, self.loop.port, self.uuid, os.getpid())
         # registering handlers
@@ -60,7 +63,7 @@ class WorkerDaemon(MiddlewareCore):
         self.exposed_methods = []
         MiddlewareCore.__init__(self)
         # control tasks
-        self.ctl = ControlTasks( self.loop.get_context() )
+        self.ctl = ControlTasks()
         self.ctl.register_task("stop", self.CTL_stop )
         self.ctl.register_task("start", self.CTL_start )
         self.ctl.register_task("stats", self.CTL_stats )
@@ -112,11 +115,6 @@ class WorkerDaemon(MiddlewareCore):
         except AttributeError:
             return
         __import__(modn)
-
-    def connect(self, context):
-        sock = context.socket(zmq.REP)
-        addr = bind_socket_to_port_range(sock, settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
-        return sock, addr
 
     def run(self):
         self.__load_modules()
