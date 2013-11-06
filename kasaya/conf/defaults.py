@@ -15,11 +15,11 @@ SERVICE_BUS_NAME = "sb"
 ENCRYPTION = False
 COMPRESSION = False
 
-# zamiast plain password można wczytać zawartość jakiegoś tajmeniczego pliku z /etc/esb/secret.txt
+# zamiast plain password można wczytać zawartość jakiegoś tajemniczego pliku z /etc/esb/secret.txt
 PASSWORD = ""
 
 # nazwy plików z socketami
-SOCK_QUERIES = "/tmp/esb_queries.sock"
+#SOCK_QUERIES = "/tmp/esb_queries.sock"
 #SOCK_LOCALWORKERS = "/tmp/esb_local_workers.sock"
 
 # adres do jakiego zostaną podłączona sockety tcp
@@ -62,7 +62,7 @@ SYNC_BACKEND = "udp-broadcast"
 BROADCAST_PORT = 4040
 # port na którym prowadzona jest synchronizacja pomiędzy serwerami syncd i zarządzanie siecią
 KASAYAD_CONTROL_PORT = 4041
-SYNCD_CONTROL_BIND = "AUTO"
+#SYNCD_CONTROL_BIND = "AUTO"
 
 # stan sieci może być przechowywany w lokalnej bazie danych
 KASAYAD_DB_BACKEND = "memory"

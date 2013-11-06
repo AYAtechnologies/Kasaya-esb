@@ -26,18 +26,18 @@ def _load_passwd():
 class ConfiguredSerializer(object):
 
 
-    def make_header(self, size, trim, iv=b""):
+    def make_header(self, datasize, trim, iv=b""):
         """
         busname - 6 character long service bus name
         version - protocol version
-        payload - data to store in packet
+        datasize - length of data to send
         iv - initial vector used for encryption
         """
 
         return self.header.pack(
             self._busname, # service bus name
             self._version, # protocol version
-            size, # size of data in packet
+            datasize, # size of data in packet
             iv, # initial vector
             False, # compression
             trim)
@@ -45,7 +45,9 @@ class ConfiguredSerializer(object):
 
     def decode_header(self, packet):
         if len(packet)<self.header.size:
+            print ("leeen", self.header.size, len(packet))
             raise exceptions.MessageCorrupted()
+
         busname, ver, psize, iv, cmpr, trim = self.header.unpack(packet)
 
         # not our service bus
@@ -70,15 +72,22 @@ class ConfiguredSerializer(object):
 
 
     def _plain_deserialize(self, msg):
-        HS = self.header.size
-        psize, iv, cmpr, trim = self.decode_header(msg[:HS])
+        # raw message or header, data tuple?
+        if type(msg) is tuple:
+            psize, iv, cmpr, trim = msg[0]
+            msg = msg[1]
+        else:
+            HS = self.header.size
+            header = msg[:HS]
+            msg = msg[HS:]
+            psize, iv, cmpr, trim = self.decode_header(header)
 
         # check data size declared in header
-        if (len(msg)-HS) != psize:
-            raise exceptions.MessageCorrupted()
+        #if (len(msg)-HS) != psize:
+        #    raise exceptions.MessageCorrupted()
 
         try:
-            return self.bin_2_data(msg[HS:])
+            return self.bin_2_data(msg)
         except:
             raise exceptions.MessageCorrupted()
 
@@ -99,13 +108,23 @@ class ConfiguredSerializer(object):
 
 
     def _encrypted_deserialize(self, msg):
-        HS = self.header.size
-        psize, iv, cmpr, trim = self.decode_header(msg[:HS])
+        """
+        msg - message or header tuple of header parameters and message body (tithout header)
+        """
+        if type(msg) is tuple:
+            psize, iv, cmpr, trim = msg[0]
+            msg = msg[1]
+        else:
+            HS = self.header.size
+            header = msg[:HS]
+            msg = msg[HS:]
+            psize, iv, cmpr, trim = self.decode_header(header)
 
+        # decrypt
         try:
             pckt = {
                 "iv":iv,
-                "payload":msg[HS:],
+                "payload":msg,
                 "trim":trim
                 }
             msg = self.decrypt(pckt, self._passwd)
@@ -171,6 +190,7 @@ class ConfiguredSerializer(object):
         if silentinit:
             return
         LOG.debug("Service bus is configured to use %s as transport protocol." % settings.TRANSPORT_PROTOCOL )
+
 
 
 

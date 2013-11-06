@@ -60,18 +60,18 @@ class SyncWorker(object):
         self.DB = database
         self.BC = broadcaster
         self.__pingdb = {}
+
         # cache
         self.__services = None
-        # local workers <--> local kasayad communication
-        self.queries = MessageLoop( 'ipc://'+settings.SOCK_QUERIES )
-        self.queries.register_message(messages.WORKER_LIVE, self.handle_worker_live)
-        self.queries.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
-        self.queries.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
-        self.queries.register_message(messages.CTL_CALL, self.handle_local_control_request)
-        #self.queries.register_message(messages.HOST_REFRESH, self.handle_host)
+
         # kasayad <--> kasayad communication
         self.intersync = MessageLoop( 'tcp://0.0.0.0:'+str(settings.KASAYAD_CONTROL_PORT) )#+settings.SYNCD_CONTROL_BIND )
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
+        # local worker <-> kasayad dialog on public port
+        self.intersync.register_message(messages.WORKER_LIVE, self.handle_worker_live)
+        self.intersync.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
+        self.intersync.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
+        self.intersync.register_message(messages.CTL_CALL, self.handle_local_control_request)
         # service control tasks
         self.ctl = ControlTasks(allow_redirect=True)
         self.ctl.register_task("svbus.status",  self.CTL_global_services)
@@ -98,16 +98,18 @@ class SyncWorker(object):
 
     def stop(self):
         #self.local_input.stop()
-        self.queries.stop()
+        #self.queries.stop()
+        pass
 
     def close(self):
         #self.local_input.close()
-        self.queries.close()
+        #self.queries.close()
+        pass
 
     # all message loops used in syncd
     def get_loops(self):
         return [
-            self.queries.loop,
+            #self.queries.loop,
             self.hearbeat_loop,
             self.intersync.loop,
         ]

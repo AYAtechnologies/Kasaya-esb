@@ -4,14 +4,13 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.conf import settings
 from kasaya.core.lib.binder import bind_socket_to_port_range
 from kasaya.core.protocol import messages
-from kasaya.core.lib.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize
+from kasaya.core.lib.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system
+from kasaya.core.lib.syncclient import KasayaLocalClient
 from kasaya.core import exceptions
 from .worker_reg import worker_methods_db
-from .syncclient import SyncClient
-import zmq.green as zmq
 import gevent
 import gevent.monkey
 
@@ -26,7 +25,7 @@ class TaskTimeout(Exception): pass
 
 
 
-class WorkerDaemon(MiddlewareCore):
+class WorkerDaemon(object):
 
     def __init__(self, servicename=None, load_config=True):
         self.uuid = str(uuid.uuid4())
@@ -42,7 +41,7 @@ class WorkerDaemon(MiddlewareCore):
 
         # worker status
         # 0 - initialized
-        # 1 - starting
+        # 1 - starting or waiting for reconnect to kasaya
         # 2 - working
         # 3 - stopping
         # 4 - dead
@@ -53,7 +52,12 @@ class WorkerDaemon(MiddlewareCore):
         #addr = bind_socket_to_port_range(sock,)
 
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
-        self.SYNC = SyncClient(servicename, self.loop.ip, self.loop.port, self.uuid, os.getpid())
+        self.SYNC = KasayaLocalClient(
+            autoreconnect=True,
+            on_connection_close = self.kasaya_connection_broken,
+            on_connection_start = self.kasaya_connection_started,
+            )
+        self.SYNC.make_ping_msg(servicename, self.loop.ip, self.loop.port, self.uuid, os.getpid())
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call, raw_msg_response=True )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )
@@ -61,7 +65,7 @@ class WorkerDaemon(MiddlewareCore):
         self.__hbloop=True
         #exposing methods
         self.exposed_methods = []
-        MiddlewareCore.__init__(self)
+        #MiddlewareCore.__init__(self)
         # control tasks
         self.ctl = ControlTasks()
         self.ctl.register_task("stop", self.CTL_stop )
@@ -120,8 +124,10 @@ class WorkerDaemon(MiddlewareCore):
         self.__load_modules()
         self.status = 1
         LOG.debug("Sending notification to local sync daemon. Service [%s] starting on address [%s]" % (self.servicename, self.loop.address))
-        self.SYNC.notify_live(self.status)
-        self.setup_middleware()
+        #try:
+        #    self.SYNC.notify_worker_live(self.status)
+        #except ConnectionClosed:
+        #    pass
         self.__greens = []
         self.__greens.append( gevent.spawn(self.loop.loop) )
         self.__greens.append( gevent.spawn(self.heartbeat_loop) )
@@ -135,7 +141,10 @@ class WorkerDaemon(MiddlewareCore):
         self.__hbloop = False
         self.status = 3
         LOG.debug("Sending stop notification. Address [%s]" % self.loop.address)
-        self.SYNC.notify_stop()
+        try:
+            self.SYNC.notify_worker_stop()
+        except ConnectionClosed:
+            pass
         self.loop.stop()
         # killing greenlets
         for g in self.__greens:
@@ -148,13 +157,33 @@ class WorkerDaemon(MiddlewareCore):
         self.status=4
 
 
+    # network state changed
+
+    def kasaya_connection_broken(self):
+        """
+        Should be called when connection with kasaya is broken.
+        """
+        if self.status<3: # is worker is already stopping?
+            self.status = 1 #set status as 1 - waiting for start
+
+    def kasaya_connection_started(self):
+        """
+        This will be called when connection with kasaya is started
+        """
+        self.SYNC.notify_worker_live(self.status)
+
+
 
     # --------------------
     # Hearbeat
 
     def heartbeat_loop(self):
+        failmode = False
         while self.__hbloop:
-            self.SYNC.notify_live(self.status)
+            try:
+                self.SYNC.notify_worker_live(self.status)
+            except ConnectionClosed:
+                pass
             gevent.sleep(settings.WORKER_HEARTBEAT)
 
 

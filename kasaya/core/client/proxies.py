@@ -70,7 +70,7 @@ class ControlProxy(GenericProxy):
         }
         # wysłanie żądania
         #print "Control task: ", msg
-        msgbody = self.sync_query.control_task(msg)
+        msgbody = self.kasayad.control_task(msg)
         msg = msgbody['message']
         if msg==messages.RESULT:
             return msgbody['result']

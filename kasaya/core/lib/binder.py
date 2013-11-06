@@ -4,10 +4,6 @@ from __future__ import unicode_literals
 from kasaya.conf import settings
 import socket, fcntl, struct, array
 import netifaces
-try:
-    from zmq.error import ZMQError
-except ImportError:
-    from zmq.core.error import ZMQError
 
 
 
