@@ -22,7 +22,7 @@ class KasayaLocalClient(Sender):
 
     # worker methods
 
-    def make_ping_msg(self, servicename, ip, port, uuid, pid):
+    def make_ping_msg(self, servicename, ip, port, ID, pid):
         self.srvname = servicename
         self.__addr = ip
         self.__port = port
@@ -30,7 +30,7 @@ class KasayaLocalClient(Sender):
             "message" : messages.WORKER_LIVE,
             "addr" : ip,
             "port" : port,
-            "uuid" : uuid,
+            "id" : ID,
             "service" : servicename,
             "pid": pid,
             "status": 0,

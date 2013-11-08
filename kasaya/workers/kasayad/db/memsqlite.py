@@ -11,9 +11,9 @@ class MemoryDB(BaseDB):
     def __init__(self):
         self.__db = SQ.connect(":memory:")
         self.cur=self.__db.cursor()
-        self.cur.execute("CREATE TABLE hosts (uuid TEXT, hostname TEXT, ip TEXT)")
-        self.cur.execute("CREATE TABLE workers (uuid TEXT, service TEXT, ip TEXT, port INT, pid INT)")
-        self.cur.execute("CREATE TABLE services (host_uuid TEXT, name TEXT)")
+        self.cur.execute("CREATE TABLE hosts (id TEXT, hostname TEXT, ip TEXT)")
+        self.cur.execute("CREATE TABLE workers (id TEXT, host_id TEXT, service TEXT, addr TEXT, pid INT)")
+        self.cur.execute("CREATE TABLE services (host_id TEXT, name TEXT)")
         self.SEMA = Semaphore()
 
     def close(self):
@@ -24,37 +24,37 @@ class MemoryDB(BaseDB):
     # -------------------------
 
 
-    def host_add(self, uuid, ip, hostname):
+    def host_add(self, ID, ip, hostname):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "INSERT INTO hosts ('uuid','ip','hostname') VALUES (?,?,?)",
-                (uuid, ip, hostname))
+                "INSERT INTO hosts ('id','ip','hostname') VALUES (?,?,?)",
+                (ID, ip, hostname))
             self.__db.commit()
         finally:
             self.SEMA.release()
 
 
-    def host_get(self, uuid):
+    def host_get(self, ID):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "SELECT uuid,ip,hostname FROM hosts WHERE uuid=?",
-                (uuid,) )
+                "SELECT ID,ip,hostname FROM hosts WHERE id=?",
+                (ID,) )
             res = self.cur.fetchone()
         finally:
             self.SEMA.release()
         if res is None:
             return None
-        return { 'uuid':res[0], 'ip':res[1], 'hostname':res[2] }
+        return { 'id':res[0], 'ip':res[1], 'hostname':res[2] }
 
 
-    def host_del(self, uuid):
+    def host_del(self, ID):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "DELETE FROM hosts WHERE uuid=?",
-                (uuid,) )
+                "DELETE FROM hosts WHERE id=?",
+                (ID,) )
             self.__db.commit()
         finally:
             self.SEMA.release()
@@ -64,48 +64,51 @@ class MemoryDB(BaseDB):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "SELECT uuid,ip,hostname FROM hosts")
+                "SELECT id,ip,hostname FROM hosts")
             res = self.cur.fetchall()
         finally:
             self.SEMA.release()
         for u,a,h in res:
-            yield { 'uuid':u, 'ip':a, 'hostname':h }
+            yield { 'id':u, 'ip':a, 'hostname':h }
 
 
 
-    def service_add(self, host_uuid, name):
+    def service_add(self, host_ID, name):
         """
         Dodanie serwisu do hosta
         """
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "INSERT INTO services ('host_uuid','name') VALUES (?,?)",
-                (host_uuid, name))
+                "INSERT INTO services ('host_id','name') VALUES (?,?)",
+                (host_ID, name))
             self.__db.commit()
         finally:
             self.SEMA.release()
 
 
-    def service_del(self, host_uuid, name):
+    def service_del(self, host_ID, name):
         """
         Usunięcie serwisu z hosta
         """
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "DELETE FROM services WHERE host_uuid=? AND name=?",
-                (host_uuid, name) )
+                "DELETE FROM services WHERE host_id=? AND name=?",
+                (host_ID, name) )
             self.__db.commit()
         finally:
             self.SEMA.release()
 
 
-    def service_list(self, host_uuid):
+    def service_list(self, host_id):
+        """
+        List of services on host
+        """
         self.SEMA.acquire()
         try:
-            self.cur.execute( "SELECT name FROM services WHERE host_uuid=?",
-                (host_uuid,) )
+            self.cur.execute( "SELECT name FROM services WHERE host_id=?",
+                (host_id,) )
             res = self.cur.fetchall()
         finally:
             self.SEMA.release()
@@ -115,75 +118,116 @@ class MemoryDB(BaseDB):
 
 
 
-    def worker_add(self, worker_uuid, name, ip, port, pid):
+    def worker_add(self, host_id, worker_id, name, address, pid):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "INSERT INTO workers ('uuid','ip', 'port', 'service','pid') VALUES (?,?,?,?,?)",
-                (worker_uuid, ip, port, name, pid))
+                "INSERT INTO workers ('id', 'host_id', 'addr', 'service','pid') VALUES (?,?,?,?,?)",
+                (worker_id, host_id, address, name, pid))
             self.__db.commit()
         finally:
             self.SEMA.release()
 
 
-    def worker_get(self, worker_uuid):
+    def worker_get(self, worker_id):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "SELECT uuid,service,ip,port,pid FROM workers WHERE uuid=?",
-                [worker_uuid,] )
+                "SELECT ID,service,addr,pid FROM workers WHERE id=?",
+                [worker_id,] )
             res = self.cur.fetchone()
         finally:
             self.SEMA.release()
-        return { 'uuid':res[0], 'service':res[1], 'ip':res[2], 'port':res[3], 'pid':res[4] }
+
+        if res is None:
+            return
+        return { 'id':res[0], 'service':res[1], 'addr':res[2], 'pid':res[3] }
 
 
-    def worker_del(self, ip, port):
+    def worker_del_by_addr(self, addr):
+        """
+        Delete worker from database identified by address
+        """
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "DELETE FROM workers WHERE ip=? AND port=?",
-                [ip,port] )
+                "DELETE FROM workers WHERE addr=?",
+                (addr,) )
+            self.__db.commit()
+        finally:
+            self.SEMA.release()
+
+    def worker_del_by_id(self, id):
+        """
+        Delete worker from database identified by worker id
+        """
+        self.SEMA.acquire()
+        try:
+            self.cur.execute(
+                "DELETE FROM workers WHERE id=?",
+                (id,) )
             self.__db.commit()
         finally:
             self.SEMA.release()
 
 
-    def worker_list(self, ip):
+
+    def worker_list(self, host_id):
+        '''
+        list all workers on given host
+        '''
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "SELECT uuid,service,ip,port,pid FROM workers WHERE ip=?",
-                (ip,) )
+                "SELECT id,service,addr,pid FROM workers WHERE host_id=?",
+                (host_id,) )
             res = self.cur.fetchall()
         finally:
             self.SEMA.release()
         if res is None:
             return
-        for u,s,i,p,pid in res:
-            yield { 'uuid':u, 'service':s, 'ip':i, 'port':p, 'pid':pid }
+        for u,s,a,pid in res:
+            yield { 'id':u, 'service':s, 'addr':a, 'pid':pid }
 
 
-    def worker_list_local_services(self, ip, service):
+    def workers_for_service(self, service):
+        """
+        List of workers for service
+        """
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "SELECT ip,port FROM workers WHERE ip=? AND service=?",
-                (ip, service) )
+                "SELECT id,addr FROM workers WHERE service=?",
+                (service,) )
             res = self.cur.fetchall()
         finally:
             self.SEMA.release()
-        lst = []
-        for s in res:
-            lst.append( {'ip':s[0], 'port':s[1]} )
-        return lst
+        for i,a in res:
+            yield { 'id':i, 'addr':a }
 
-    #def worker_exist(self, worker_uuid):
+
+    #def worker_list_local_services(self, host_id, service):
     #    self.SEMA.acquire()
     #    try:
     #        self.cur.execute(
-    #            "SELECT * FROM workers WHERE uuid=?",
-    #            [worker_uuid] )
+    #            "SELECT ip,port FROM workers WHERE ip=? AND service=?",
+    #            (ip, service) )
+    #        res = self.cur.fetchall()
+    #    finally:
+    #        self.SEMA.release()
+    #    lst = []
+    #    for s in res:
+    #        lst.append( {'ip':s[0], 'port':s[1]} )
+    #    return lst
+
+
+
+    #def worker_exist(self, worker_ID):
+    #    self.SEMA.acquire()
+    #    try:
+    #        self.cur.execute(
+    #            "SELECT * FROM workers WHERE ID=?",
+    #            [worker_ID] )
     #        res = self.cur.fetchone()
     #    finally:
     #        self.SEMA.release()

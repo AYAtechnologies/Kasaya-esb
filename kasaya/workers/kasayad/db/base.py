@@ -30,27 +30,27 @@ class BaseDB(object):
     # -------------------------
 
 
-    def host_add(self, uuid, ip, hostname):
+    def host_add(self, ID, ip, hostname):
         raise NotImplemented()
 
-    def host_get(self, uuid):
+    def host_get(self, ID):
         raise NotImplemented()
 
-    def host_del(self, uuid):
+    def host_del(self, ID):
         raise NotImplemented()
 
     def host_list(self):
         raise NotImplemented()
 
-    def host_exist(self, host_uuid=None, ip=None):
+    def host_exist(self, host_id=None, ip=None):
         """
         Check if host exists in database.
         """
-        if host_uuid == ip == None:
+        if host_id == ip == None:
             return None
         for h in self.host_list():
-            if host_uuid is not None:
-                if h['uuid']==host_uuid:
+            if host_id is not None:
+                if h['id']==host_id:
                     return h
             if ip is not None:
                 if h['ip']==ip:
@@ -61,15 +61,15 @@ class BaseDB(object):
     # -------------------------
 
 
-    def service_add(self, host_uuid, name):
+    def service_add(self, host_id, name):
         raise NotImplemented()
 
 
-    def service_del(self, host_uuid, name):
+    def service_del(self, host_id, name):
         raise NotImplemented()
 
 
-    def service_list(self, host_uuid):
+    def service_list(self, host_id):
         raise NotImplemented()
 
 
@@ -78,11 +78,11 @@ class BaseDB(object):
     # -------------------------
 
 
-    def worker_add(self, worker_uuid, name, ip, port, pid):
+    def worker_add(self, worker_id, name, ip, port, pid):
         raise NotImplemented()
 
 
-    def worker_get(self, worker_uuid):
+    def worker_get(self, worker_id):
         raise NotImplemented()
 
 
@@ -93,5 +93,5 @@ class BaseDB(object):
     def worker_list(self, ip):
         raise NotImplemented()
 
-    def worker_exist(self, worker_uuid):
+    def worker_exist(self, worker_id):
         raise NotImplemented()

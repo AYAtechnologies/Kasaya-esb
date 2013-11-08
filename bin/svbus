@@ -27,7 +27,7 @@ class Jobs(object):
     #    pass
 
     @plac.annotations(
-        u=("Show UUID identifiers", "flag"),
+        u=("Show ID identifiers", "flag"),
         hi=("Hide offline services", "flag"),
     )
     def list(self, u=False, hi=False):
@@ -39,8 +39,8 @@ class Jobs(object):
         inactiveline = "  {service: >{ws}}  off"
 
         if u:
-            hostline   += "   uuid: {uuid}"
-            workerline += "   uuid: {uuid}  pid: {pid}"
+            hostline   += "   ID: {id}"
+            workerline += "   ID: {id}  pid: {pid}"
 
         # all hosts in network
         hosts = control.svbus.status()
@@ -57,7 +57,7 @@ class Jobs(object):
         hcnt, wcnt = 0,0
         for h in hosts:
             hcnt += 1
-            print ( hostline.format(wh=whst, wi=wip, ws=wsvc, service="SYNCD", **h) )
+            print ( hostline.format(wh=whst, wi=wip, ws=wsvc, service="KASAYAD", **h) )
 
             inact = []
             for w in h['services']:
@@ -89,29 +89,29 @@ class Jobs(object):
 
 
     @plac.annotations(
-        uuid=("UUID of worker to stop"),
-        terminate=("Use pid rather then uuid", "flag"),
+        ID=("ID of worker to stop"),
+        terminate=("Use pid rather then ID", "flag"),
         sigkill=("Send SIGKILL (if everything else fails)", "flag")
     )
-    def wrkstop(self, uuid, terminate=False, sigkill=False):
+    def wrkstop(self, ID, terminate=False, sigkill=False):
         """
-        Send stop signal to worker with specified uuid. If worker is currently
+        Send stop signal to worker with specified ID. If worker is currently
         processing task, it will stop after finishing current job.
         """
-        control.worker.stop(uuid, terminate, sigkill)
+        control.worker.stop(ID, terminate, sigkill)
 
 
     @plac.annotations(
-        uuid=("UUID of worker to show stats")
+        ID=("ID of worker to show stats")
     )
-    def wrkstats(self, uuid):
+    def wrkstats(self, ID):
         """
-        Send stop signal to worker with specified uuid. If worker is currently
+        Send stop signal to worker with specified ID. If worker is currently
         processing task, worker will stop after finishing current job.
         """
-        res = control.worker.stats(uuid)
+        res = control.worker.stats(ID)
         if res is None:
-            print ("Worker not found (uuid: %s)" % uuid)
+            print ("Worker not found (ID: %s)" % ID)
             return
 
         uptime = str( datetime.timedelta(seconds=res['uptime'] ) )

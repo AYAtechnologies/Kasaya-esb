@@ -19,8 +19,8 @@ class NetworkStateDB(object):
 
         self.LLDB.connect()
 
-    def set_own_ip(self,ip):
-        self.own_ip = ip
+    def set_own_id(self,id):
+        self.own_id = id
 
     def close(self):
         self.LLDB.close()
@@ -30,35 +30,43 @@ class NetworkStateDB(object):
 
     # hosts
 
-    def host_register(self, host_uuid, hostname, ip, services=None):
+    def host_register(self, host_id, hostname, ip, services=None):
+        """
+        Register new host (kasayad instance).
+        host_id - id of kasayad
+        hostnam - name of host on which is kasayad running
+        ip - ip address of host
+        services - list of services available on host
+        """
         # check if host is already registered
-        he = self.LLDB.host_exist(host_uuid=host_uuid, ip=ip)
+        he = self.LLDB.host_exist(host_id=host_id, ip=ip)
         if not he is None:
-            # if current host has different UUID,
+            # if current host has different ID,
             # then previous was stopped and this is new instance
             # we unregister previous instance before register new one
-            if he['uuid']!=host_uuid:
-                self.host_unregister(host_uuid)
+            if he['id']!=host_id:
+                self.host_unregister(host_id)
             else:
                 return False
         # register host
-        self.LLDB.host_add(host_uuid, ip, hostname)
+        self.LLDB.host_add(host_id, ip, hostname)
         # register services
-        self.service_update_list(host_uuid, services)
+        if services is not None:
+            self.service_update_list(host_id, services)
         return True
 
 
-    def host_unregister(self, host_uuid):
+    def host_unregister(self, host_id):
         """
         Wyrejestrowanie hosta z bazy.
           Zwraca True jeśli wyrejestrowano workera,
           False jeśli workera nie było w bazie
         """
         # remove all services for host
-        for s in self.LLDB.service_list(host_uuid):
-            self.LLDB.service_del(host_uuid, s['service'])
+        for s in self.LLDB.service_list(host_id):
+            self.LLDB.service_del(host_id, s['service'])
         # remove host
-        self.LLDB.host_del(host_uuid)
+        self.LLDB.host_del(host_id)
         #return {"addr":res[2],"hostname":res[1]}
 
 
@@ -70,11 +78,11 @@ class NetworkStateDB(object):
             yield h
 
 
-    def host_addr_by_uuid(self, uuid):
+    def host_addr_by_id(self, ID):
         """
-        Zwraca adres IP na którym znajduje się host o podanym UUID
+        Return address of host with given ID
         """
-        res = self.LLDB.host_get(uuid)
+        res = self.LLDB.host_get(ID)
         if res is None:
             return None
         return res['ip']
@@ -83,39 +91,39 @@ class NetworkStateDB(object):
     # services
 
 
-    def service_add(self, host_uuid, sname):
+    def service_add(self, host_id, sname):
         """
         Dodanie serwisu do hosta
         """
-        self.LLDB.service_add(host_uuid, sname)
+        self.LLDB.service_add(host_id, sname)
 
-    def service_del(self, host_uuid, sname):
+    def service_del(self, host_id, sname):
         """
         Usunięcie serwisu z hosta
         """
-        self.LLDB.service_del(host_uuid, sname)
+        self.LLDB.service_del(host_id, sname)
 
-    def service_clear(self, host_uuid):
+    def service_clear(self, host_id):
         """
         Usunięcie wszystkich serwisów z serwera
         """
         for s in self.LLDB.service_list():
-            self.LLDB.service_del(host_uuid, s['service'])
+            self.LLDB.service_del(host_id, s['service'])
 
-    def service_list(self, uuid):
+    def service_list(self, ID):
         """
         List of all services available on host
         """
-        for s in self.LLDB.service_list(uuid):
+        for s in self.LLDB.service_list(ID):
             yield s
 
-    def service_update_list(self, host_uuid, services):
+    def service_update_list(self, host_id, services):
         """
         Aktualizacja listy wbudowanych serwisów
         """
         newset = set(services)
         todel = set()
-        for s in self.service_list(host_uuid):
+        for s in self.service_list(host_id):
             name = s['service']
             if name in newset:
                 newset.discard(name)
@@ -123,10 +131,10 @@ class NetworkStateDB(object):
                 todel.add(name)
         changes = 0
         for s in newset:
-            self.service_add(host_uuid, s)
+            self.service_add(host_id, s)
             changes+=1
         for s in todel:
-            self.service_del(host_uuid, s)
+            self.service_del(host_id, s)
             changes+=1
         return changes>0
 
@@ -134,68 +142,66 @@ class NetworkStateDB(object):
 
     # workers
 
-    def worker_register(self, worker_uuid, service_name, ip, port, pid):
+    def worker_register(self, host_id, worker_id, service_name, address, pid):
         """
         Zarejestrowanie workera w bazie.
-          worker_uuid - uuid workera
+          worker_id - ID workera
+          host_id - ID hosta do którego worker jest przypisany
           service_name - nazwa serwisu
-          ip, port - adres ip:port workera
+          addr - adres serwisu
 
           wynikiem jest:
           True - jeśli nowy worker został zarejestrowany
           False - jesli worker już istnieje w bazie
         """
         # sprawdzenie czy worker istnieje w bazie
-        for w in self.LLDB.worker_list(ip=ip):
-            if w['uuid']==worker_uuid:
-                # already registered
+        for w in self.LLDB.worker_list(host_id=host_id):
+            # is already registered
+            if w['id']==worker_id:
                 return False
-            if (w['ip']==ip) and (w['port']==port):
-                # another worker under same address, unregister existing
-                self.worker_unregister(ip, port)
-
-        self.LLDB.worker_add(worker_uuid, service_name, ip, port, pid)
+            # another worker under same address, unregister existing
+            if w['addr']==address:
+                self.worker_unregister(address)
+        self.LLDB.worker_add(host_id, worker_id, service_name, address, pid)
         return True
 
 
-    def worker_unregister(self, ip, port):
+    def worker_unregister(self, address=None, ID=None):
         """
         Wyrejestrowanie workera z bazy.
-          Zwraca True jeśli wyrejestrowano workera,
-          False jeśli workera nie było w bazie
+        Parametrem może być adres lub ID workera.
         """
-        self.LLDB.worker_del(ip,port)
+        if address==ID==None:
+            raise Exception("Missing parameter (address or ID)")
+        if address:
+            self.LLDB.worker_del_by_addr(address)
+        if ID:
+            self.LLDB.worker_del_by_id(ID)
 
 
-    def worker_get(self, worker_uuid):
-        return self.LLDB.worker_get(worker_uuid)
-
-
-    def worker_list(self, host_uuid=None, ip=None):
+    def worker_get(self, worker_id):
         """
-        Return list of workers on host by host ip or host uuid
+        Return worker details for given ID
         """
-        if host_uuid==ip==None:
-            raise Exception("Missing parameter uuid or ip")
-        if ip is None:
-            ip = self.host_addr_by_uuid(host_uuid)
-            if ip is None:
-                return
+        return self.LLDB.worker_get(worker_id)
 
-        lst = self.LLDB.worker_list(ip)
-        if lst is None:
-            return
+
+    def worker_list(self, host_id):
+        """
+        Return list of workers on host by host ip or host ID
+        """
+        #if host_id==ip==None:
+        #    raise Exception("Missing parameter ID or ip")
+        lst = self.LLDB.worker_list(host_id)
+        #if lst is None:
+        #    return
         for wrk in lst:
             yield wrk
 
 
-    def worker_list_local(self):
-        for w in self.LLDB.worker_list(ip=self.own_ip):
-            yield w
-
-
     def choose_worker_for_service(self, service):
-        lst = self.LLDB.worker_list_local_services(self.own_ip, service)
+        lst = self.LLDB.workers_for_service(service)#worker_list_local_services(self.own_id, service)
+        lst = list(lst)
         if len(lst)==0:
             return None
         return choice(lst)

@@ -382,7 +382,7 @@ class MessageLoop(object):
             try:
                 result = handler(msgdata)
             except Exception as e:
-                #result = exception_serialize(e, False)
+                result = exception_serialize(e, False)
                 _serialize_and_send(
                     SOCK,
                     self.serializer,
@@ -424,19 +424,18 @@ class MessageLoop(object):
 
 def send_and_receive(address, message, timeout=10):
     """
-    context - ZMQ context
-    address - full ZMQ destination address (eg: tcp://127.0.0.1:1234)
+    address - full destination address (eg: tcp://127.0.0.1:1234)
     message - message payload (will be automatically serialized)
     timeout - time in seconds after which TimeoutError will be raised
     """
-    S = Serializer() # <-- serializer is a singleton
+    serializer = Serializer() # <-- serializer is a singleton
 
     typ, addr, so1, so2 = decode_addr(address)
     SOCK = socket.socket(so1,so2)
     SOCK.connect(addr)
 
     # send...
-    _serialize_and_send(SOCK, S, message)
+    _serialize_and_send(SOCK, serializer, message)
 
     # receive response
     try:
@@ -458,7 +457,7 @@ def send_and_receive_response(address, message, timeout=10):
     """
     j.w. ale dekoduje wynik i go zwraca, lub rzuca otrzymany w wiadomości exception
     """
-    result = send_and_receive(context, address, message, timeout)
+    result = send_and_receive(address, message, timeout)
     typ = result['message']
     if typ==messages.RESULT:
         return result['result']

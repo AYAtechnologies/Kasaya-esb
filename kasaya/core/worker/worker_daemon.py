@@ -4,10 +4,11 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.conf import settings
 from kasaya.core.lib.binder import bind_socket_to_port_range
 from kasaya.core.protocol import messages
+from kasaya.core.worker.worker_base import WorkerBase
 from kasaya.core.lib.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
-from kasaya.core.lib import LOG, system
+from kasaya.core.lib import LOG, system, make_kasaya_id
 from kasaya.core.lib.syncclient import KasayaLocalClient
 from kasaya.core import exceptions
 from .worker_reg import worker_methods_db
@@ -15,7 +16,7 @@ import gevent
 import gevent.monkey
 
 import traceback
-import datetime, uuid, os
+import datetime, os
 import inspect
 
 __all__=("WorkerDaemon",)
@@ -25,10 +26,10 @@ class TaskTimeout(Exception): pass
 
 
 
-class WorkerDaemon(object):
+class WorkerDaemon(WorkerBase):
 
     def __init__(self, servicename=None, load_config=True):
-        self.uuid = str(uuid.uuid4())
+        super(WorkerDaemon, self).__init__()
 
         # config loader
         if servicename is None:
@@ -46,7 +47,7 @@ class WorkerDaemon(object):
         # 3 - stopping
         # 4 - dead
         self.status = 0
-        LOG.info("Starting worker daemon, service [%s], uuid: [%s]" % (self.servicename, self.uuid) )
+        LOG.info("Starting worker daemon, service [%s], ID: [%s]" % (self.servicename, self.ID) )
         adr = "tcp://127.0.0.1:"+str(settings.WORKER_MIN_PORT)
         self.loop = MessageLoop(adr)#"127.0.0.1", settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
         #addr = bind_socket_to_port_range(sock,)
@@ -57,7 +58,7 @@ class WorkerDaemon(object):
             on_connection_close = self.kasaya_connection_broken,
             on_connection_start = self.kasaya_connection_started,
             )
-        self.SYNC.make_ping_msg(servicename, self.loop.ip, self.loop.port, self.uuid, os.getpid())
+        self.SYNC.make_ping_msg(servicename, self.loop.ip, self.loop.port, self.ID, os.getpid())
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call, raw_msg_response=True )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )

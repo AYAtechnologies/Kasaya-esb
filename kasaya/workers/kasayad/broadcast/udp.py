@@ -14,7 +14,7 @@ class UDPLoop(object):
     def __init__(self):
         self.is_running = True
         self.own_ip = None
-        self.uuid = None
+        self.ID = None
         self._msgdb = {}
         self.port = settings.BROADCAST_PORT
         self.SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -56,7 +56,7 @@ class UDPLoop(object):
 
             # own broadcast from another interface
             try:
-                if msgdata['suuid'] == self.uuid:
+                if msgdata['sID'] == self.ID:
                     continue
             except KeyError:
                 continue
@@ -103,7 +103,7 @@ class UDPLoop(object):
         """
         Wysłanie komunikatu do wszystkich workerów w sieci
         """
-        msg['suuid'] = self.uuid
+        msg['sID'] = self.ID
         msg = self.serializer.serialize(msg)
         self.SOCK.sendto(msg, ('<broadcast>', self.port) )
 
@@ -116,7 +116,7 @@ class UDPBroadcast(UDPLoop):
 
     def __init__(self, server):
         self.DAEMON = server
-        self.uuid = server.uuid
+        self.ID = server.ID
         super(UDPBroadcast, self).__init__()
         self.register_message(messages.WORKER_LIVE, self.handle_worker_join)
         self.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
@@ -125,30 +125,30 @@ class UDPBroadcast(UDPLoop):
         self.register_message(messages.HOST_REFRESH, self.handle_host_refresh)
 
     def handle_worker_join(self, msgdata):
-        self.DAEMON.WORKER.worker_start(msgdata['uuid'], msgdata['service'], msgdata['ip'], msgdata['port'] )
+        self.DAEMON.WORKER.worker_start(msgdata['ID'], msgdata['service'], msgdata['ip'], msgdata['port'] )
 
     def handle_worker_leave(self, msgdata):
         self.DAEMON.WORKER.worker_stop(msgdata['ip'], msgdata['port'] )
 
     def handle_host_join(self, msgdata):
-        self.DAEMON.notify_kasayad_start( msgdata['uuid'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
+        self.DAEMON.notify_kasayad_start( msgdata['ID'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
 
     def handle_host_leave(self, msgdata):
-        self.DAEMON.notify_kasayad_stop(msgdata['uuid'])
+        self.DAEMON.notify_kasayad_stop(msgdata['ID'])
 
     def handle_host_refresh(self, msgdata):
-        self.DAEMON.notify_kasayad_refresh(msgdata['uuid'], services=msgdata['services'])
+        self.DAEMON.notify_kasayad_refresh(msgdata['ID'], services=msgdata['services'])
 
 
     # broadcast specific messages
 
-    def send_worker_live(self, uuid, service, ip,port):
+    def send_worker_live(self, ID, service, ip,port):
         """
         Send information to other hosts about running worker
         """
         msg = {
             "message" : messages.WORKER_LIVE,
-            "uuid" : uuid,
+            "ID" : ID,
             "ip" : ip,
             "port": port,
             "service" : service#,
@@ -167,27 +167,27 @@ class UDPBroadcast(UDPLoop):
             }
         self.broadcast_message(msg)
 
-    def send_host_start(self, uuid, hostname, address=None, services=None):
+    def send_host_start(self, ID, hostname, address=None, services=None):
         msg = {
             "message" : messages.HOST_JOIN,
             "hostname" : hostname,
             "addr" : address,
-            "uuid" : uuid,
+            "ID" : ID,
             "services" : services,
             }
         self.broadcast_message(msg)
 
-    def send_host_stop(self, uuid):
+    def send_host_stop(self, ID):
         msg = {
             "message" : messages.HOST_LEAVE,
-            "uuid" : uuid
+            "ID" : ID
             }
         self.broadcast_message(msg)
 
-    def send_host_refresh(self, uuid, services=None):
+    def send_host_refresh(self, ID, services=None):
         msg = {
             "message" : messages.HOST_REFRESH,
-            "uuid" : uuid
+            "ID" : ID
         }
         if services:
             msg["services"] = services

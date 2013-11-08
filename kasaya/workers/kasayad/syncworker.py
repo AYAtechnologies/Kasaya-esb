@@ -30,28 +30,6 @@ class RedirectRequiredEx(RedirectRequiredToAddr):
 
 
 
-    # socket connectors
-'''
-    def _connect_queries_loop(self, context):
-        """
-        connect local queries loop
-        """
-        sock = context.socket(zmq.REP)
-        addr = 'ipc://'+settings.SOCK_QUERIES
-        sock.bind(addr)
-        LOG.debug("Connected query socket %s" % addr)
-        return sock, addr
-
-    def _connect_inter_sync_loop(self, context):
-        """
-        connext global network syncd dialog
-        """
-        sock = context.socket(zmq.REP)
-        addr = _ip_to_sync_addr( get_bind_address(settings.SYNCD_CONTROL_BIND) )
-        sock.bind(addr)
-        LOG.debug("Connected inter-kasaya dialog socket %s" % addr)
-        return sock, addr
-'''
 
 class SyncWorker(object):
 
@@ -90,8 +68,8 @@ class SyncWorker(object):
     def own_ip(self):
         return self.intersync.ip
 
-    def get_sync_address(self, ip):
-        return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
+    #def get_sync_address(self, ip):
+    #    return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
 
 
     # closing and quitting
@@ -106,7 +84,7 @@ class SyncWorker(object):
         #self.queries.close()
         pass
 
-    # all message loops used in syncd
+    # all message loops used in kasayad
     def get_loops(self):
         return [
             #self.queries.loop,
@@ -133,10 +111,10 @@ class SyncWorker(object):
             self.__services = servicesctl.local_services()
         lst = self.__services.keys()
         if rescan:
-            uuid = self.DAEMON.uuid
-            changes = self.DB.service_update_list(uuid, lst)
+            ID = self.DAEMON.ID
+            changes = self.DB.service_update_list(ID, lst)
             if changes:
-                self.DAEMON.notify_kasayad_refresh(uuid, lst, local=True)
+                self.DAEMON.notify_kasayad_refresh(ID, lst, local=True)
         return lst
 
 
@@ -153,14 +131,14 @@ class SyncWorker(object):
 #        for wrk in self.DB.get_local_workers():
 #            name = wrk[1]
 #            if not name in result:
-#                result[name] = {'count':0,'uuid':[]}
+#                result[name] = {'count':0,'ID':[]}
 #            result[name]['count'] += 1
-#            result[name]['uuid'].append(wrk[0])
+#            result[name]['ID'].append(wrk[0])
 #        # add inactive services
 #        for svc in self.__services:
 #            if svc in result:
 #                continue
-#            result[svc] = {'count':0,'uuid':[]}
+#            result[svc] = {'count':0,'ID':[]}
 #        return result
 
 
@@ -180,7 +158,7 @@ class SyncWorker(object):
         This function is triggered only by local worker.
         """
         now = datetime.now()
-        uuid = msg['uuid']
+        ID = msg['id']
         ip = msg['addr']
         port = msg['port']
         svce = msg['service']
@@ -190,14 +168,14 @@ class SyncWorker(object):
             png = self.__pingdb[addr]
         except KeyError:
             # worker is unknown
-            self.worker_start(uuid, svce, ip, port, pid)
+            self.worker_start(ID, svce, ip, port, pid)
             return
 
         if png['s']!=svce:
             # different service under same address!
             LOG.error("Service [%s] expected on address [%s], but [%s] appeared. Removing old, registering new." % (png['s'], addr, svce))
             self.worker_stop(ip, port, True)
-            self.worker_start(uuid, svce, ip, port, pid)
+            self.worker_start(ID, svce, ip, port, pid)
             return
 
         # update heartbeats
@@ -239,35 +217,31 @@ class SyncWorker(object):
 
 
 
-    # worker state changes
-    # ------------------------------
+    # worker state changes, high level functions
+    # ------------------------------------------
 
-    def after_worker_start(self, uuid, service, ip, port):
+    def after_worker_start(self, ID, service, ip, port):
         # send information on worker start
         addr = _worker_addr({'ip':ip, 'port':port})
         msg = {
             'message':messages.CTL_CALL,
             'method':['start']
         }
-        res = send_and_receive_response(self.context, addr, msg)
+        res = send_and_receive_response(addr, msg)
         LOG.debug("Local worker [%s] on [%s] is now running" % (service, addr) )
 
         # broadcast new worker state
-        self.BC.send_worker_live(uuid, service, ip, port)
+        self.BC.send_worker_live(ID, service, ip, port)
 
 
-    def worker_start(self, uuid, service, ip, port, pid=0):
+    def worker_start(self, ID, service, ip, port, pid=-1):
         """
         Handle joining to network by worker (local or global)
         """
-        succ = self.DB.worker_register(uuid, service, ip, port,pid)
+        isnew = self.DB.worker_register(ID, service, ip, port, pid)
+        local = pid>0
         addr = ip+":"+str(port)
-        local = ip==self.own_ip
-        if succ:
-            if local:
-                LOG.info("Local worker [%s] started, address [%s]" % (service, addr) )
-            else:
-                LOG.info("Remote worker [%s] started, address [%s]" % (service, addr) )
+
         if local:
             # dodanie serwisu do bazy z czasami pingów
             self.__pingdb[addr] =  {
@@ -276,10 +250,16 @@ class SyncWorker(object):
             }
 
         # przygotowanie lokalnego workera i rozesłanie informacji w sieci jeśli nastąpi zmiana stanu
-        if succ and local:
+        if isnew and local:
             # run worker and notify network
-            g = gevent.Greenlet(self.after_worker_start, uuid, service, ip, port)
+            g = gevent.Greenlet(self.after_worker_start, ID, service, ip, port)
             g.start()
+
+        if isnew:
+            if local:
+                LOG.info("Local worker [%s] started, address [%s]" % (service, addr) )
+            else:
+                LOG.info("Remote worker [%s] started, address [%s]" % (service, addr) )
 
 
     def worker_stop(self, ip, port):
@@ -302,18 +282,21 @@ class SyncWorker(object):
             LOG.info("Remote worker stopped, address [%s]" % addr )
 
 
-    def request_workers_broadcast(self):
-        """
-        Send to all local workers request for registering in network.
-        Its used after new host start.
-        """
-        for w in self.DB.worker_list_local():
-            gevent.sleep(0.4)
-            self.BC.send_worker_live(w['uuid'], w['service'], w['ip'], w['port'])
+    #def request_workers_broadcast(self):
+    #    """
+    #    Send to all local workers request for registering in network.
+    #    Its used after new host start.
+    #    """
+    #    for w in self.DB.worker_list_local():
+    #        gevent.sleep(0.4)
+    #        self.BC.send_worker_live(w['ID'], w['service'], w['ip'], w['port'])
 
 
     # heartbeat
     def hearbeat_loop(self):
+        """
+        Check all locally registered workers last ping time and unregister dead workers
+        """
         maxpinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT + settings.WORKER_HEARTBEAT )
         unreglist = []
         while True:
@@ -359,7 +342,7 @@ class SyncWorker(object):
 
 
 
-    # syncd host tasks
+    # kasayad host tasks
 
 
     def CTL_global_services(self):
@@ -367,25 +350,26 @@ class SyncWorker(object):
         List of all working hosts and services in network
         """
         lst = []
-        # all syncd hosts
+        # all kasayad hosts
         for hst in self.DB.host_list():
             # workers on host
-            hst ['services'] = self.CTL_services_on_host( hst['uuid'] )
+            hst ['services'] = self.CTL_services_on_host( hst['id'] )
             lst.append( hst )
         return lst
 
 
     # this command is not currently exposed via control interface
-    def CTL_services_on_host(self, uuid):
+    def CTL_services_on_host(self, ID):
         """
         List of all services on host
         """
         lst = []
         managed = set()
-        for s in self.DB.service_list(uuid):
+        for s in self.DB.service_list(ID):
+            print ("   ",s)
             managed.add(s['service'])
         running = set()
-        for wnfo in self.DB.worker_list(uuid):
+        for wnfo in self.DB.worker_list(ID):
             running.add(wnfo['service'])
             wnfo['running'] = True
             wnfo['managed'] = wnfo['service'] in managed
@@ -397,11 +381,11 @@ class SyncWorker(object):
         return lst
 
 
-    def CTL_worker_stop(self, uuid, terminate=False, sigkill=False):
+    def CTL_worker_stop(self, ID, terminate=False, sigkill=False):
         """
         Send stop signal to worker
         """
-        wrkr = self.DB.worker_get(uuid)
+        wrkr = self.DB.worker_get(ID)
         self.redirect_or_pass_by_ip( wrkr['ip'] )
 
         if terminate:
@@ -421,11 +405,11 @@ class SyncWorker(object):
             return res
 
 
-    def CTL_worker_stats(self, uuid):
+    def CTL_worker_stats(self, ID):
         """
         Return full stats of worker
         """
-        wrkr = self.DB.worker_get(uuid)
+        wrkr = self.DB.worker_get(ID)
         self.redirect_or_pass_by_ip( wrkr['ip'] )
         # call worker for stats
         addr = _worker_addr(wrkr)
@@ -469,7 +453,7 @@ class SyncWorker(object):
         services = []
         for wrk in self.DB.worker_list_local():
             if wrk['service']==name:
-                services.append(wrk['uuid'])
+                services.append(wrk['ID'])
         if len(services)==0:
             raise exceptions.ServiceBusException("There is no [%s] service running" % name)
         for u in services:
@@ -485,6 +469,6 @@ class SyncWorker(object):
         self.redirect_or_pass_by_ip(ip)
         svlist = self.local_services_list(rescan=True)
         # send nwe list of services to kasaya daemon instance
-        #self.DAEMON.notify_kasayad_refresh(self.DAEMON.uuid, svlist, True)
+        #self.DAEMON.notify_kasayad_refresh(self.DAEMON.ID, svlist, True)
 
 
