@@ -3,6 +3,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.core.protocol import messages
 from kasaya.conf import settings
 from .generic_proxy import GenericProxy
+from kasaya.core.lib import LOG
 
 __all__ = ("SyncProxy", "AsyncProxy", "ControlProxy", "TransactionProxy", "async_result")
 
@@ -28,6 +29,7 @@ class SyncProxy(GenericProxy):
             "args" : args,
             "kwargs" : kwargs
         }
+        LOG.debug("Client is about to send this message: %r" % msg)
         # wysłanie żądania
         #print "Sync task: ", addr, msg
         return self._send_message(addr, msg)
