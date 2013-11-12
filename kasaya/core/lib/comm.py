@@ -309,7 +309,25 @@ class MessageLoop(object):
         else:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setblocking(1)
-        sock.bind(addr)
+
+        if self.socket_type=="ipc" or (maxport is None):
+            # single socket binding
+            sock.bind(addr)
+        else:
+            # binding to one from range of available ports
+            while True:
+                try:
+                    sock.bind(addr)
+                    break # success
+                except socket.error as e:
+                    if e.errno==errno.EADDRINUSE:
+                        ip,port = addr
+                        if port<maxport:
+                            addr = (ip,port+1)
+                        else:
+                            # all port range is unavailable
+                            raise e
+
         sock.listen(backlog)
 
         # stream server from gevent
