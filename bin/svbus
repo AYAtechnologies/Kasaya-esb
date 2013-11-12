@@ -35,7 +35,7 @@ class Jobs(object):
         List all hosts and workers running in service bus
         """
         hostline     = "  {service: >{ws}}  {ip: <{wi}} (hostname: {hostname})"
-        workerline   = "  {service: >{ws}}  on port: {port} {extra}"
+        workerline   = "  {service: >{ws}}  address: {addr} {extra}"
         inactiveline = "  {service: >{ws}}  off"
 
         if u:

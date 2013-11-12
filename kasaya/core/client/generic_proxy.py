@@ -35,7 +35,7 @@ class GenericProxy(object):
         #print ("initialize", method, context)
         self._names = method
         self._context = context
-        self.addr = self.find_worker(method)
+        self._addr = self.find_worker(method)
 
     def __getattr__(self, itemname):
         #print ("getattr")
@@ -46,14 +46,14 @@ class GenericProxy(object):
         self._names.append(itemname)
         return self
 
-    def find_worker(self, method):
+    def _find_worker(self, method):
         srvce = method[0]
         msg = self.kasayad.query( srvce )
         if not msg['message']==messages.WORKER_ADDR:
             raise exceptions.ServiceBusException("Wrong response from sync server")
-        if msg['ip'] is None:
+        addr = msg['addr']
+        if addr is None:
             raise exceptions.ServiceNotFound("No service %s found" % srvce)
-        addr = "tcp://%s:%i/" % ( msg['ip'],msg['port'] )
         return addr
 
     def _send_message(self, addr, msg):
@@ -61,9 +61,9 @@ class GenericProxy(object):
         if _namefix:
             msg['service'] = unicode(msg['service'],'ascii')
             msg['method'] = [ unicode(m,"ascii") for m in msg['method']]
-        msg = self.prepare_message(msg) # _middleware hook
+        #msg = self.prepare_message(msg) # _middleware hook
         res = send_and_receive_response(addr, msg, 30) # manual timeout!
-        res = self.postprocess_message(res) # _middleware hook
+        #res = self.postprocess_message(res) # _middleware hook
         return res
 
     def __call__(self, *args, **kwargs):

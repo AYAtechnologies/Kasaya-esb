@@ -22,15 +22,13 @@ class KasayaLocalClient(Sender):
 
     # worker methods
 
-    def make_ping_msg(self, servicename, ip, port, ID, pid):
+    def setup(self, servicename, address, ID, pid):
         self.srvname = servicename
-        self.__addr = ip
-        self.__port = port
+        self.ID = ID
         self.__pingmsg = {
             "message" : messages.WORKER_LIVE,
-            "addr" : ip,
-            "port" : port,
-            "id" : ID,
+            "addr" : address,
+            "id" : self.ID,
             "service" : servicename,
             "pid": pid,
             "status": 0,
@@ -43,8 +41,7 @@ class KasayaLocalClient(Sender):
     def notify_worker_stop(self):
         msg = {
             "message" : messages.WORKER_LEAVE,
-            "ip" : self.__addr,
-            "port" : self.__port,
+            "id" : self.ID,
             }
         self.send(msg)
 

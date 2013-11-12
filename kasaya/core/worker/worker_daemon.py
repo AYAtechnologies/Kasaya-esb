@@ -49,7 +49,7 @@ class WorkerDaemon(WorkerBase):
         self.status = 0
         LOG.info("Starting worker daemon, service [%s], ID: [%s]" % (self.servicename, self.ID) )
         adr = "tcp://127.0.0.1:"+str(settings.WORKER_MIN_PORT)
-        self.loop = MessageLoop(adr)#"127.0.0.1", settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
+        self.loop = MessageLoop(adr, settings.WORKER_MAX_PORT)#"127.0.0.1", settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
         #addr = bind_socket_to_port_range(sock,)
 
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
@@ -58,7 +58,7 @@ class WorkerDaemon(WorkerBase):
             on_connection_close = self.kasaya_connection_broken,
             on_connection_start = self.kasaya_connection_started,
             )
-        self.SYNC.make_ping_msg(servicename, self.loop.ip, self.loop.port, self.ID, os.getpid())
+        self.SYNC.setup( servicename, self.loop.address, self.ID, os.getpid() )
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call, raw_msg_response=True )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )

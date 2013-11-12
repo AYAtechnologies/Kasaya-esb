@@ -300,10 +300,10 @@ class MessageLoop(object):
     def __init__(self, address, maxport=None, backlog=50):
         self.is_running = True
         self._msgdb = {}
+
         # bind to socket
         self.socket_type, addr, so1, so2 = decode_addr(address)
         sock = socket.socket(so1, so2)
-        #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if self.socket_type=="ipc":
             os.unlink(addr)
         else:
@@ -311,6 +311,8 @@ class MessageLoop(object):
         sock.setblocking(1)
         sock.bind(addr)
         sock.listen(backlog)
+
+        # stream server from gevent
         self.SERVER = StreamServer(sock, self.connection_handler)
         # current address
         if self.socket_type=="tcp":

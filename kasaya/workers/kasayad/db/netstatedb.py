@@ -110,11 +110,11 @@ class NetworkStateDB(object):
         for s in self.LLDB.service_list():
             self.LLDB.service_del(host_id, s['service'])
 
-    def service_list(self, ID):
+    def service_list(self, host_id):
         """
         List of all services available on host
         """
-        for s in self.LLDB.service_list(ID):
+        for s in self.LLDB.service_list(host_id):
             yield s
 
     def service_update_list(self, host_id, services):
@@ -190,11 +190,7 @@ class NetworkStateDB(object):
         """
         Return list of workers on host by host ip or host ID
         """
-        #if host_id==ip==None:
-        #    raise Exception("Missing parameter ID or ip")
         lst = self.LLDB.worker_list(host_id)
-        #if lst is None:
-        #    return
         for wrk in lst:
             yield wrk
 
@@ -204,4 +200,4 @@ class NetworkStateDB(object):
         lst = list(lst)
         if len(lst)==0:
             return None
-        return choice(lst)
+        return choice(lst)['addr']

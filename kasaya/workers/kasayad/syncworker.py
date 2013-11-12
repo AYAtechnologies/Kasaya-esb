@@ -159,53 +159,44 @@ class SyncWorker(object):
         """
         now = datetime.now()
         ID = msg['id']
-        ip = msg['addr']
-        port = msg['port']
+        addr = msg['addr']
         svce = msg['service']
         pid = msg['pid']
-        addr = ip+"."+str(port)
         try:
             png = self.__pingdb[addr]
         except KeyError:
             # worker is unknown
-            self.worker_start(ID, svce, ip, port, pid)
+            self.worker_start(ID, svce, addr, pid)
             return
 
         if png['s']!=svce:
             # different service under same address!
             LOG.error("Service [%s] expected on address [%s], but [%s] appeared. Removing old, registering new." % (png['s'], addr, svce))
-            self.worker_stop(ip, port, True)
-            self.worker_start(ID, svce, ip, port, pid)
+            self.worker_stop(ID)
+            self.worker_start(ID, svce, addr, pid)
             return
 
         # update heartbeats
         png['t'] = now
-        self.__pingdb[addr] = png
+        self.__pingdb[ID] = png
 
 
     def handle_worker_leave(self, msg):
         """
         Worker is going down
         """
-        self.worker_stop( msg['ip'], msg['port'] )
+        self.worker_stop( msg['id'] )
 
     def handle_name_query(self, msg):
         """
         Odpowiedź na pytanie o adres workera
         """
         name = msg['service']
-        res = self.DB.choose_worker_for_service(name)
-        if res is None:
-            a = None
-            p = None
-        else:
-            a = res['ip']
-            p = res['port']
+        addr = self.DB.choose_worker_for_service(name)
         return {
             'message':messages.WORKER_ADDR,
             'service':name,
-            'ip':a,
-            'port':p
+            'addr':addr,
         }
 
     def handle_local_control_request(self, msg):
@@ -220,31 +211,28 @@ class SyncWorker(object):
     # worker state changes, high level functions
     # ------------------------------------------
 
-    def after_worker_start(self, ID, service, ip, port):
+    def after_worker_start(self, ID, service, address):
         # send information on worker start
-        addr = _worker_addr({'ip':ip, 'port':port})
         msg = {
             'message':messages.CTL_CALL,
             'method':['start']
         }
-        res = send_and_receive_response(addr, msg)
-        LOG.debug("Local worker [%s] on [%s] is now running" % (service, addr) )
+        res = send_and_receive_response(address, msg)
+        LOG.debug("Local worker [%s] on [%s] is now running" % (service, address) )
 
         # broadcast new worker state
-        self.BC.send_worker_live(ID, service, ip, port)
+        self.BC.send_worker_live(ID, service, address)
 
 
-    def worker_start(self, ID, service, ip, port, pid=-1):
+    def worker_start(self, ID, service, address, pid=-1):
         """
         Handle joining to network by worker (local or global)
         """
-        isnew = self.DB.worker_register(ID, service, ip, port, pid)
+        isnew = self.DB.worker_register(self.DAEMON.ID, ID, service, address, pid)
         local = pid>0
-        addr = ip+":"+str(port)
-
         if local:
             # dodanie serwisu do bazy z czasami pingów
-            self.__pingdb[addr] =  {
+            self.__pingdb[ID] =  {
                 's' : service,
                 't' : datetime.now(),
             }
@@ -252,34 +240,39 @@ class SyncWorker(object):
         # przygotowanie lokalnego workera i rozesłanie informacji w sieci jeśli nastąpi zmiana stanu
         if isnew and local:
             # run worker and notify network
-            g = gevent.Greenlet(self.after_worker_start, ID, service, ip, port)
+            g = gevent.Greenlet(self.after_worker_start, ID, service, address)
             g.start()
 
         if isnew:
             if local:
-                LOG.info("Local worker [%s] started, address [%s]" % (service, addr) )
+                LOG.info("Local worker [%s] started, address [%s]" % (service, address) )
             else:
-                LOG.info("Remote worker [%s] started, address [%s]" % (service, addr) )
+                LOG.info("Remote worker [%s] started, address [%s]" % (service, address) )
 
 
-    def worker_stop(self, ip, port):
+    def worker_stop(self, ID):
         """
         Handle worker leaving network (local or global)
         """
-        self.DB.worker_unregister(ip,port)
-        addr = ip+":"+str(port)
-        local = ip==self.own_ip
+        wnfo = self.DB.worker_get(ID)
+        if wnfo is None:
+            return
+        # unregistering
+        self.DB.worker_unregister(ID=ID)
+
+        # it was local worker?
+        local = wnfo['host_id']==self.DAEMON.ID
         if local:
-            LOG.info("Local worker stopped, address [%s]" % addr )
+            LOG.info("Local worker stopped, service [%s], id [%s]" % (wnfo['service'], ID) )
             # usunięcie wpisu z listy pingów
             try:
-                del self.__pingdb[addr]
+                del self.__pingdb[ID]
             except KeyError:
                 pass
             # send information to all network about stopping worker
-            self.BC.send_worker_stop(ip,port)
+            self.BC.send_worker_stop(ID)
         else:
-            LOG.info("Remote worker stopped, address [%s]" % addr )
+            LOG.info("Remote worker stopped, service [%s], id [%s]" % (wnfo['service'], ID) )
 
 
     #def request_workers_broadcast(self):
@@ -301,16 +294,17 @@ class SyncWorker(object):
         unreglist = []
         while True:
             now = datetime.now()
-            for addr, nfo in self.__pingdb.iteritems():
+            for ID, nfo in self.__pingdb.iteritems():
                 # find outdated timeouts
                 to = nfo['t'] + maxpinglife
                 if to<now:
-                    LOG.warning("Worker [%s] died on address [%s]. Unregistering." % (nfo['s'], addr) )
-                    unreglist.append(addr)
+                    LOG.warning("Worker [%s] with id [%s] died. Unregistering." % (nfo['s'], ID) )
+                    unreglist.append(ID)
+
             # unregister all dead workers
             while len(unreglist)>0:
-                ip,port = unreglist.pop().split(":")
-                self.worker_stop(ip,int(port))
+                ID = unreglist.pop()
+                self.worker_stop( ID )
 
             gevent.sleep(settings.WORKER_HEARTBEAT)
 
@@ -359,21 +353,27 @@ class SyncWorker(object):
 
 
     # this command is not currently exposed via control interface
-    def CTL_services_on_host(self, ID):
+    def CTL_services_on_host(self, host_id):
         """
         List of all services on host
         """
         lst = []
+
+        # managed services set
         managed = set()
-        for s in self.DB.service_list(ID):
+        for s in self.DB.service_list(host_id):
             print ("   ",s)
             managed.add(s['service'])
+
+        # currently running services
         running = set()
-        for wnfo in self.DB.worker_list(ID):
+        for wnfo in self.DB.worker_list(host_id):
+            print ("w", wnfo)
             running.add(wnfo['service'])
             wnfo['running'] = True
             wnfo['managed'] = wnfo['service'] in managed
             lst.append(wnfo)
+
         # offline services
         for sv in managed:
             if not sv in running:

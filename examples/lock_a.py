@@ -11,7 +11,7 @@ def task_a(param):
     print ("Starting A task")
     print ("calling B task")
     res = param+" a"
-    #res = sync.lockb.task_b(res)
+    res = sync.lockb.task_b(res)
     print ("B task result", res)
     print ("Finishing A task")
     return res

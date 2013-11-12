@@ -14,7 +14,7 @@ class SyncProxy(GenericProxy):
         """
         method = self._names
         context = self._context
-        addr = self.find_worker(method)
+        addr = self._find_worker(method)
         # zbudowanie komunikatu
         msg = {
             "message" : messages.SYNC_CALL,
@@ -33,7 +33,7 @@ class AsyncProxy(GenericProxy):
     def __call__(self, *args, **kwargs):
         method = self._names
         context = self._context
-        addr = self.find_worker([settings.ASYNC_DAEMON_SERVICE, "register_task"])
+        addr = self._find_worker([settings.ASYNC_DAEMON_SERVICE, "register_task"])
         # zbudowanie komunikatu
         msg = {
             "message" : messages.SYSTEM_CALL,

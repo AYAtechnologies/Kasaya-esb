@@ -125,45 +125,42 @@ class UDPBroadcast(UDPLoop):
         self.register_message(messages.HOST_REFRESH, self.handle_host_refresh)
 
     def handle_worker_join(self, msgdata):
-        self.DAEMON.WORKER.worker_start(msgdata['ID'], msgdata['service'], msgdata['ip'], msgdata['port'] )
+        self.DAEMON.WORKER.worker_start(msgdata['id'], msgdata['service'], msgdata['addr'] )
 
     def handle_worker_leave(self, msgdata):
-        self.DAEMON.WORKER.worker_stop(msgdata['ip'], msgdata['port'] )
+        self.DAEMON.WORKER.worker_stop(msgdata['id'] )
 
     def handle_host_join(self, msgdata):
-        self.DAEMON.notify_kasayad_start( msgdata['ID'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
+        self.DAEMON.notify_kasayad_start( msgdata['id'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
 
     def handle_host_leave(self, msgdata):
-        self.DAEMON.notify_kasayad_stop(msgdata['ID'])
+        self.DAEMON.notify_kasayad_stop(msgdata['id'])
 
     def handle_host_refresh(self, msgdata):
-        self.DAEMON.notify_kasayad_refresh(msgdata['ID'], services=msgdata['services'])
+        self.DAEMON.notify_kasayad_refresh(msgdata['id'], services=msgdata['services'])
 
 
     # broadcast specific messages
 
-    def send_worker_live(self, ID, service, ip,port):
+    def send_worker_live(self, ID, service, address):
         """
         Send information to other hosts about running worker
         """
         msg = {
             "message" : messages.WORKER_LIVE,
-            "ID" : ID,
-            "ip" : ip,
-            "port": port,
-            "service" : service#,
-            #"pid": pid
+            "id" : ID,
+            "addr" : address,
+            "service" : service,
             }
         self.broadcast_message(msg)
 
-    def send_worker_stop(self, ip,port):
+    def send_worker_stop(self, ID):
         """
         Send information to other hosts about shutting down worker
         """
         msg = {
             "message" : messages.WORKER_LEAVE,
-            "ip" : ip,
-            "port": port,
+            "id" : ID,
             }
         self.broadcast_message(msg)
 
@@ -180,14 +177,14 @@ class UDPBroadcast(UDPLoop):
     def send_host_stop(self, ID):
         msg = {
             "message" : messages.HOST_LEAVE,
-            "ID" : ID
+            "id" : ID,
             }
         self.broadcast_message(msg)
 
     def send_host_refresh(self, ID, services=None):
         msg = {
             "message" : messages.HOST_REFRESH,
-            "ID" : ID
+            "id" : ID,
         }
         if services:
             msg["services"] = services

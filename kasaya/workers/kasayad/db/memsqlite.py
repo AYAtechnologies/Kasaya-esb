@@ -133,7 +133,7 @@ class MemoryDB(BaseDB):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "SELECT ID,service,addr,pid FROM workers WHERE id=?",
+                "SELECT ID,host_id,service,addr,pid FROM workers WHERE id=?",
                 [worker_id,] )
             res = self.cur.fetchone()
         finally:
@@ -141,7 +141,7 @@ class MemoryDB(BaseDB):
 
         if res is None:
             return
-        return { 'id':res[0], 'service':res[1], 'addr':res[2], 'pid':res[3] }
+        return { 'id':res[0], 'host_id':res[1], 'service':res[2], 'addr':res[3], 'pid':res[4] }
 
 
     def worker_del_by_addr(self, addr):
@@ -179,15 +179,15 @@ class MemoryDB(BaseDB):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "SELECT id,service,addr,pid FROM workers WHERE host_id=?",
+                "SELECT id,service,addr,pid, host_id FROM workers WHERE host_id=?",
                 (host_id,) )
             res = self.cur.fetchall()
         finally:
             self.SEMA.release()
         if res is None:
             return
-        for u,s,a,pid in res:
-            yield { 'id':u, 'service':s, 'addr':a, 'pid':pid }
+        for i,s,a,pid, hh in res:
+            yield { 'id':i, 'service':s, 'addr':a, 'pid':pid }
 
 
     def workers_for_service(self, service):
