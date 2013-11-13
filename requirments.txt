@@ -1,5 +1,4 @@
 netifaces
-pyzmq
 gevent
 plac
 pycrypto

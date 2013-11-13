@@ -362,13 +362,11 @@ class SyncWorker(object):
         # managed services set
         managed = set()
         for s in self.DB.service_list(host_id):
-            print ("   ",s)
             managed.add(s['service'])
 
         # currently running services
         running = set()
         for wnfo in self.DB.worker_list(host_id):
-            print ("w", wnfo)
             running.add(wnfo['service'])
             wnfo['running'] = True
             wnfo['managed'] = wnfo['service'] in managed

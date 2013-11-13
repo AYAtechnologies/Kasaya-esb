@@ -14,7 +14,7 @@ def task_b(param):
     res = param+" b"
     res = sync.locka.task_c(res)
     #print ("B task result", res)
-    print ("Finishing A task")
+    print ("Finishing B task")
     return res
 
 

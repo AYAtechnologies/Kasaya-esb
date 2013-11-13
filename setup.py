@@ -46,7 +46,6 @@ setup(
     scripts=['bin/svbus'],
     # requirments
     install_requires = [
-        'pyzmq>=13.0',
         'gevent',
         'netifaces',
         'plac',

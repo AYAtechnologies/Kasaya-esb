@@ -59,10 +59,9 @@ def _serialize_and_send(SOCK, serializer, message, timeout=None):
     try:
         SOCK.sendall( message )
     except socket.error as e:
-        if e.errno==errno.EPIPE:
+        if e.errno in (errno.EPIPE, errno.ECONNRESET):
             raise ConnectionClosed
-        print ("     UNKNOWN EXCEPTION",e)
-
+        raise
 
 
 def _receive_and_deserialize(SOCK, serializer, timeout=None):
@@ -324,9 +323,13 @@ class MessageLoop(object):
                         ip,port = addr
                         if port<maxport:
                             addr = (ip,port+1)
+                            continue
                         else:
-                            # all port range is unavailable
-                            raise e
+                            # whole port range is used
+                            raise
+                    else:
+                        # other socket errors...
+                        raise
 
         sock.listen(backlog)
 
@@ -413,21 +416,24 @@ class MessageLoop(object):
                 LOG.debug(result['traceback'])
                 continue
 
-            # send result
-            if rawmsg:
-                _serialize_and_send(
-                    SOCK,
-                    self.serializer,
-                    result
-                )
-            else:
-                _serialize_and_send(
-                    SOCK,
-                    self.serializer, {
-                        "message":messages.RESULT,
-                        "result":result
-                    }
-                )
+            try:
+                # send result
+                if rawmsg:
+                    _serialize_and_send(
+                        SOCK,
+                        self.serializer,
+                        result
+                    )
+                else:
+                    _serialize_and_send(
+                        SOCK,
+                        self.serializer, {
+                            "message":messages.RESULT,
+                            "result":result
+                        }
+                    )
+            except ConnectionClosed:
+                return
 
     def _send_noop(self, SOCK):
         """
