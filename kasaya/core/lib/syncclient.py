@@ -5,8 +5,9 @@ from kasaya.conf import settings
 from kasaya.core.protocol import Serializer, messages
 from kasaya.core.exceptions import ReponseTimeout
 from gevent.coros import Semaphore
-from kasaya.core.lib.comm import Sender
+from kasaya.core.lib.comm import Sender, ConnectionClosed
 import gevent
+from kasaya.core.lib import LOG
 
 
 class KasayaLocalClient(Sender):
@@ -36,14 +37,22 @@ class KasayaLocalClient(Sender):
 
     def notify_worker_live(self, status):
         self.__pingmsg['status'] = status
-        return self.send(self.__pingmsg)
+        try:
+            self.send(self.__pingmsg)
+            return True
+        except ConnectionClosed:
+            return False
 
     def notify_worker_stop(self):
         msg = {
             "message" : messages.WORKER_LEAVE,
             "id" : self.ID,
             }
-        self.send(msg)
+        try:
+            self.send(msg)
+            return True
+        except ConnectionClosed:
+            return False
 
 
     # client methods

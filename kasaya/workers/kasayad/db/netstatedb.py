@@ -30,29 +30,30 @@ class NetworkStateDB(object):
 
     # hosts
 
-    def host_register(self, host_id, hostname, ip, services=None):
+    def host_register(self, host_id, address):# hostname, ip, services=None):
         """
         Register new host (kasayad instance).
         host_id - id of kasayad
-        hostnam - name of host on which is kasayad running
-        ip - ip address of host
-        services - list of services available on host
+        address - address of remote kasaya daemon
+        // hostname - name of host on which is kasayad running
+        // ip - ip address of host
+        // services - list of services available on host
         """
         # check if host is already registered
-        he = self.LLDB.host_exist(host_id=host_id, ip=ip)
+        he = self.LLDB.host_get(host_id)
         if not he is None:
-            # if current host has different ID,
+            # if current host has different address,
             # then previous was stopped and this is new instance
             # we unregister previous instance before register new one
-            if he['id']!=host_id:
-                self.host_unregister(host_id)
-            else:
-                return False
+            #if he['id']!=host_id:
+            #    self.host_unregister(host_id)
+            #else:
+            return False
         # register host
-        self.LLDB.host_add(host_id, ip, hostname)
+        self.LLDB.host_add(host_id, address)
         # register services
-        if services is not None:
-            self.service_update_list(host_id, services)
+        #if services is not None:
+        #    self.service_update_list(host_id, services)
         return True
 
 
@@ -78,14 +79,14 @@ class NetworkStateDB(object):
             yield h
 
 
-    def host_addr_by_id(self, ID):
+    def host_addr_by_id(self, host_id):
         """
-        Return address of host with given ID
+        Return address of host with given host_id
         """
-        res = self.LLDB.host_get(ID)
+        res = self.LLDB.host_get(host_id)
         if res is None:
             return None
-        return res['ip']
+        return res['addr']
 
 
     # services
@@ -142,7 +143,7 @@ class NetworkStateDB(object):
 
     # workers
 
-    def worker_register(self, host_id, worker_id, service_name, address, pid):
+    def worker_register(self, host_id, worker_id, service_name, address, pid = -1, online=True):
         """
         Zarejestrowanie workera w bazie.
           worker_id - ID workera
@@ -162,7 +163,7 @@ class NetworkStateDB(object):
             # another worker under same address, unregister existing
             if w['addr']==address:
                 self.worker_unregister(address)
-        self.LLDB.worker_add(host_id, worker_id, service_name, address, pid)
+        self.LLDB.worker_add(host_id, worker_id, service_name, address, pid, online)
         return True
 
 
@@ -179,6 +180,16 @@ class NetworkStateDB(object):
             self.LLDB.worker_del_by_id(ID)
 
 
+    def worker_set_state(self, worker_id, online):
+        """
+        Change state of worker to online or offline
+        """
+        wnfo = self.LLDB.worker_get(worker_id)
+        if wnfo is None: return
+        if wnfo['online'] == online: return
+        self.LLDB.worker_set_state(worker_id, online)
+
+
     def worker_get(self, worker_id):
         """
         Return worker details for given ID
@@ -186,7 +197,7 @@ class NetworkStateDB(object):
         return self.LLDB.worker_get(worker_id)
 
 
-    def worker_list(self, host_id):
+    def worker_list(self, host_id, only_online=False):
         """
         Return list of workers on host by host ip or host ID
         """
@@ -196,8 +207,8 @@ class NetworkStateDB(object):
 
 
     def choose_worker_for_service(self, service):
-        lst = self.LLDB.workers_for_service(service)#worker_list_local_services(self.own_id, service)
+        lst = self.LLDB.workers_for_service(service, True)
         lst = list(lst)
         if len(lst)==0:
             return None
-        return choice(lst)['addr']
+        return choice(lst)

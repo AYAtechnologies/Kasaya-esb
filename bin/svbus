@@ -34,7 +34,7 @@ class Jobs(object):
         """
         List all hosts and workers running in service bus
         """
-        hostline     = "  {service: >{ws}}  {ip: <{wi}} (hostname: {hostname})"
+        hostline     = "  {service: >{ws}}  {addr: <{wi}} (hostname: {hostname})"
         workerline   = "  {service: >{ws}}  address: {addr} {extra}"
         inactiveline = "  {service: >{ws}}  off"
 
@@ -48,8 +48,10 @@ class Jobs(object):
         # maximum length of names
         whst, wip, wsvc = 5,0,0
         for h in hosts:
+            if h['hostname'] is None:
+                h['hostname'] = "-"
             whst = max(whst, len(h['hostname']) )
-            wip  = max(wip, len(h['ip']) )
+            wip  = max(wip, len(h['addr']) )
             for s in h['services']:
                 wsvc = max(wsvc, len(s['service']) )
 

@@ -10,6 +10,7 @@ from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system, make_kasaya_id
 from kasaya.core.lib.syncclient import KasayaLocalClient
+from kasaya.core.events import add_event_handler
 from kasaya.core import exceptions
 from .worker_reg import worker_methods_db
 import gevent
@@ -19,10 +20,18 @@ import traceback
 import datetime, os
 import inspect
 
+from kasaya.core.lib import LOG
+
 __all__=("WorkerDaemon",)
 
 
 class TaskTimeout(Exception): pass
+
+from kasaya.core.events import OnEvent
+
+@OnEvent("sender-conn-reconn")
+def mesydzek(addr):
+    LOG.debug ("Trying to reconnect with %s" % addr)
 
 
 
@@ -48,16 +57,14 @@ class WorkerDaemon(WorkerBase):
         # 4 - dead
         self.status = 0
         LOG.info("Starting worker daemon, service [%s], ID: [%s]" % (self.servicename, self.ID) )
-        adr = "tcp://127.0.0.1:"+str(settings.WORKER_MIN_PORT)
-        self.loop = MessageLoop(adr, settings.WORKER_MAX_PORT)#"127.0.0.1", settings.WORKER_MIN_PORT, settings.WORKER_MAX_PORT)
-        #addr = bind_socket_to_port_range(sock,)
+        adr = "tcp://%s:%i" % (settings.BIND_WORKER_TO, settings.WORKER_MIN_PORT)
+        self.loop = MessageLoop(adr, settings.WORKER_MAX_PORT)
 
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
-        self.SYNC = KasayaLocalClient(
-            autoreconnect=True,
-            on_connection_close = self.kasaya_connection_broken,
-            on_connection_start = self.kasaya_connection_started,
-            )
+        self.SYNC = KasayaLocalClient( autoreconnect=True )
+        add_event_handler( "sender-conn-closed", self.kasaya_connection_broken )
+        add_event_handler( "sender-conn-started", self.kasaya_connection_started )
+
         self.SYNC.setup( servicename, self.loop.address, self.ID, os.getpid() )
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call, raw_msg_response=True )
@@ -124,7 +131,7 @@ class WorkerDaemon(WorkerBase):
     def run(self):
         self.__load_modules()
         self.status = 1
-        LOG.debug("Sending notification to local sync daemon. Service [%s] starting on address [%s]" % (self.servicename, self.loop.address))
+        LOG.debug("Sending notification to local kasayad. Service [%s] starting on address [%s]" % (self.servicename, self.loop.address))
         #try:
         #    self.SYNC.notify_worker_live(self.status)
         #except ConnectionClosed:
@@ -142,10 +149,7 @@ class WorkerDaemon(WorkerBase):
         self.__hbloop = False
         self.status = 3
         LOG.debug("Sending stop notification. Address [%s]" % self.loop.address)
-        try:
-            self.SYNC.notify_worker_stop()
-        except ConnectionClosed:
-            pass
+        self.SYNC.notify_worker_stop()
         self.loop.stop()
         # killing greenlets
         for g in self.__greens:
@@ -160,17 +164,20 @@ class WorkerDaemon(WorkerBase):
 
     # network state changed
 
-    def kasaya_connection_broken(self):
+    def kasaya_connection_broken(self, addr):
         """
         Should be called when connection with kasaya is broken.
         """
+        LOG.debug("Connection closed with %s", addr)
         if self.status<3: # is worker is already stopping?
             self.status = 1 #set status as 1 - waiting for start
 
-    def kasaya_connection_started(self):
+
+    def kasaya_connection_started(self, addr):
         """
         This will be called when connection with kasaya is started
         """
+        LOG.debug("Connected to %s", addr)
         self.SYNC.notify_worker_live(self.status)
 
 
@@ -181,10 +188,11 @@ class WorkerDaemon(WorkerBase):
     def heartbeat_loop(self):
         failmode = False
         while self.__hbloop:
-            try:
-                self.SYNC.notify_worker_live(self.status)
-            except ConnectionClosed:
-                pass
+            res = self.SYNC.notify_worker_live(self.status)
+            #if res:
+            #    LOG.debug("ping succ")
+            #else:
+            #    LOG.debug("ping fail")
             gevent.sleep(settings.WORKER_HEARTBEAT)
 
 

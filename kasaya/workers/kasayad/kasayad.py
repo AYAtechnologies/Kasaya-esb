@@ -3,6 +3,7 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
 from kasaya.core.lib import LOG, system
+from kasaya.core.events import add_event_handler
 from kasaya.core.worker.worker_base import WorkerBase
 from .syncworker import SyncWorker
 from .db.netstatedb import NetworkStateDB
@@ -13,6 +14,10 @@ class KasayaDaemon(WorkerBase):
 
     def __init__(self):
         super(KasayaDaemon, self).__init__(is_host=True)
+
+        # event handlers
+        add_event_handler("host-join", self.on_remote_kasayad_start)
+        add_event_handler("host-leave", self.on_remote_kasayad_stop)
 
         self.hostname = system.get_hostname()
         LOG.info("Starting local kasaya daemon with ID: [%s]" % self.ID)
@@ -38,7 +43,7 @@ class KasayaDaemon(WorkerBase):
         and all used sockets.
         """
         LOG.info("Stopping local kasaya daemon")
-        self.notify_kasayad_stop(self.ID, local=True)
+        self.on_local_kasayad_stop(self.ID, local=True)
         self.WORKER.close()
         self.DB.close()
         self.BC.close()
@@ -61,7 +66,7 @@ class KasayaDaemon(WorkerBase):
         backend = settings.SYNC_BACKEND
         if backend=="udp-broadcast":
             from .broadcast.udp import UDPBroadcast
-            return UDPBroadcast(server=self)
+            return UDPBroadcast(self.ID)
         raise Exception("Unknown broadcast backend: %s" % backend)
 
 
@@ -90,31 +95,41 @@ class KasayaDaemon(WorkerBase):
             self.notify_kasayad_self_start()
 
 
-    def notify_kasayad_self_start(self):
+    def on_remote_kasayad_start(self, host_id, addr):
+        """
+        Remote kasaya host started
+        """
+        # register self in database
+        self.DB.host_register(host_id, addr)
+        LOG.info("Remote kasaya daemon started, address: %s [id:%s]" % (addr, host_id) )
+
+    def on_local_kasayad_start(self):
         """
         send information about self start to all hosts
         """
-        self.notify_kasayad_start(
-            self.ID,
-            self.hostname,
-            self.WORKER.own_ip,
-            self.WORKER.local_services_list(),
-            local=True,
-        )
+        # register self in database
+        self.DB.host_register(self.ID, self.WORKER.own_addr)
+        # register own services
+        self.DB.service_update_list(self.ID, self.WORKER.local_services_list() )
+        # broadcast own existence
+        self.BC.broadcast_host_start(self.WORKER.own_addr)
 
 
-    def notify_kasayad_stop(self, ID, local=False):
+    def on_remote_kasayad_stop(self, host_id):
+        """
+        received information about kasaya host leaving network
+        """
+        self.DB.host_unregister(self.ID)
+        LOG.info("Remote kasaya daemon stopped, [id:%s]" % host_id)
+
+
+    def on_local_kasayad_stop(self, ID, local=False):
         """
         Send information about shutdown to all hosts in network
         """
-        res = self.DB.host_unregister(ID)
+        self.DB.host_unregister(self.ID)
+        self.BC.broadcast_host_stop()
 
-        if local:
-            self.BC.send_host_stop(ID)
-        else:
-            if not res is None:
-                a,h = str(res['addr']), res['hostname']
-                LOG.info("Remote kasaya daemon [%s] stopped, addres [%s], ID [%s]" % (h, a, ID))
 
 
     def notify_kasayad_refresh(self, ID, services=None, local=False):
@@ -138,7 +153,7 @@ class KasayaDaemon(WorkerBase):
 
     # main loop
     def run(self):
-        self.notify_kasayad_self_start()
+        self.on_local_kasayad_start()
         try:
             loops = self.WORKER.get_loops()
             loops.append(self.BC.loop)

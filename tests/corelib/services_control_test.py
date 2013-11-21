@@ -5,6 +5,7 @@ import unittest, os
 
 from kasaya.conf import set_value, settings, load_defaults, load_config_from_file
 from decimal import Decimal
+#load_settings_from_config_file
 
 
 class ConfigTest(unittest.TestCase):

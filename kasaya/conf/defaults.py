@@ -25,19 +25,16 @@ PASSWORD = ""
 # adres do jakiego zostaną podłączona sockety tcp
 # dopuszczalne są:
 #  nazwa interfejsu - "eth0", "eth1", ...
-#  "LOCAL" - podpięty do lokalnego IP (127.0.0.1)
 #  "AUTO" - podpięty do pierwszego interfejsu nie-lokalnego (zwykle eth0)
-BIND_WORKER_TO = "AUTO"
+#  "0.0.0.0" - podpięty do wszystkich
+BIND_WORKER_TO = "0.0.0.0"#0.0.0.0"
 
 MAX_CONCURRENT_CONNECTIONS = 1000
 
 # HEARBEAT
 
 # co ile sekund wykonywany jest heartbeat
-WORKER_HEARTBEAT = 6
-# po ilu sekundach od przekroczenia czasu heartbeatu
-# worker jest traktowany jako martwy
-HEARTBEAT_TIMEOUT = 2
+WORKER_HEARTBEAT = 5
 
 # ile czasu ma syncd na odpowiedź
 SYNC_REPLY_TIMEOUT = 2

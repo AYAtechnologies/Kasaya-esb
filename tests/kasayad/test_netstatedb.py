@@ -10,7 +10,7 @@ from kasaya.workers.kasayad.db.netstatedb import NetworkStateDB
 from kasaya.core.lib import make_kasaya_id
 
 
-class EncryptionTests(unittest.TestCase):
+class NetstateDBTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -18,24 +18,24 @@ class EncryptionTests(unittest.TestCase):
 
     def test_host_up_and_down(self):
         DB = NetworkStateDB()
-        ID, hn, ip = make_kasaya_id(True), "host_1", "192.168.1.2"
+        ID, addr = make_kasaya_id(True), "tcp://192.168.1.2:4000"
 
         # adding host
-        res = DB.host_register(ID, hn, ip)
+        res = DB.host_register(ID, addr)
         self.assertEqual(res, True)
-        res = DB.host_register(ID, hn, ip)
+        res = DB.host_register(ID, addr)
         self.assertEqual(res, False)
 
         # listing hosts
         lst = list( DB.host_list() )
         self.assertEqual( len(lst), 1 )
         self.assertEqual( lst[0]['id'], ID )
-        self.assertEqual( lst[0]['hostname'], hn )
-        self.assertEqual( lst[0]['ip'], ip )
+        self.assertEqual( lst[0]['hostname'], None )
+        self.assertEqual( lst[0]['addr'], addr )
 
         # get host by ID
         h = DB.host_addr_by_id(ID)
-        self.assertEqual( h, ip )
+        self.assertEqual( h, addr )
 
         # unregister
         DB.host_unregister(ID)
@@ -48,10 +48,10 @@ class EncryptionTests(unittest.TestCase):
 
         # register 10 hosts
         for n in range(10,20):
-            ID, hn, ip = make_kasaya_id(True), "host_%i" % n, "192.168.1.%i" % n
-            res = DB.host_register(ID, hn, ip)
+            ID, hn, addr = make_kasaya_id(True), "host_%i" % n, "tcp://192.168.1.%i:4000" % n
+            res = DB.host_register(ID, addr)
             self.assertEqual(res, True)
-            res = DB.host_register(ID, hn, ip)
+            res = DB.host_register(ID, addr)
             self.assertEqual(res, False)
 
         # is there 10 hosts on list?
@@ -64,6 +64,65 @@ class EncryptionTests(unittest.TestCase):
         DB.close()
 
 
+    def assertDictEequal(self, d1, d2):
+        self.assertItemsEqual( d1.keys(), d2.keys(), "Keys for dicts not equal. %r != %r" % (d1.keys(), d2.keys()) )
+        for k,v in d1.items():
+            self.assertEqual( type(v), type(d2[k]), "Types [%r] not equal: %s != %s" % (k, type(v), type(d2[k])) )
+            self.assertEqual( v, d2[k], "Value [%r] not equal: %r != %r" % (k, v, d2[k]) )
+
+
+    def test_worker_registers(self):
+        DB = NetworkStateDB()
+        host_id, addr = make_kasaya_id(True), "tcp://127.0.0.1:4000"
+        DB.host_register(host_id, addr)
+
+        wid1, svc1, addr1 = make_kasaya_id(), "srvc1", "tcp://127.0.0.1:5000"
+        wid2, svc2, addr2 = make_kasaya_id(), "srvc2", "tcp://127.0.0.1:5001"
+        wid3, svc3, addr3 = make_kasaya_id(), "srvc3", "tcp://127.0.0.1:5002"
+
+        DB.worker_register( host_id, wid1, svc1, addr1, 100, online=True )
+        DB.worker_register( host_id, wid2, svc2, addr2, 101, online=False )
+        DB.worker_register( host_id, wid3, svc3, addr3 )
+
+        self.assertDictEequal(
+            DB.worker_get( wid1 ),
+            { 'id'      : wid1,
+              'host_id' : host_id,
+              'service' : svc1,
+              'addr'    : addr1,
+              'pid'     : 100,
+              'online'  : True })
+
+        self.assertDictEequal(
+            DB.worker_get( wid2 ),
+            { 'id'      : wid2,
+              'host_id' : host_id,
+              'service' : svc2,
+              'addr'    : addr2,
+              'pid'     : 101,
+              'online'  : False })
+
+        self.assertDictEequal(
+            DB.worker_get( wid3 ),
+            { 'id'      : wid3,
+              'host_id' : host_id,
+              'service' : svc3,
+              'addr'    : addr3,
+              'pid'     : -1,
+              'online'  : True })
+
+        # selecting only online workers for service
+        self.assertEqual( DB.choose_worker_for_service(svc1)['id'], wid1 )
+        self.assertEqual( DB.choose_worker_for_service(svc2), None )
+        self.assertEqual( DB.choose_worker_for_service(svc3)['id'], wid3 )
+
+        # change worker state
+        DB.worker_set_state( wid2, True )
+        self.assertEqual( DB.choose_worker_for_service(svc2)['id'], wid2 )
+        DB.worker_set_state( wid1, False )
+        self.assertEqual( DB.choose_worker_for_service(svc1), None )
+
+
     def test_host_with_workers(self):
         _hosts = []
 
@@ -71,9 +130,10 @@ class EncryptionTests(unittest.TestCase):
         svce = ("mail","sms","bubbles","spam")
         # create hosts
         for n in range(6):
-            HID, hn, ip = make_kasaya_id(True), "host_%i" % n, "192.168.1.%i" % n
+            ip = '192.168.1.%i' % n
+            HID, hn, addr = make_kasaya_id(True), "host_%i" % n, "tcp://%s:4000" % ip
             _hosts.append(HID)
-            DB.host_register(HID, hn, ip)
+            DB.host_register(HID, addr)
 
             # make workers
             for w in range(10):
@@ -89,11 +149,12 @@ class EncryptionTests(unittest.TestCase):
         for h in hlst:
             itms=0
             wids = []
+            haddr = h['addr'].rsplit(":",1)[0]
+
             for w in DB.worker_list(h['id']):
                 itms+=1
-                ip = w['addr'].split("//")[1]
-                ip = ip.split(":")[0]
-                self.assertEqual( h['ip'], ip )
+                waddr = w['addr'].rsplit(":",1)[0]
+                self.assertEqual( waddr, haddr )
                 # is this worker listed only one
                 assert w['id'] not in wids, "Worker has been listed before!"
                 wids.append(w['id'])

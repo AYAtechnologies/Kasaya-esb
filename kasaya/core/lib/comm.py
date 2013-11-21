@@ -3,6 +3,7 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.protocol import Serializer, messages
 from kasaya.core.lib import LOG
+from kasaya.core.events import emit
 from kasaya.conf import settings
 from kasaya.core import exceptions
 from binascii import hexlify
@@ -17,19 +18,14 @@ import gevent, errno
 
 class ConnectionClosed(Exception):
     """
-    Connection is closed before receiving full message
+    exception throwed in case of transmission,
+    when current socket connection is unavailable
+    sender should try to repeat transimission after some time
     """
     pass
 class NoData(Exception):
     """
     Connection is closed normally, no more data will be received
-    """
-    pass
-class ConnectionClosed(Exception):
-    """
-    exception throwed in case of transmission,
-    when current socket connection is unavailable
-    sender should try to repeat transimission after some time
     """
     pass
 
@@ -42,6 +38,13 @@ def decode_addr(addr):
         addr = addr[6:]
         addr,port = addr.split(':',1)
         port = int(port.rstrip("/"))
+
+        #if addr.upper()=="LOCAL":
+        #    addr = "127.0.0.1"
+        #elif addr.upper
+
+        #if re.match( "^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$", addr ):
+        #    print (">>>>>>>"  )
         return ( 'tcp', (addr, port), socket.AF_INET, socket.SOCK_STREAM )
     elif addr.startswith("ipc://"):
         return ( 'ipc', addr[6:], socket.AF_UNIX, socket.SOCK_STREAM )
@@ -55,6 +58,9 @@ def _serialize_and_send(SOCK, serializer, message, timeout=None):
     Possible exceptions:
     ConnectionClosed
     """
+    if SOCK is None:
+        raise ConnectionClosed
+
     message = serializer.serialize(message)
     try:
         SOCK.sendall( message )
@@ -129,47 +135,35 @@ class Sender(object):
     on_connection_close - when connection is losed, this function will be called
 
     """
-    def __init__(self, address, autoreconnect=False, on_connection_start=None, on_connection_close=None ):
+    def __init__(self, address, autoreconnect=False):
         """
         address - destination address inf format: tcp://ipnumber:port
         autoreconnect - will try to connect in background until success if connection fails or is unavailable
         """
         self.__working = False
         self.__recon = None
-
-        # start stop notification functions
-        if on_connection_close:
-            self.__on_connection_close = on_connection_close
-        else:
-            self.__on_connection_close = self.__dummy
-        if on_connection_start:
-            self.__on_connection_start = on_connection_start
-        else:
-            self.__on_connection_start = self.__dummy
-
-        self.autoreconnect = autoreconnect
         self._address = address
+        self.autoreconnect = autoreconnect
         self.serializer = Serializer()
-
         # connect or start background connecting process
         if self.autoreconnect:
             self.__start_auto_reconnect()
         else:
             self._connect()
 
-    def __dummy(self): pass
-
 
     def _connect(self):
         """
         Connect to address. Return True if success, False if fails.
         """
+        self.SOCK = None
         self.socket_type, addr, so1, so2 = decode_addr(self._address)
-        self.SOCK = socket.socket(so1, so2)
+        SOCK = socket.socket(so1, so2)
         try:
-            self.SOCK.connect(addr)
+            SOCK.connect(addr)
             self.__working = True
-            self.__on_connection_start()
+            emit("sender-conn-started", self._address)
+            self.SOCK = SOCK
             return True
         except socket.error as e:
             # if autoreconnect is enabled, start process
@@ -180,7 +174,7 @@ class Sender(object):
                 return False
             else:
                 # no autoreconnection
-                self.__on_connection_close()
+                emit("sender-conn-closed", self._address)
                 raise
 
     def __broken_connection(self):
@@ -189,7 +183,10 @@ class Sender(object):
         """
         if self.__working:
             self.__working = False
-            self.__on_connection_close()
+            self.SOCK = None
+            emit("sender-conn-closed", self._address)
+            # run reconnection process
+            self.__start_auto_reconnect()
 
 
     def __start_auto_reconnect(self):
@@ -202,6 +199,8 @@ class Sender(object):
         if not self.autoreconnect:
             # reconnection is not enabled
             return
+        #LOG.debug("trying reconnect...")
+        emit("sender-conn-reconn", self._address)
         self.__recon = gevent.Greenlet(self.connection_loop)
         self.__recon.start()
 
@@ -211,7 +210,7 @@ class Sender(object):
         while not self.__working:
             gevent.sleep(deltime)
             succ = self._connect()
-            deltime = settings.HEARTBEAT_TIMEOUT
+            deltime = settings.WORKER_HEARTBEAT / 2.0
         #LOG.debug("Connection success")
         self.__recon = None
 
@@ -250,12 +249,8 @@ class Sender(object):
         try:
             _serialize_and_send(self.SOCK, self.serializer, message)
         except ConnectionClosed:
-            # notify about connection loose
-            self.__broken_connection()
-            # run reconnection process
-            self.__start_auto_reconnect()
+            self.__broken_connection()  # notify about connection loose
             raise
-        #return True
 
 
     def send_and_receive(self, message, timeout=10):
@@ -270,10 +265,7 @@ class Sender(object):
         try:
             _serialize_and_send(self.SOCK, self.serializer, message)
         except ConnectionClosed:
-            # notify about connection loose
-            self.__broken_connection()
-            # run reconnection process
-            self.__start_auto_reconnect()
+            self.__broken_connection()  # notify about connection loose
             raise
 
         # receive response
@@ -286,7 +278,7 @@ class Sender(object):
                     res = _receive_and_deserialize(self.SOCK, self.serializer)
             except exceptions.ReponseTimeout:
                 raise exceptions.ReponseTimeout("Response timeout")
-        #print ("res",res)
+
         return res
 
 
@@ -406,14 +398,14 @@ class MessageLoop(object):
                 result = handler(msgdata)
             except Exception as e:
                 result = exception_serialize(e, False)
+                LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
+                LOG.debug("Message dump: %s" % repr(msgdata) )
+                LOG.debug(result['traceback'])
                 _serialize_and_send(
                     SOCK,
                     self.serializer,
                     exception_serialize(e, False)
                 )
-                LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
-                LOG.debug("Message dump: %s" % repr(msgdata) )
-                LOG.debug(result['traceback'])
                 continue
 
             try:
