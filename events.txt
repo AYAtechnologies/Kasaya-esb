@@ -15,6 +15,14 @@ worker-local-start
         pid - process number
 
 
+worker-local-wait
+
+    Local orker is started but offline, waiting for kasaya daemon for signal to start.
+
+    parameters:
+        ID - worker id
+
+
 worket-local-stop
 
     local worker stopped or died
@@ -79,3 +87,11 @@ sender-conn-reconn
     parameters:
         addr - address of receiver
 
+
+
+connection-end
+    send by MessageLoop after finishing or breaking of connection.
+
+    parameters:
+        address - address of sender given from socket on connection start
+        session_id - session id or none if is not set. Session id is received from sender at initialisation.

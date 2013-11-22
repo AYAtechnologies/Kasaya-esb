@@ -131,11 +131,9 @@ class Sender(object):
     """
     Sending multiple messages to one target. Not receiving any data
     autoreconnect - if True enables autoreconnection process
-    on_connection_start - when connection is back again, this funcion will be called
-    on_connection_close - when connection is losed, this function will be called
-
+    sessionid - optional session id which will be send immediately after connection.
     """
-    def __init__(self, address, autoreconnect=False):
+    def __init__(self, address, autoreconnect=False, sessionid=None):
         """
         address - destination address inf format: tcp://ipnumber:port
         autoreconnect - will try to connect in background until success if connection fails or is unavailable
@@ -144,6 +142,7 @@ class Sender(object):
         self.__recon = None
         self._address = address
         self.autoreconnect = autoreconnect
+        self.__sessionid = sessionid
         self.serializer = Serializer()
         # connect or start background connecting process
         if self.autoreconnect:
@@ -164,6 +163,18 @@ class Sender(object):
             self.__working = True
             emit("sender-conn-started", self._address)
             self.SOCK = SOCK
+
+            # send session if is given
+            if self.__sessionid!=None:
+                msg = {
+                    "message" : messages.SET_SESSION_ID,
+                    "id" : self.__sessionid,
+                }
+                try:
+                    self.send(msg)
+                except ConnectionClosed:
+                    return False
+
             return True
         except socket.error as e:
             # if autoreconnect is enabled, start process
@@ -288,8 +299,12 @@ class MessageLoop(object):
     Loop receiving messages
     """
 
-    def __init__(self, address, maxport=None, backlog=50):
-        self.is_running = True
+    def __init__(self, address, maxport=None, backlog=50 ):
+        # session id is received from connecting side for each connection
+        # by default it's unset and unused. When set it will be sended after
+        # connection lost in event.
+
+        #self.is_running = True
         self._msgdb = {}
 
         # bind to socket
@@ -327,14 +342,28 @@ class MessageLoop(object):
 
         # stream server from gevent
         self.SERVER = StreamServer(sock, self.connection_handler)
+
         # current address
         if self.socket_type=="tcp":
-            self.ip, self.port = self.SERVER.address
+            ip, self.port = self.SERVER.address
+            self.ip = self._ip_translate(ip)
             self.address = "tcp://%s:%i" % (self.ip, self.port)
+
         elif self.socket_type=="ipc":
             self.address = "ipc://%s" % addr
+
         # serialization
         self.serializer = Serializer()
+
+
+    def _ip_translate(self, ip):
+        if ip=="127.0.0.1": return ip
+        if not ip=="0.0.0.0": return ip
+
+        from kasaya.core.lib.binder import all_interfaces
+        print( all_interfaces() )
+        #all_interfaces
+        return ip
 
 
     def kill(self):
@@ -345,7 +374,8 @@ class MessageLoop(object):
         """
         Request warm stop, exits loop after finishing current task
         """
-        self.is_running = False
+        #self.is_running = False
+        pass
 
     def close(self):
         """
@@ -371,11 +401,15 @@ class MessageLoop(object):
 
 
     def connection_handler(self, SOCK, address):
-        #print ("connection from", repr(address) )
+        print ("new conn", address)
+        ssid = None
         while True:
             try:
                 msgdata = _receive_and_deserialize(SOCK, self.serializer)
             except (NoData, ConnectionClosed):
+                #print (".", end="")
+                #gevent.sleep(0)
+                print("   A connection-end", address, ssid )
                 return
 
             try:
@@ -384,7 +418,18 @@ class MessageLoop(object):
                 self._send_noop(SOCK)
                 LOG.debug("Decoded message is incomplete. Message dump: %s" % repr(msgdata) )
                 continue
-            # find handler
+
+            # message SET_SESSION_ID is special message
+            # it never return reply and is not propagated to handlers
+            if msg == messages.SET_SESSION_ID:
+                try:
+                    ssid = msgdata['id']
+                    print("conn session id" , address, ssid)
+                except KeyError:
+                    pass
+                continue
+
+            # find message handler
             try:
                 handler, rawmsg = self._msgdb[ msg ]
             except KeyError:
@@ -393,6 +438,7 @@ class MessageLoop(object):
                 LOG.warning("Unknown message received [%s]" % msg)
                 LOG.debug("Message body dump:\n%s" % repr(msgdata) )
                 continue
+
             # run handler
             try:
                 result = handler(msgdata)
@@ -425,6 +471,7 @@ class MessageLoop(object):
                         }
                     )
             except ConnectionClosed:
+                print ("   B connection-end", address, ssid )
                 return
 
     def _send_noop(self, SOCK):

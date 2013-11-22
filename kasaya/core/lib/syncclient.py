@@ -3,18 +3,21 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
 from kasaya.core.protocol import Serializer, messages
+from kasaya.core import SingletonCreator
 from kasaya.core.exceptions import ReponseTimeout
 from gevent.coros import Semaphore
 from kasaya.core.lib.comm import Sender, ConnectionClosed
 import gevent
 from kasaya.core.lib import LOG
 
-
+#, SingletonCreator
 class KasayaLocalClient(Sender):
     """
     KasayaLocalClient is communication class to talk with kasaya daemon.
     It's used by workers and clients.
     """
+
+    __metaclass__ = SingletonCreator
 
     def __init__(self, *args, **kwargs):
         # connect to kasaya

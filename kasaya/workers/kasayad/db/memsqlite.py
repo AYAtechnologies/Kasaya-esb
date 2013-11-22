@@ -220,30 +220,3 @@ class MemoryDB(BaseDB):
         for i,a in res:
             yield { 'id':i, 'addr':a }
 
-
-    #def worker_list_local_services(self, host_id, service):
-    #    self.SEMA.acquire()
-    #    try:
-    #        self.cur.execute(
-    #            "SELECT ip,port FROM workers WHERE ip=? AND service=?",
-    #            (ip, service) )
-    #        res = self.cur.fetchall()
-    #    finally:
-    #        self.SEMA.release()
-    #    lst = []
-    #    for s in res:
-    #        lst.append( {'ip':s[0], 'port':s[1]} )
-    #    return lst
-
-
-
-    #def worker_exist(self, worker_ID):
-    #    self.SEMA.acquire()
-    #    try:
-    #        self.cur.execute(
-    #            "SELECT * FROM workers WHERE ID=?",
-    #            [worker_ID] )
-    #        res = self.cur.fetchone()
-    #    finally:
-    #        self.SEMA.release()
-    #    return res is not None

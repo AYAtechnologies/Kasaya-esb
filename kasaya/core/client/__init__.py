@@ -1,12 +1,15 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
-from .exec_context import ExecContext
-from .proxies import async_result
+from .exec_context import SyncExec, AsyncExec, TransactionExec, ControlExec
+#from .proxies import SyncProxy, AsyncProxy, ControlProxy, TransactionProxy
 
-__all__ = ("sync", "async", "register_auth_processor", "async_result")
+__all__ = ("sync", "async", "trans", "control")
 
-sync = ExecContext(default_proxy="sync")
-async = ExecContext(default_proxy="async")
-trans = ExecContext(default_proxy="trans")
-control = ExecContext(default_proxy="control")
+sync = SyncExec()
+async = AsyncExec()
+trans = TransactionExec()
+control = ControlExec()
 
+# remove unneccessary imports
+del SyncExec, AsyncExec, TransactionExec, ControlExec
+#del SyncProxy, AsyncProxy, ControlProxy, TransactionProxy

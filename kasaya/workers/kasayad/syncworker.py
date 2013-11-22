@@ -8,7 +8,7 @@ from kasaya.core.lib.comm import MessageLoop, send_and_receive_response
 from kasaya.core.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
 from kasaya.core.lib import LOG, servicesctl
 from kasaya.core.events import add_event_handler, emit
-from kasaya.workers.kasayad.pong import PingDB
+#from kasaya.workers.kasayad.pong import PingDB
 from datetime import datetime, timedelta
 import gevent
 
@@ -37,7 +37,7 @@ class SyncWorker(object):
         self.DAEMON = server
         self.DB = database
         self.BC = broadcaster
-        self.pinger = PingDB()
+        #self.pinger = PingDB()
 
         # bind events
         add_event_handler("worker-local-start", self.worker_start_local )
@@ -45,6 +45,7 @@ class SyncWorker(object):
         add_event_handler("worker-local-wait", self.worker_prepare )
         add_event_handler("worker-remote-join", self.worker_start_remote )
         add_event_handler("worker-remote-leave", self.worker_stop_remote )
+        add_event_handler("connection-end", self.handle_connection_end )
 
         # cache
         self.__services = None
@@ -102,7 +103,7 @@ class SyncWorker(object):
     # all message loops used in kasayad
     def get_loops(self):
         return [
-            self.pinger.loop,
+            #self.pinger.loop,
             self.intersync.loop,
         ]
 
@@ -132,30 +133,6 @@ class SyncWorker(object):
         return lst
 
 
-#    def local_services_stats(self):
-#        """
-#        List of all services on localhost including inactive.
-#        result is dict, key is service name, value is number
-#        of workers currently running for this service.
-#        """
-#        svlist = self.local_services_list()
-#        print ("svlist",svlist)
-#        result = {}
-#        # list of running workers
-#        for wrk in self.DB.get_local_workers():
-#            name = wrk[1]
-#            if not name in result:
-#                result[name] = {'count':0,'ID':[]}
-#            result[name]['count'] += 1
-#            result[name]['ID'].append(wrk[0])
-#        # add inactive services
-#        for svc in self.__services:
-#            if svc in result:
-#                continue
-#            result[svc] = {'count':0,'ID':[]}
-#        return result
-
-
     def get_service_ctl(self, name):
         """
         Return ServiceCtl object for given service name
@@ -171,7 +148,39 @@ class SyncWorker(object):
         Receive worker's ping singnal.
         This function is triggered only by local worker.
         """
-        self.pinger.ping_ex( msg['id'], msg['service'], msg['addr'], msg['pid'] )
+        {
+            u'status': 1,
+            u'addr': u'tcp://0.0.0.0:5000',
+            u'service': u'locka',
+            u'pid': 6222,
+            u'id': u'WLUKJGE5AOKF4E'
+        }
+
+        wrkr = self.DB.worker_get(msg['id'])
+
+        if wrkr is None:
+            # new local worker just started
+            emit("worker-local-start", msg['id'], msg['addr'], msg['service'], msg['pid'] )
+
+        return
+
+        if (msg['addr']!=wrkr['addr']) or (msg['service']!=wrkr['service']):
+            # worker properties are different, assume that
+            # old worker died silently and new appears under same ID
+            # (it's just impossible!)
+            emit("worker-local-stop", worker_id )
+            return
+
+    def handle_connection_end(self, addr, ssid):
+        """
+        This is event handler for connection-end.
+        """
+        print ("CONNECTION END", addr, ssid)
+        if ssid==None: return
+        # unexpected connection lost with local worker
+        wrkr = self.DB.worker_get(ssid)
+        if wrkr is not None:
+            emit("worker-local-stop", ssid )
 
     def handle_worker_leave(self, msg):
         """
@@ -186,10 +195,12 @@ class SyncWorker(object):
         """
         name = msg['service']
         addr = self.DB.choose_worker_for_service(name)
+        if not addr is None:
+            addr = addr['addr']
         return {
             'message':messages.WORKER_ADDR,
             'service':name,
-            'addr':addr['addr'],
+            'addr':addr,
         }
 
     def handle_local_control_request(self, msg):
@@ -257,65 +268,6 @@ class SyncWorker(object):
         self.DB.worker_unregister(ID=worker_id)
         LOG.info("Remote worker stopped [id:%s]" % worker_id )
 
-
-
-#    def worker_start(self, ID, address, service, pid=-1):
-#        """
-#        Handle joining to network by worker (local or global)
-#        """
-#        isnew = self.DB.worker_register(self.DAEMON.ID, ID, service, address, pid)
-#        local = pid>0
-#
-#        # przygotowanie lokalnego workera i rozesłanie informacji w sieci jeśli nastąpi zmiana stanu
-#        if isnew and local:
-#            # run worker and notify network
-#            g = gevent.Greenlet(self.after_worker_start, ID, service, address)
-#            g.start()
-#
-#        if isnew:
-#            if local:
-#                LOG.info("Local worker [%s] started, address [%s]" % (service, address) )
-#            else:
-#                LOG.info("Remote worker [%s] started, address [%s]" % (service, address) )
-
-
-#    def worker_stop(self, ID):
-#        """
-#        Handle worker leaving network (local or global)
-#        """
-#        print (1)
-#        wnfo = self.DB.worker_get(ID)
-#        if wnfo is None:
-#            return
-#        print (2)
-#        # unregistering
-#        self.DB.worker_unregister(ID=ID)
-#        print (3)
-#        # it was local worker?
-#        local = wnfo['host_id']==self.DAEMON.ID
-#        print (4, local)
-#        if local:
-#            LOG.info("Local worker stopped, service [%s], id [%s]" % (wnfo['service'], ID) )
-#            # send information to all network about stopping worker
-#            print (6)
-#            self.BC.send_worker_stop(ID)
-#            print (7)
-#        else:
-#            print (8)
-#            LOG.info("Remote worker stopped, service [%s], id [%s]" % (wnfo['service'], ID) )
-#        print (9)
-#        #import pprint
-#        #pprint.pprint (self.__pingdb)
-#        print ()
-
-    #def request_workers_broadcast(self):
-    #    """
-    #    Send to all local workers request for registering in network.
-    #    Its used after new host start.
-    #    """
-    #    for w in self.DB.worker_list_local():
-    #        gevent.sleep(0.4)
-    #        self.BC.send_worker_live(w['ID'], w['service'], w['ip'], w['port'])
 
 
     # heartbeat

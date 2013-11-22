@@ -1,7 +1,7 @@
 #encoding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
-from .proxies import *
-__author__ = 'wektor'
+from .proxies import SyncProxy, AsyncProxy, ControlProxy, TransactionProxy
+
 
 
 class ExecContext(object):
@@ -9,45 +9,26 @@ class ExecContext(object):
     Uruchamia zadania i tworzy context.
     """
 
-    def __init__(self, context=None, timeout=None, default_proxy="sync"):
+    def __init__(self, context=None):
         self._context = context
-        self._timeout = timeout
-        self._default_proxy = default_proxy
-        self._proxy = {
-            "sync": SyncProxy,
-            "async": AsyncProxy,
-            "control": ControlProxy,
-            "trans": TransactionProxy
-        }
 
-    def _make_proxy(self, name):
-        proxy = self._proxy[name]()
-        proxy._top = proxy # << zrobić tutaj weakref aby zlikwidować cykliczne odwołanie do samego siebie
+    def __getattr__(self, itemname):
+        """
+        When called immediatelly without context:
+            sync.service.function()
+        we must create proxy instance and return it back as result
+        """
+        proxy = self._create_proxy()
         proxy._context = self._context
-        proxy._timeout = self._timeout
-        return proxy
-
-    def __getattribute__(self, itemname):
-        if itemname.startswith("_"):
-            return super(ExecContext, self).__getattribute__(itemname)
-        if itemname in self._proxy.keys():
-            proxy = self._make_proxy(itemname)
-        else:
-            proxy = self._make_proxy(self._default_proxy)
-            proxy._names.append(itemname)
+        proxy._names.append(itemname)
         return proxy
 
     @classmethod
     def __call__(cls, context):
         """
-        To wywołanie używane jest przy tworzeniu context managera lub wywołaniu z określonymi context.
-        W takim przypadku należy utworzyć nową instancję tej klasy z ustawionym podanym parametrem authoinfo.
-
-        Wynikiem jest nowa instancja własnej klasy z ustawionym context.
+        To wywołanie używane jest przy tworzeniu context managera lub wywołaniu z określonym contekstem wywołania.
+        W takim przypadku należy utworzyć nową instancję tej klasy z ustawionym kontekstem.
         """
-        # global AUTHPROC
-        # if not AUTHPROC is None:
-        #     context = AUTHPROC(context)
         authexec = cls( context )
         return authexec
 
@@ -63,3 +44,21 @@ class ExecContext(object):
         tutaj nic nie ma do zrobienia ponieważ nie przechwytujemy wyjątków
         """
         pass
+
+
+
+class SyncExec(ExecContext):
+    def _create_proxy(self):
+        return SyncProxy()
+
+class AsyncExec(ExecContext):
+    def _create_proxy(self):
+        return AsyncProxy()
+
+class TransactionExec(ExecContext):
+    def _create_proxy(self):
+        return TransactionProxy()
+
+class ControlExec(ExecContext):
+    def _create_proxy(self):
+        return ControlProxy()

@@ -68,6 +68,7 @@ class PingDB(object):
         maxdiff = settings.WORKER_HEARTBEAT * 2.5
         for worker_id, dat in self._pingdb.items():
             if (t-dat['t'])>maxdiff:
+                print ("KURWA ZDECHLO!", maxdiff, t-dat['t'] )
                 emit("worker-local-stop", worker_id )
                 del self._pingdb[worker_id]
 

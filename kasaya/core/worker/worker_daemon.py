@@ -61,7 +61,7 @@ class WorkerDaemon(WorkerBase):
         self.loop = MessageLoop(adr, settings.WORKER_MAX_PORT)
 
         LOG.debug("Connected to socket [%s]" % (self.loop.address) )
-        self.SYNC = KasayaLocalClient( autoreconnect=True )
+        self.SYNC = KasayaLocalClient( autoreconnect=True, sessionid=self.ID )
         add_event_handler( "sender-conn-closed", self.kasaya_connection_broken )
         add_event_handler( "sender-conn-started", self.kasaya_connection_started )
 

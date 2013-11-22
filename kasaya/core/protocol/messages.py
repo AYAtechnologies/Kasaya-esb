@@ -2,6 +2,7 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 
+SET_SESSION_ID = "ssid/set"
 # worker join and leave
 WORKER_LIVE = "wrkr/up"
 WORKER_LEAVE = "wrkr/stop"
