@@ -193,10 +193,14 @@ class SyncWorker(object):
         """
         Odpowiedź na pytanie o adres workera
         """
+        print ("A")
         name = msg['service']
+        print ("B")
         addr = self.DB.choose_worker_for_service(name)
+        print ("C", addr)
         if not addr is None:
             addr = addr['addr']
+        print ("RESULT",msg)
         return {
             'message':messages.WORKER_ADDR,
             'service':name,

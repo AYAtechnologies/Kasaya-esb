@@ -47,7 +47,7 @@ class UDPLoop(object):
                 continue
             # deserialize
             try:
-                msgdata = self.serializer.deserialize(msgdata)
+                msgdata, repreq = self.serializer.deserialize(msgdata)
             except NotOurMessage:
                 continue
             except Exception:
@@ -105,7 +105,7 @@ class UDPLoop(object):
         Wysłanie komunikatu do wszystkich odbiorców w sieci
         """
         msg['__sid__'] = self.ID
-        msg = self.serializer.serialize(msg)
+        msg = self.serializer.serialize(msg, resreq=False)
         self.SOCK.sendto(msg, ('<broadcast>', self.port) )
 
 

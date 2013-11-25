@@ -8,6 +8,7 @@ from kasaya.core.exceptions import ReponseTimeout
 from gevent.coros import Semaphore
 from kasaya.core.lib.comm import Sender, ConnectionClosed
 import gevent
+from gevent.coros import Semaphore
 from kasaya.core.lib import LOG
 
 #, SingletonCreator
@@ -22,7 +23,7 @@ class KasayaLocalClient(Sender):
     def __init__(self, *args, **kwargs):
         # connect to kasaya
         super(KasayaLocalClient, self).__init__('tcp://127.0.0.1:'+str(settings.KASAYAD_CONTROL_PORT), *args, **kwargs)
-
+        self.SEMA = Semaphore()
 
     # worker methods
 
@@ -39,14 +40,18 @@ class KasayaLocalClient(Sender):
         }
 
     def notify_worker_live(self, status):
+        self.SEMA.acquire()
         self.__pingmsg['status'] = status
         try:
             self.send(self.__pingmsg)
             return True
         except ConnectionClosed:
             return False
+        finally:
+            self.SEMA.release()
 
     def notify_worker_stop(self):
+        self.SEMA.acquire()
         msg = {
             "message" : messages.WORKER_LEAVE,
             "id" : self.ID,
@@ -56,6 +61,8 @@ class KasayaLocalClient(Sender):
             return True
         except ConnectionClosed:
             return False
+        finally:
+            self.SEMA.release()
 
 
     # client methods
@@ -66,16 +73,20 @@ class KasayaLocalClient(Sender):
         jest serwis o żądanej nazwie
         """
         msg = {'message':messages.QUERY, 'service':service}
-        return self.send_and_receive(msg)
+        self.SEMA.acquire()
+        try:
+            return self.send_and_receive(msg)
+        finally:
+            self.SEMA.release()
 
 
     def control_task(self, msg):
         """
         zadanie tego typu jest wysyłane do serwera kasayad nie do workera!
         """
-        return self.send_and_receive(msg)
-        #self.queries.send( serialize(msg) )
-        #res = self.queries.recv()
-        #res = deserialize(res)
-        #return res
+        self.SEMA.acquire()
+        try:
+            return self.send_and_receive(msg)
+        finally:
+            self.SEMA.release()
 

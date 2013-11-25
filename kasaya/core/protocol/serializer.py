@@ -26,7 +26,7 @@ def _load_passwd():
 class ConfiguredSerializer(object):
 
 
-    def make_header(self, datasize, trim, iv=b""):
+    def make_header(self, datasize, trim, iv=b"", response_required=True):
         """
         busname - 6 character long service bus name
         version - protocol version
@@ -40,15 +40,16 @@ class ConfiguredSerializer(object):
             datasize, # size of data in packet
             iv, # initial vector
             False, # compression
-            trim)
+            trim,
+            response_required,
+            )
 
 
     def decode_header(self, packet):
         if len(packet)<self.header.size:
-            print ("leeen", self.header.size, len(packet))
             raise exceptions.MessageCorrupted()
 
-        busname, ver, psize, iv, cmpr, trim = self.header.unpack(packet)
+        busname, ver, psize, iv, cmpr, trim, resreq = self.header.unpack(packet)
 
         # not our service bus
         if busname!=self._busname:
@@ -58,41 +59,44 @@ class ConfiguredSerializer(object):
         if ver!=self._version:
             raise exceptions.ServiceBusException("Unknown service bus protocol version")
 
-        return (psize, iv, cmpr, trim)
+        return (psize, iv, cmpr, trim, resreq)
 
 
 
-    def _plain_serialize(self, msg):
+    def _plain_serialize(self, msg, resreq=True):
         try:
             payload = self.data_2_bin(msg)
         except Exception as e:
             raise exceptions.SerializationError("Serialization error")
-        h = self.make_header( len(payload), 0 )
+        h = self.make_header(
+            len(payload),
+            0,
+            response_required=resreq )
         return h+payload
 
 
     def _plain_deserialize(self, msg):
         # raw message or header, data tuple?
         if type(msg) is tuple:
-            psize, iv, cmpr, trim = msg[0]
+            psize, iv, cmpr, trim, resreq = msg[0]
             msg = msg[1]
         else:
             HS = self.header.size
             header = msg[:HS]
             msg = msg[HS:]
-            psize, iv, cmpr, trim = self.decode_header(header)
+            psize, iv, cmpr, trim, resreq = self.decode_header(header)
 
         # check data size declared in header
         #if (len(msg)-HS) != psize:
         #    raise exceptions.MessageCorrupted()
 
         try:
-            return self.bin_2_data(msg)
+            return self.bin_2_data(msg), resreq
         except:
             raise exceptions.MessageCorrupted()
 
 
-    def _encrypted_serialize(self, msg):
+    def _encrypted_serialize(self, msg, resreq=True):
         pack = self.data_2_bin(msg)
         try:
             pack = self.data_2_bin(msg)
@@ -103,7 +107,8 @@ class ConfiguredSerializer(object):
         h = self.make_header(
             len(pack['payload']),
             pack['trim'],
-            pack['iv'] )
+            pack['iv'],
+            response_required=resreq )
         return h+pack['payload']
 
 
@@ -112,13 +117,13 @@ class ConfiguredSerializer(object):
         msg - message or header tuple of header parameters and message body (tithout header)
         """
         if type(msg) is tuple:
-            psize, iv, cmpr, trim = msg[0]
+            psize, iv, cmpr, trim, resreq = msg[0]
             msg = msg[1]
         else:
             HS = self.header.size
             header = msg[:HS]
             msg = msg[HS:]
-            psize, iv, cmpr, trim = self.decode_header(header)
+            psize, iv, cmpr, trim, resreq = self.decode_header(header)
 
         # decrypt
         try:
@@ -132,14 +137,25 @@ class ConfiguredSerializer(object):
             raise exceptions.MessageCorrupted()
 
         # unpack message
-        return self.bin_2_data(msg)
+        return self.bin_2_data(msg), resreq
 
 
 
     def __init__(self, silentinit=False):
         # binary header
         import struct
-        self.header = struct.Struct(b"!6s h L 16s ? H")
+        #
+        # header format
+        #  ! big-endian
+        #  6s - 6 characters of header prefix
+        #  h - protocol version (=1)
+        #  L - unsigned long - data size
+        #  16s - 16 bytes of initial vector (used for encryption)
+        #  ? - boolean - compression flag
+        #  H - unsigned short - how many bytes trim from data
+        #  ? - boolean - response required
+        #
+        self.header = struct.Struct(b"!6s h L 16s ? H ?")
         self._version = 1
 
         # encrypted or not...

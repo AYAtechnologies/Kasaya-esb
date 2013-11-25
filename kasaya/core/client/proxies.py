@@ -38,9 +38,12 @@ class GenericProxy(object):
         return self
 
     def _find_worker(self, method):
-        kasayad = KasayaLocalClient()
+        """
+        Ask kasaya daemon where is service for given method
+        """
         srvce = method[0]
-        msg = kasayad.query( srvce )
+        kasaya = KasayaLocalClient()
+        msg = kasaya.query( srvce )
         if not msg['message']==messages.WORKER_ADDR:
             raise exceptions.ServiceBusException("Wrong response from sync server")
         addr = msg['addr']
@@ -83,7 +86,6 @@ class SyncProxy(GenericProxy):
             "kwargs" : kwargs
         }
         # wysłanie żądania
-        #print "Sync task: ", addr, msg
         return self._send_message(addr, msg)
 
 
@@ -120,8 +122,8 @@ class ControlProxy(GenericProxy):
             "kwargs" : kwargs
         }
         # wysłanie żądania
-        #print "Control task: ", msg
-        msgbody = self.kasayad.control_task(msg)
+        kasaya = KasayaLocalClient()
+        msgbody = kasaya.control_task(msg)
         msg = msgbody['message']
         if msg==messages.RESULT:
             return msgbody['result']

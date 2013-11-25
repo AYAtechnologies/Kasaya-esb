@@ -51,7 +51,7 @@ def decode_addr(addr):
 
 
 
-def _serialize_and_send(SOCK, serializer, message, timeout=None):
+def _serialize_and_send(SOCK, serializer, message, timeout=None, resreq=True):
     """
     Send message throught socket.
     Serialization is done by serializer.
@@ -60,8 +60,7 @@ def _serialize_and_send(SOCK, serializer, message, timeout=None):
     """
     if SOCK is None:
         raise ConnectionClosed
-
-    message = serializer.serialize(message)
+    message = serializer.serialize(message, resreq=resreq)
     try:
         SOCK.sendall( message )
     except socket.error as e:
@@ -93,7 +92,7 @@ def _receive_and_deserialize(SOCK, serializer, timeout=None):
                 raise ConnectionClosed
             else:
                 header += data
-        psize, iv, cmpr, trim = serializer.decode_header(header)
+        psize, iv, cmpr, trim, resreq = serializer.decode_header(header)
 
         # receiving data
         body = SOCK.recv(psize)
@@ -118,7 +117,7 @@ def _receive_and_deserialize(SOCK, serializer, timeout=None):
             raise
 
     return serializer.deserialize(
-        ((psize, iv, cmpr, trim),
+        ((psize, iv, cmpr, trim, resreq),
         body)
     )
 
@@ -258,7 +257,7 @@ class Sender(object):
         if not self.__working:
             raise ConnectionClosed
         try:
-            _serialize_and_send(self.SOCK, self.serializer, message)
+            _serialize_and_send(self.SOCK, self.serializer, message, resreq=False)
         except ConnectionClosed:
             self.__broken_connection()  # notify about connection loose
             raise
@@ -274,19 +273,19 @@ class Sender(object):
         if not self.__working:
             raise ConnectionClosed
         try:
-            _serialize_and_send(self.SOCK, self.serializer, message)
+            _serialize_and_send(self.SOCK, self.serializer, message, resreq=True)
         except ConnectionClosed:
             self.__broken_connection()  # notify about connection loose
             raise
 
         # receive response
         if timeout is None:
-            res = _receive_and_deserialize(self.SOCK, self.serializer, timeout)
+            res, resreq = _receive_and_deserialize(self.SOCK, self.serializer, timeout)
         else:
             # throw exception after timeout and close socket
             try:
                 with gevent.Timeout(timeout, exceptions.ReponseTimeout):
-                    res = _receive_and_deserialize(self.SOCK, self.serializer)
+                    res, resreq = _receive_and_deserialize(self.SOCK, self.serializer)
             except exceptions.ReponseTimeout:
                 raise exceptions.ReponseTimeout("Response timeout")
 
@@ -401,21 +400,18 @@ class MessageLoop(object):
 
 
     def connection_handler(self, SOCK, address):
-        print ("new conn", address)
         ssid = None
         while True:
             try:
-                msgdata = _receive_and_deserialize(SOCK, self.serializer)
+                msgdata, resreq = _receive_and_deserialize(SOCK, self.serializer)
             except (NoData, ConnectionClosed):
-                #print (".", end="")
-                #gevent.sleep(0)
-                print("   A connection-end", address, ssid )
                 return
 
             try:
                 msg = msgdata['message']
             except KeyError:
-                self._send_noop(SOCK)
+                if resreq:
+                    self._send_noop(SOCK)
                 LOG.debug("Decoded message is incomplete. Message dump: %s" % repr(msgdata) )
                 continue
 
@@ -427,14 +423,18 @@ class MessageLoop(object):
                     print("conn session id" , address, ssid)
                 except KeyError:
                     pass
+                if resreq:
+                    self._send_noop(SOCK)
                 continue
+
 
             # find message handler
             try:
                 handler, rawmsg = self._msgdb[ msg ]
             except KeyError:
                 # unknown messages are ignored
-                self._send_noop(SOCK)
+                if resreq:
+                    self._send_noop(SOCK)
                 LOG.warning("Unknown message received [%s]" % msg)
                 LOG.debug("Message body dump:\n%s" % repr(msgdata) )
                 continue
@@ -447,11 +447,21 @@ class MessageLoop(object):
                 LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
                 LOG.debug("Message dump: %s" % repr(msgdata) )
                 LOG.debug(result['traceback'])
+
+                if not resreq:
+                    # if response is not required, then don't send exceptions
+                    continue
+
                 _serialize_and_send(
                     SOCK,
                     self.serializer,
-                    exception_serialize(e, False)
+                    exception_serialize(e, False),
+                    resreq = False, # response never require another response
                 )
+                continue
+
+            # response is not expected, throw result and back to loop
+            if not resreq:
                 continue
 
             try:
@@ -460,18 +470,19 @@ class MessageLoop(object):
                     _serialize_and_send(
                         SOCK,
                         self.serializer,
-                        result
+                        result,
+                        resreq = False,
                     )
                 else:
                     _serialize_and_send(
                         SOCK,
                         self.serializer, {
                             "message":messages.RESULT,
-                            "result":result
-                        }
+                            "result":result,
+                        },
+                        resreq = False
                     )
             except ConnectionClosed:
-                print ("   B connection-end", address, ssid )
                 return
 
     def _send_noop(self, SOCK):
@@ -482,8 +493,9 @@ class MessageLoop(object):
             SOCK,
             self.serializer, {
                 "message":messages.NOOP,
-                "result":result
-            }
+                "result":result,
+            },
+            resreq = False
         )
 
 
@@ -500,17 +512,17 @@ def send_and_receive(address, message, timeout=10):
     SOCK.connect(addr)
 
     # send...
-    _serialize_and_send(SOCK, serializer, message)
+    _serialize_and_send(SOCK, serializer, message, resreq=True)
 
     # receive response
     try:
         if timeout is None:
-            res = _receive_and_deserialize(SOCK, serializer)
+            res, resreq = _receive_and_deserialize(SOCK, serializer)
         else:
             # throw exception after timeout and close socket
             try:
                 with gevent.Timeout(timeout, exceptions.ReponseTimeout):
-                    res = _receive_and_deserialize(SOCK, serializer)
+                    res, resreq = _receive_and_deserialize(SOCK, serializer)
             except exceptions.ReponseTimeout:
                 raise exceptions.ReponseTimeout("Response timeout")
     finally:
