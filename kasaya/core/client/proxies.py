@@ -5,6 +5,7 @@ from kasaya.conf import settings
 from kasaya.core.lib.syncclient import KasayaLocalClient
 from kasaya.core.lib.comm import send_and_receive_response
 from kasaya.core import exceptions
+from kasaya.core.lib import LOG
 
 # on python 2 we need to fix some strings to unicode
 # this is required to work with python 3 workers called with python 2 clients
@@ -75,6 +76,10 @@ class SyncProxy(GenericProxy):
         """
         method = self._names
         context = self._context
+        #if self._allow_method_mocking:
+        #    m = '.'.join(method)
+        #    if m in self._mock_methods:
+        #        return self._mock_methods[m](*args, **kwargs)
         addr = self._find_worker(method)
         # zbudowanie komunikatu
         msg = {
@@ -85,8 +90,10 @@ class SyncProxy(GenericProxy):
             "args" : args,
             "kwargs" : kwargs
         }
+        LOG.debug("Client is about to send this message: %r" % msg)
         # wysłanie żądania
         return self._send_message(addr, msg)
+
 
 
 class AsyncProxy(GenericProxy):

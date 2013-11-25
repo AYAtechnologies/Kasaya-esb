@@ -91,7 +91,7 @@ class WorkerDaemon(WorkerBase):
         if settings.WORKER_MONKEY:
             gevent.monkey.patch_all()
 
-
+ 
     def __load_config(self):
         """
         This function is used only if servicename is not given, and
@@ -242,6 +242,7 @@ class WorkerDaemon(WorkerBase):
 
         # try to run function and catch exceptions
         try:
+            LOG.debug("task %s, args %s, kwargs %s" % (funcname, repr(args), repr(kwargs)))
             func = task['func']
             tout = task['timeout']
             if tout is None:
