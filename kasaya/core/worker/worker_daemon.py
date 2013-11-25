@@ -60,12 +60,13 @@ class WorkerDaemon(WorkerBase):
         adr = "tcp://%s:%i" % (settings.BIND_WORKER_TO, settings.WORKER_MIN_PORT)
         self.loop = MessageLoop(adr, settings.WORKER_MAX_PORT)
 
-        LOG.debug("Connected to socket [%s]" % (self.loop.address) )
-        self.SYNC = KasayaLocalClient( autoreconnect=True, sessionid=self.ID )
         add_event_handler( "sender-conn-closed", self.kasaya_connection_broken )
         add_event_handler( "sender-conn-started", self.kasaya_connection_started )
 
+        self.SYNC = KasayaLocalClient( autoreconnect=True, sessionid=self.ID )
         self.SYNC.setup( servicename, self.loop.address, self.ID, os.getpid() )
+        LOG.debug("Binded to socket [%s]" % (",".join(self.loop.binded_ip_list()) ) )
+
         # registering handlers
         self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call, raw_msg_response=True )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )
@@ -91,7 +92,7 @@ class WorkerDaemon(WorkerBase):
         if settings.WORKER_MONKEY:
             gevent.monkey.patch_all()
 
- 
+
     def __load_config(self):
         """
         This function is used only if servicename is not given, and
@@ -131,11 +132,7 @@ class WorkerDaemon(WorkerBase):
     def run(self):
         self.__load_modules()
         self.status = 1
-        LOG.debug("Sending notification to local kasayad. Service [%s] starting on address [%s]" % (self.servicename, self.loop.address))
-        #try:
-        #    self.SYNC.notify_worker_live(self.status)
-        #except ConnectionClosed:
-        #    pass
+        LOG.debug("Service [%s] starting." % self.servicename)
         self.__greens = []
         self.__greens.append( gevent.spawn(self.loop.loop) )
         self.__greens.append( gevent.spawn(self.heartbeat_loop) )
@@ -189,10 +186,6 @@ class WorkerDaemon(WorkerBase):
         failmode = False
         while self.__hbloop:
             res = self.SYNC.notify_worker_live(self.status)
-            #if res:
-            #    LOG.debug("ping succ")
-            #else:
-            #    LOG.debug("ping fail")
             gevent.sleep(settings.WORKER_HEARTBEAT)
 
 

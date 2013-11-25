@@ -12,10 +12,10 @@ import traceback
 
 class UDPLoop(object):
 
-    def __init__(self):
+    def __init__(self, ownid):
         self.is_running = True
         self.own_ip = None
-        self.ID = None
+        self.ID = ownid
         self._msgdb = {}
         self.port = settings.BROADCAST_PORT
         self.SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -117,8 +117,7 @@ class UDPBroadcast(UDPLoop):
 
     def __init__(self, host_id):
         #self.DAEMON = server
-        self.ID = host_id
-        super(UDPBroadcast, self).__init__()
+        super(UDPBroadcast, self).__init__(host_id)
         self.register_message(messages.WORKER_LIVE, self.handle_remote_worker_join)
         self.register_message(messages.WORKER_LEAVE, self.handle_remote_worker_leave)
         self.register_message(messages.HOST_JOIN, self.handle_host_join)

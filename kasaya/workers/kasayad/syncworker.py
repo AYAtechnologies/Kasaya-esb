@@ -19,8 +19,6 @@ import random
 
 __all__=("SyncWorker",)
 
-#def _ip_to_sync_addr(ip):
-#    return "tcp://%s:%i" % (ip, settings.KASAYAD_CONTROL_PORT)
 
 def _worker_addr( wrkr ):
     return "tcp://%s:%i" % (wrkr['ip'],wrkr['port'])
@@ -83,9 +81,6 @@ class SyncWorker(object):
         Own network address
         """
         return self.intersync.address
-
-    #def get_sync_address(self, ip):
-    #    return "tcp://%s:%i" % (ip, settings.SYNCD_CONTROL_PORT)
 
 
     # closing and quitting
@@ -161,7 +156,6 @@ class SyncWorker(object):
         if wrkr is None:
             # new local worker just started
             emit("worker-local-start", msg['id'], msg['addr'], msg['service'], msg['pid'] )
-
         return
 
         if (msg['addr']!=wrkr['addr']) or (msg['service']!=wrkr['service']):
@@ -175,7 +169,6 @@ class SyncWorker(object):
         """
         This is event handler for connection-end.
         """
-        print ("CONNECTION END", addr, ssid)
         if ssid==None: return
         # unexpected connection lost with local worker
         wrkr = self.DB.worker_get(ssid)
@@ -193,14 +186,10 @@ class SyncWorker(object):
         """
         Odpowiedź na pytanie o adres workera
         """
-        print ("A")
         name = msg['service']
-        print ("B")
         addr = self.DB.choose_worker_for_service(name)
-        print ("C", addr)
         if not addr is None:
             addr = addr['addr']
-        print ("RESULT",msg)
         return {
             'message':messages.WORKER_ADDR,
             'service':name,
@@ -265,7 +254,7 @@ class SyncWorker(object):
         LOG.info("Local worker stopped [id:%s]" % worker_id )
         self.BC.broadcast_worker_stop(worker_id)
 
-    def worker_stop_remote(self, ID):
+    def worker_stop_remote(self, worker_id):
         """
         Remote worker stopped
         """
@@ -281,7 +270,6 @@ class SyncWorker(object):
         """
         maxpinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT + settings.WORKER_HEARTBEAT )
         unreglist = []
-        #from pprint import pprint
         while True:
 
             now = datetime.now()

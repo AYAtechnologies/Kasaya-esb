@@ -6,6 +6,7 @@ from kasaya.core.lib import LOG
 from kasaya.core.events import emit
 from kasaya.conf import settings
 from kasaya.core import exceptions
+from kasaya.core.lib.system import all_interfaces
 from binascii import hexlify
 import traceback, sys, os
 from gevent.server import StreamServer
@@ -39,12 +40,20 @@ def decode_addr(addr):
         addr,port = addr.split(':',1)
         port = int(port.rstrip("/"))
 
-        #if addr.upper()=="LOCAL":
-        #    addr = "127.0.0.1"
-        #elif addr.upper
+        if addr.lower()=="local":
+            addr = "127.0.0.1"
 
-        #if re.match( "^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$", addr ):
-        #    print (">>>>>>>"  )
+        elif addr.lower()=="auto":
+            addr = "0.0.0.0"
+
+        else:
+            for name, ip in all_interfaces().items():
+                if name==addr:
+                    addr = ip
+                    break
+        # match ip numbers only
+        #re.match( "^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$", addr )
+
         return ( 'tcp', (addr, port), socket.AF_INET, socket.SOCK_STREAM )
     elif addr.startswith("ipc://"):
         return ( 'ipc', addr[6:], socket.AF_UNIX, socket.SOCK_STREAM )
@@ -163,7 +172,7 @@ class Sender(object):
             emit("sender-conn-started", self._address)
             self.SOCK = SOCK
 
-            # send session if is given
+            # send session id if is configured
             if self.__sessionid!=None:
                 msg = {
                     "message" : messages.SET_SESSION_ID,
@@ -173,8 +182,8 @@ class Sender(object):
                     self.send(msg)
                 except ConnectionClosed:
                     return False
-
             return True
+
         except socket.error as e:
             # if autoreconnect is enabled, start process
             if self.autoreconnect:
@@ -302,9 +311,8 @@ class MessageLoop(object):
         # session id is received from connecting side for each connection
         # by default it's unset and unused. When set it will be sended after
         # connection lost in event.
-
-        #self.is_running = True
         self._msgdb = {}
+        self.__listening_on = []
 
         # bind to socket
         self.socket_type, addr, so1, so2 = decode_addr(address)
@@ -345,7 +353,7 @@ class MessageLoop(object):
         # current address
         if self.socket_type=="tcp":
             ip, self.port = self.SERVER.address
-            self.ip = self._ip_translate(ip)
+            self.ip = self.__ip_translate(ip)
             self.address = "tcp://%s:%i" % (self.ip, self.port)
 
         elif self.socket_type=="ipc":
@@ -354,15 +362,44 @@ class MessageLoop(object):
         # serialization
         self.serializer = Serializer()
 
+    def __ip_translate(self, ip):
+        """
+        Translate interface to ip adress, and stores
+        all used ip adresses used to bind socket to
+        """
+        self.__listening_on = []
+        if ip=="127.0.0.1":
+            self.__listening_on.append(ip)
+            return ip
 
-    def _ip_translate(self, ip):
-        if ip=="127.0.0.1": return ip
-        if not ip=="0.0.0.0": return ip
+        if not ip=="0.0.0.0":
+            self.__listening_on.append(ip)
+            return ip
 
-        from kasaya.core.lib.binder import all_interfaces
-        print( all_interfaces() )
-        #all_interfaces
+        # interfaces list
+        iflist = all_interfaces()
+
+        # is interface name used?
+        if ip in iflist.keys():
+            ip = iflist[ip]
+            self.__listening_on.append(ip)
+            return ip
+
+        # listening on 0.0.0.0 (all interfaces)
+        for name, ifip in iflist.items():
+            self.__listening_on.append(ifip)
+
         return ip
+
+
+    def binded_ip_list(self):
+        """
+        list of addresses on which is listening socket
+        """
+        lst = []
+        for ip in self.__listening_on:
+            lst.append( "tcp://%s:%i" % (ip, self.port) )
+        return lst
 
 
     def kill(self):
@@ -445,8 +482,8 @@ class MessageLoop(object):
             except Exception as e:
                 result = exception_serialize(e, False)
                 LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
-                LOG.debug("Message dump: %s" % repr(msgdata) )
-                LOG.debug(result['traceback'])
+                #LOG.debug("Message dump: %s" % repr(msgdata) )
+                #LOG.debug(result['traceback'])
 
                 if not resreq:
                     # if response is not required, then don't send exceptions

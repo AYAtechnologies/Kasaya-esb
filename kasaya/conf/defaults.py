@@ -25,9 +25,9 @@ PASSWORD = ""
 # adres do jakiego zostaną podłączona sockety tcp
 # dopuszczalne są:
 #  nazwa interfejsu - "eth0", "eth1", ...
-#  "AUTO" - podpięty do pierwszego interfejsu nie-lokalnego (zwykle eth0)
-#  "0.0.0.0" - podpięty do wszystkich
-BIND_WORKER_TO = "0.0.0.0"#0.0.0.0"
+#  "AUTO" - podpięty do wszystkich interfejsów (alias dla 0.0.0.0)
+#  "LOCAL" - alias dla 127.0.0.1
+BIND_WORKER_TO = "eth0"
 
 MAX_CONCURRENT_CONNECTIONS = 1000
 
