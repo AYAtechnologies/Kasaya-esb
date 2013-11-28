@@ -7,6 +7,8 @@ from kasaya.core.events import add_event_handler
 from kasaya.core.worker.worker_base import WorkerBase
 from .syncworker import SyncWorker
 from .db.netstatedb import NetworkStateDB
+from .broadcast import UDPBroadcast
+from .dbsync import Synchronizer
 import gevent
 
 
@@ -21,18 +23,11 @@ class KasayaDaemon(WorkerBase):
 
         self.hostname = system.get_hostname()
         LOG.info("Starting local kasaya daemon with ID: [%s]" % self.ID)
-        # uruchomienie bazy danych
-        #self.DB = self.setup_db()
-        self.DB = NetworkStateDB()
-        # broadcaster is not used with distributed database backend
-        if not self.DB.replaces_broadcast:
-            self.BC = self.setup_broadcaster()
-        else:
-            from broadcast.fake import FakeBroadcast
-            self.BC = FakeBroadcast()
-        # uruchomienie workera
-        self.WORKER = self.setup_worker()
-        #self.DB.set_own_ip(self.WORKER.own_ip)
+
+        self.DB = NetworkStateDB()  # database
+        self.BC = UDPBroadcast(self.ID) # broadcaster
+        self.SYNC = Synchronizer(self.DB, self.ID) # synchronisation
+        self.WORKER = SyncWorker(server=self, database=self.DB)
         self.BC.set_own_ip(self.WORKER.own_ip)
 
 
@@ -47,27 +42,6 @@ class KasayaDaemon(WorkerBase):
         self.WORKER.close()
         self.DB.close()
         self.BC.close()
-
-
-    # setting up daemon
-
-
-    def setup_worker(self):
-        """
-        This worker loop is for communication between syncd and local workers.
-        """
-        return SyncWorker(server=self, database=self.DB, broadcaster=self.BC)
-
-
-    def setup_broadcaster(self):
-        """
-        Broadcaster is used to synchronise information between all syncd servers in network.
-        """
-        backend = settings.SYNC_BACKEND
-        if backend=="udp-broadcast":
-            from .broadcast.udp import UDPBroadcast
-            return UDPBroadcast(self.ID)
-        raise Exception("Unknown broadcast backend: %s" % backend)
 
 
     # global network changes

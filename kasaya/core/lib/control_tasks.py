@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from kasaya.core.lib.comm import send_and_receive_response
+from kasaya.core.protocol.comm import send_and_receive_response
 from kasaya.core import exceptions
 from kasaya.core.lib import LOG
 from kasaya.core.protocol import messages
@@ -32,10 +32,6 @@ class ControlTasks(object):
         Register control method.
         """
         self.__ctltasks[method] = func
-
-
-    def ip_to_zmq_addr(self, ip):
-        raise NotImplemented
 
 
     def redirect(self, addr, message):

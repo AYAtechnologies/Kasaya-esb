@@ -3,7 +3,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.core.protocol import messages
 from kasaya.conf import settings
 from kasaya.core.lib.syncclient import KasayaLocalClient
-from kasaya.core.lib.comm import send_and_receive_response
+from kasaya.core.protocol.comm import send_and_receive_response
 from kasaya.core import exceptions
 from kasaya.core.lib import LOG
 

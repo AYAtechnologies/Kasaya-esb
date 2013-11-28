@@ -4,7 +4,7 @@ from kasaya.conf import settings
 from kasaya.core.protocol import messages
 from kasaya.core import exceptions
 #from kasaya.core.lib.binder import get_bind_address
-from kasaya.core.lib.comm import MessageLoop, send_and_receive_response
+from kasaya.core.protocol.comm import MessageLoop, send_and_receive_response
 from kasaya.core.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
 from kasaya.core.lib import LOG, servicesctl
 from kasaya.core.events import add_event_handler, emit
@@ -31,10 +31,10 @@ class RedirectRequiredEx(RedirectRequiredToAddr):
 
 class SyncWorker(object):
 
-    def __init__(self, server, database, broadcaster):
+    def __init__(self, server, database):
         self.DAEMON = server
         self.DB = database
-        self.BC = broadcaster
+        #self.BC = broadcaster
         #self.pinger = PingDB()
 
         # bind events
@@ -49,7 +49,7 @@ class SyncWorker(object):
         self.__services = None
 
         # kasayad <--> kasayad communication
-        self.intersync = MessageLoop( 'tcp://0.0.0.0:'+str(settings.KASAYAD_CONTROL_PORT) )#+settings.SYNCD_CONTROL_BIND )
+        self.intersync = MessageLoop( 'tcp://0.0.0.0:'+str(settings.KASAYAD_CONTROL_PORT) )
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
         # local worker <-> kasayad dialog on public port
         self.intersync.register_message(messages.WORKER_LIVE, self.handle_worker_live)
@@ -227,7 +227,7 @@ class SyncWorker(object):
         LOG.debug("Local worker [%s] on [%s] is now online" % (wrknfo['service'], wrknfo['addr']) )
         # broadcast new worker state
         self.DB.worker_set_state( worker_id, True )
-        self.BC.broadcast_worker_live(self.DAEMON.ID, worker_id, wrknfo['addr'], wrknfo['service'])
+        #self.BC.broadcast_worker_live(self.DAEMON.ID, worker_id, wrknfo['addr'], wrknfo['service'])
 
 
     def worker_start_local(self, worker_id, address, service, pid):
@@ -252,7 +252,7 @@ class SyncWorker(object):
         """
         self.DB.worker_unregister(ID=worker_id)
         LOG.info("Local worker stopped [id:%s]" % worker_id )
-        self.BC.broadcast_worker_stop(worker_id)
+        #self.BC.broadcast_worker_stop(worker_id)
 
     def worker_stop_remote(self, worker_id):
         """

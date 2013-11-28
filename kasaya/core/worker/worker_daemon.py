@@ -2,10 +2,9 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
-from kasaya.core.lib.binder import bind_socket_to_port_range
 from kasaya.core.protocol import messages
 from kasaya.core.worker.worker_base import WorkerBase
-from kasaya.core.lib.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
+from kasaya.core.protocol.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system, make_kasaya_id

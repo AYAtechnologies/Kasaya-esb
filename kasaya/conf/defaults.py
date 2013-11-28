@@ -52,7 +52,7 @@ WORKER_MONKEY = True
 # konfiguracja name(?) serwera
 # możliwe:
 #  udp-broadcast, rijak,... cośtam cośtam
-SYNC_BACKEND = "udp-broadcast"
+#SYNC_BACKEND = "udp-broadcast"
 
 # jeśli serwer ma synchronizować się z innymi hostami poprzez rozsyłanie broadcastów,
 # należy podać numer portu na którym nasłuchuje serwer

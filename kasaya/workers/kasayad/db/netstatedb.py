@@ -8,8 +8,6 @@ from random import choice
 
 class NetworkStateDB(object):
 
-    replaces_broadcast = False
-
     def __init__(self):
         if settings.KASAYAD_DB_BACKEND=="memory":
             from . import memsqlite

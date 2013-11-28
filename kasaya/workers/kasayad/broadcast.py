@@ -118,27 +118,27 @@ class UDPBroadcast(UDPLoop):
     def __init__(self, host_id):
         #self.DAEMON = server
         super(UDPBroadcast, self).__init__(host_id)
-        self.register_message(messages.WORKER_LIVE, self.handle_remote_worker_join)
-        self.register_message(messages.WORKER_LEAVE, self.handle_remote_worker_leave)
+        #self.register_message(messages.WORKER_LIVE, self.handle_remote_worker_join)
+        #self.register_message(messages.WORKER_LEAVE, self.handle_remote_worker_leave)
         self.register_message(messages.HOST_JOIN, self.handle_host_join)
-        self.register_message(messages.HOST_LEAVE, self.handle_host_leave)
+        #self.register_message(messages.HOST_LEAVE, self.handle_host_leave)
         #self.register_message(messages.HOST_REFRESH, self.handle_host_refresh)
 
-    def handle_remote_worker_join(self, msgdata):
-        emit("worker-remote-join", msgdata['id'], msgdata['host'], msgdata['addr'], msgdata['service'] )
-        #self.DAEMON.WORKER.worker_start(msgdata['id'], msgdata['service'], msgdata['addr'] )
+    #def handle_remote_worker_join(self, msgdata):
+    #    emit("worker-remote-join", msgdata['id'], msgdata['host'], msgdata['addr'], msgdata['service'] )
+    #    #self.DAEMON.WORKER.worker_start(msgdata['id'], msgdata['service'], msgdata['addr'] )
 
-    def handle_remote_worker_leave(self, msgdata):
-        emit("worker-remote-leave", msgdata['id'] )
-        #self.DAEMON.WORKER.worker_stop(msgdata['id'] )
+    #def handle_remote_worker_leave(self, msgdata):
+    #    emit("worker-remote-leave", msgdata['id'] )
+    #    #self.DAEMON.WORKER.worker_stop(msgdata['id'] )
 
     def handle_host_join(self, msgdata):
         emit("host-join", msgdata['id'], msgdata['addr'])
         #self.DAEMON.notify_kasayad_start( msgdata['id'], msgdata['hostname'], msgdata['addr'], msgdata['services'])
 
-    def handle_host_leave(self, msgdata):
-        emit("host-leave", msgdata['id'] )
-        #self.DAEMON.notify_kasayad_stop(msgdata['id'])
+    #def handle_host_leave(self, msgdata):
+    #    emit("host-leave", msgdata['id'] )
+    #    #self.DAEMON.notify_kasayad_stop(msgdata['id'])
 
     #def handle_host_refresh(self, msgdata):
     #    self.DAEMON.notify_kasayad_refresh(msgdata['id'], services=msgdata['services'])
@@ -147,28 +147,28 @@ class UDPBroadcast(UDPLoop):
 
     # broadcast specific messages
 
-    def broadcast_worker_live(self, host_id, worker_id, address, service):
-        """
-        Send information to other hosts about running worker
-        """
-        msg = {
-            "message" : messages.WORKER_LIVE,
-            "id" : worker_id,
-            "host" : host_id,
-            "addr" : address,
-            "service" : service,
-            }
-        self.broadcast_message(msg)
+    #def broadcast_worker_live(self, host_id, worker_id, address, service):
+    #    """
+    #    Send information to other hosts about running worker
+    #    """
+    #    msg = {
+    #        "message" : messages.WORKER_LIVE,
+    #        "id" : worker_id,
+    #        "host" : host_id,
+    #        "addr" : address,
+    #        "service" : service,
+    #        }
+    #    self.broadcast_message(msg)
 
-    def broadcast_worker_stop(self, worker_id ):
-        """
-        Send information to other hosts about shutting down worker
-        """
-        msg = {
-            "message" : messages.WORKER_LEAVE,
-            "id" : worker_id,
-            }
-        self.broadcast_message(msg)
+    #def broadcast_worker_stop(self, worker_id ):
+    #    """
+    #    Send information to other hosts about shutting down worker
+    #    """
+    #    msg = {
+    #        "message" : messages.WORKER_LEAVE,
+    #        "id" : worker_id,
+    #        }
+    #    self.broadcast_message(msg)
 
     def broadcast_host_start(self, address):
         msg = {
@@ -178,12 +178,12 @@ class UDPBroadcast(UDPLoop):
             }
         self.broadcast_message(msg)
 
-    def broadcast_host_stop(self):
-        msg = {
-            "message" : messages.HOST_LEAVE,
-            "id" : self.ID,
-            }
-        self.broadcast_message(msg)
+    #def broadcast_host_stop(self):
+    #    msg = {
+    #        "message" : messages.HOST_LEAVE,
+    #        "id" : self.ID,
+    #        }
+    #    self.broadcast_message(msg)
 
     #def broadcast_host_refresh(self, ID, services=None):
     #    msg = {

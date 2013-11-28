@@ -6,7 +6,7 @@ from kasaya.core.protocol import Serializer, messages
 from kasaya.core import SingletonCreator
 from kasaya.core.exceptions import ReponseTimeout
 from gevent.coros import Semaphore
-from kasaya.core.lib.comm import Sender, ConnectionClosed
+from kasaya.core.protocol.comm import Sender, ConnectionClosed
 import gevent
 from gevent.coros import Semaphore
 from kasaya.core.lib import LOG
