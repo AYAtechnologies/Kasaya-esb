@@ -90,7 +90,7 @@ class SyncProxy(GenericProxy):
             "args" : args,
             "kwargs" : kwargs
         }
-        LOG.debug("Client is about to send this message: %r" % msg)
+        #LOG.debug("Client is about to send this message: %r" % msg)
         # wysłanie żądania
         return self._send_message(addr, msg)
 

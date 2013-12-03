@@ -128,10 +128,30 @@ class WorkerDaemon(WorkerBase):
             return
         __import__(modn)
 
+
+    def _worker_just_started(self):
+        """
+        Called before worker starts serving tasks.
+        It's called before worker connect's to kasaya daemon.
+        """
+        for func in worker_methods_db._before_start:
+            func()
+
+    def _worker_just_stopped(self):
+        """
+        After worker is shutted down, we cal this.
+        This function is called after closing connection with kasaya daemon.
+        """
+        for func in worker_methods_db._after_stop:
+            func()
+
+
     def run(self):
         self.__load_modules()
         self.status = 1
         LOG.debug("Service [%s] starting." % self.servicename)
+        # before run...
+        self._worker_just_started()
         self.__greens = []
         self.__greens.append( gevent.spawn(self.loop.loop) )
         self.__greens.append( gevent.spawn(self.heartbeat_loop) )
@@ -140,6 +160,8 @@ class WorkerDaemon(WorkerBase):
         finally:
             self.stop()
             self.close()
+            # just finished working
+            self._worker_just_stopped()
 
     def stop(self):
         self.__hbloop = False

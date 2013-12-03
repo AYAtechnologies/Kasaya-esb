@@ -1,17 +1,52 @@
 #!/usr/bin/env python
 #coding: utf-8
-from kasaya.conf import settings
-from kasaya.core.worker import WorkerDaemon
-from kasaya.core.protocol import messages
-from kasaya.core.client.proxies import SyncProxy
-from async_backend import AsyncBackend
+from kasaya import Task, before_worker_start, after_worker_stop
+#from kasaya.conf import settings
+#from kasaya.core.protocol import messages
+#from kasaya.core.client.proxies import SyncProxy
+#from async_backend import AsyncBackend
+#from gevent import *
+#from gevent.coros import Semaphore
+#from gevent.pool import Pool
 
-from gevent import *
-from gevent.coros import Semaphore
-from gevent.pool import Pool
 
 
-class AsyncDeamon(WorkerDaemon):
+class AsyncWorker(object):
+
+    def __init__(self):
+        pass
+
+    def close(self):
+        pass
+
+
+
+@before_worker_start
+def setup_async():
+    global ASYNC
+    ASYNC = AsyncWorker()
+
+@after_worker_stop
+def stop_async():
+    global ASYNC
+    ASYNC.close()
+
+
+@Task()
+def add_task_to_queue(task, context, args, kwargs):
+    global ASYNC
+    pass
+
+@Task()
+def get_task_result(task_id):
+    global ASYNC
+    pass
+
+
+
+class AsyncWorkerOld(object):
+
+
     def __init__(self):
         super(AsyncDeamon, self).__init__(settings.ASYNC_DAEMON_SERVICE)
         self.loop.register_message(messages.SYSTEM_CALL, self.handle_async_call)
@@ -87,5 +122,10 @@ class AsyncDeamon(WorkerDaemon):
 
 
 
+
+if __name__=="__main__":
+    from kasaya import WorkerDaemon
+    daemon = WorkerDaemon("async")
+    daemon.run()
 
 

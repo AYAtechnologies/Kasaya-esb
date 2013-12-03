@@ -8,6 +8,8 @@ class WorkerMethodsDB(object):
 
     def __init__(self):
         self.db = {}
+        self._before_start = []
+        self._after_stop = []
 
     def register_task(self, name, func, timeout, anonymous, permissions):
         # task name
@@ -48,6 +50,17 @@ class WorkerMethodsDB(object):
 
     def tasks(self):
         return self.db.keys()
+
+
+    # before / after worker running functions
+
+    def register_before_start(self, func):
+        self._before_start.append( func )
+
+    def register_after_stop(self, func):
+        self._after_stop.append( func )
+
+
 
 worker_methods_db = WorkerMethodsDB()
 
