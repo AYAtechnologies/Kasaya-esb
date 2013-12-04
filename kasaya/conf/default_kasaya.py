@@ -65,7 +65,7 @@ KASAYAD_CONTROL_PORT = 4041
 KASAYAD_DB_BACKEND = "memory"
 
 # nazwa workera odpowiedzialnego za wywołania asynchroniczne
-ASYNC_DAEMON_SERVICE = "async_daemon"
+#ASYNC_DAEMON_SERVICE = "async_daemon"
 
 #MIDDLEWARE_CLASSES = ["auth"]
 
@@ -86,12 +86,12 @@ LOG_LEVEL = "DEBUG"
 
 # Select database backend for async daemon
 # possible values: memory, redis
-ASYNC_DAEMON_DB_BACKEND = "redis"
+#ASYNC_DAEMON_DB_BACKEND = "redis"
 
 
 
 # builtin ESB workers
-USE_ASYNC_SERVICE = False
+USE_ASYNC_SERVICE = True
 USE_TRANSACTION_SERVICE = False
 USE_AUTH_SERVICE = False
 USE_LOG_SERVICE = False
