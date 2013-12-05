@@ -38,25 +38,29 @@ class GenericProxy(object):
         self._names.append(itemname)
         return self
 
-    def _find_worker(self, method):
+    def _find_worker(self, service_name, method=None):
         """
-        Ask kasaya daemon where is service for given method
+        Ask kasaya daemon where is service
         """
-        srvce = method[0]
         kasaya = KasayaLocalClient()
-        msg = kasaya.query( srvce )
+        msg = kasaya.query( service_name )
         if not msg['message']==messages.WORKER_ADDR:
             raise exceptions.ServiceBusException("Wrong response from sync server")
         addr = msg['addr']
         if addr is None:
-            raise exceptions.ServiceNotFound("No service %s found" % srvce)
+            raise exceptions.ServiceNotFound("No service '%s' found" % service_name)
         return addr
 
     def _send_message(self, addr, msg):
         global _namefix
         if _namefix:
-            msg['service'] = unicode(msg['service'],'ascii')
-            msg['method'] = [ unicode(m,"ascii") for m in msg['method']]
+            s = msg['service']
+            if type(s)!=unicode:
+                msg['service'] = unicode(s,'ascii')
+
+            m = msg['method']
+            if type(s)!=unicode:
+                msg['method'] = unicode(m,'ascii')
         res = send_and_receive_response(addr, msg, 30) # manual timeout!
         return res
 
@@ -80,12 +84,12 @@ class SyncProxy(GenericProxy):
         #    m = '.'.join(method)
         #    if m in self._mock_methods:
         #        return self._mock_methods[m](*args, **kwargs)
-        addr = self._find_worker(method)
+        addr = self._find_worker(method[0])
         # zbudowanie komunikatu
         msg = {
             "message" : messages.SYNC_CALL,
             "service" : method[0],
-            "method" : method[1:],
+            "method" : ".".join( method[1:] ),
             "context" : context,
             "args" : args,
             "kwargs" : kwargs
@@ -101,16 +105,16 @@ class AsyncProxy(GenericProxy):
     def __call__(self, *args, **kwargs):
         method = self._names
         context = self._context
-        addr = self._find_worker([settings.ASYNC_DAEMON_SERVICE, "register_task"])
+        addr = self._find_worker("async")#[settings.ASYNC_DAEMON_SERVICE, "register_task"])
         # zbudowanie komunikatu
         msg = {
-            "message" : messages.SYSTEM_CALL,
-            "service" : settings.ASYNC_DAEMON_SERVICE,
-            "method" : ["register_task"],
-            "original_method": method,
+            "message" : messages.SYNC_CALL,
+            "service" : "async",#settings.ASYNC_DAEMON_SERVICE,
+            "method"  : "add_task_to_queue",
+            "original_method" : ".".join(method),
             "context" : context,
-            "args" : args,
-            "kwargs" : kwargs
+            "args"    : args,
+            "kwargs"  : kwargs
         }
         return self._send_message(addr, msg)
 
@@ -123,7 +127,7 @@ class ControlProxy(GenericProxy):
         context = self._context
         msg = {
             "message" : messages.CTL_CALL,
-            "method" : method,
+            "method" : ".".join(method),
             "context" : context,
             "args" : args,
             "kwargs" : kwargs

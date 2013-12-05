@@ -221,7 +221,7 @@ class SyncWorker(object):
         # send information to worker to start processing tasks
         msg = {
             'message':messages.CTL_CALL,
-            'method':['start']
+            'method':'start'
         }
         res = send_and_receive_response(wrknfo['addr'], msg)
         LOG.debug("Local worker [%s] on [%s] is now online" % (wrknfo['service'], wrknfo['addr']) )
@@ -376,7 +376,7 @@ class SyncWorker(object):
             addr = _worker_addr(wrkr)
             msg = {
                 'message':messages.CTL_CALL,
-                'method':['stop']
+                'method':'stop'
             }
             res = send_and_receive_response(self.context, addr, msg)
             return res
@@ -392,7 +392,7 @@ class SyncWorker(object):
         addr = _worker_addr(wrkr)
         msg = {
             'message':messages.CTL_CALL,
-            'method':['stats']
+            'method':'stats'
         }
         res = send_and_receive_response(self.context, addr, msg)
         return res

@@ -36,10 +36,15 @@ def set_value(k,v):
 
 
 
-def load_defaults():
+def load_defaults(confile, prefix=""):
     global settings
-    from . import defaults
     exclude = set( ('absolute_import', 'division', 'print_function', 'unicode_literals') )
+
+    if confile=="kasaya":
+        from . import default_kasaya as defaults
+    elif confile=="async":
+        from . import default_async as defaults
+
     # loading default settings
     for k,v in defaults.__dict__.items():
         if k in defaults.__builtins__:
@@ -48,7 +53,7 @@ def load_defaults():
             continue
         if k in exclude:
             continue
-        settings[k] = v
+        settings[prefix+k] = v
 
 
 def load_worker_settings(filename):
@@ -85,11 +90,13 @@ def load_worker_settings(filename):
 
 
 
-#def load_config_from_file(filename, optional=False):
-    #__load_config_section_from_file(filename, "config", optional, set_value )
 
+# default kasaya settings
+load_defaults("kasaya")
+load_settings_from_config_file(SYSTEM_KASAYA_CONFIG, "config", True, set_value, add_prefix="")
 
-load_defaults()
-# load kasaya settings from system file
-load_settings_from_config_file(SYSTEM_KASAYA_CONFIG, "config", True, set_value)
+# if async daemon is used, load async default settings
+if settings.USE_ASYNC_SERVICE:
+    load_defaults("async")
+    #load_settings_from_config_file(SYSTEM_SERVICES_CONFIG, "async", True, set_value, add_prefix="ASYNC_")
 

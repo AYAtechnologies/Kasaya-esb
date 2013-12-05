@@ -67,6 +67,13 @@ class CombinedConfig(object):
         self.svc = name
 
     def load_config(self, filename, globmode, optional=False, verbose=True):
+        """
+        filename - name of config file to load
+        globmode - if True, global section names [config], [env]...
+                   if False, local workers sections: [xxxx:config], [xxxx:env]...
+        optional - if set to True then no exception will be raised if file does not exist
+        verbose - some additional log information will be displayed
+        """
         try:
             cnf = KasayaConfigParser(filename)
         except IOError as e:
@@ -120,7 +127,7 @@ class CombinedConfig(object):
 
 
 
-def load_settings_from_config_file(filename, section, optional, set_value, verbose=True):
+def load_settings_from_config_file(filename, section, optional, set_value, verbose=True, add_prefix=""):
     """
     Load config and change values to types used in default settings
     """
@@ -138,6 +145,6 @@ def load_settings_from_config_file(filename, section, optional, set_value, verbo
             sys.exit(1)
 
     for k,v in cnf.items(section):
-        set_value(k,v)
+        set_value(add_prefix+k,v)
 
     return True

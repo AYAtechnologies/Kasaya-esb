@@ -36,7 +36,11 @@ def mesydzek(addr):
 
 class WorkerDaemon(WorkerBase):
 
-    def __init__(self, servicename=None, load_config=True):
+    def __init__(self,
+            servicename=None,
+            load_config=True,
+            skip_loading_modules=False):
+
         super(WorkerDaemon, self).__init__()
 
         # config loader
@@ -47,6 +51,7 @@ class WorkerDaemon(WorkerBase):
             if servicename is None:
                 servicename = self.__load_config()
         self.servicename = servicename
+        self.__skip_loading_modules = skip_loading_modules
 
         # worker status
         # 0 - initialized
@@ -105,9 +110,11 @@ class WorkerDaemon(WorkerBase):
             LOG.critical("File 'service.conf' not found, unable to start service.")
             sys.exit(1)
 
+        # system settings overwriting
         for k,v in config['config'].items():
             set_value(k, v)
 
+        # worker environment
         for k,v in config['env'].items():
             os.environ[k.upper()] = v
 
@@ -123,10 +130,10 @@ class WorkerDaemon(WorkerBase):
 
     def __load_modules(self):
         try:
-            modn = self.__auto_load_tasks_module
+            modname = self.__auto_load_tasks_module
         except AttributeError:
             return
-        __import__(modn)
+        __import__(modname)
 
 
     def _worker_just_started(self):
@@ -147,7 +154,8 @@ class WorkerDaemon(WorkerBase):
 
 
     def run(self):
-        self.__load_modules()
+        if not self.__skip_loading_modules:
+            self.__load_modules()
         self.status = 1
         LOG.debug("Service [%s] starting." % self.servicename)
         # before run...
@@ -244,8 +252,6 @@ class WorkerDaemon(WorkerBase):
 
 
     def run_task(self, funcname, args, kwargs):
-        funcname = ".".join( funcname )
-
         # find task in worker db
         try:
             task = worker_methods_db[funcname]

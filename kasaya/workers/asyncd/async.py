@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
 from kasaya import Task, before_worker_start, after_worker_stop
-#from kasaya.conf import settings
+from kasaya.conf import settings
 #from kasaya.core.protocol import messages
 #from kasaya.core.client.proxies import SyncProxy
 #from async_backend import AsyncBackend
@@ -14,10 +14,17 @@ from kasaya import Task, before_worker_start, after_worker_stop
 class AsyncWorker(object):
 
     def __init__(self):
-        pass
+        # database setup
+        dbb = settings.ASYNC_DB_BACKEND
+        if dbb=="sqlite":
+            from db.sqlite import SQLiteDatabase
+            self.DB = SQLiteDatabase("id")
+        else:
+            raise Exception("Unknown database backend defined in configuration: %r" % dbb)
 
     def close(self):
-        pass
+        self.DB.close()
+
 
 
 
@@ -44,6 +51,8 @@ def get_task_result(task_id):
 
 
 
+
+'''
 class AsyncWorkerOld(object):
 
 
@@ -118,14 +127,17 @@ class AsyncWorkerOld(object):
     def get_task_result(self, task_id):
         print "get result:", task_id
         return self.backend.get_result(task_id)
-
+'''
 
 
 
 
 if __name__=="__main__":
     from kasaya import WorkerDaemon
-    daemon = WorkerDaemon("async")
+    # If no service name is given, global and local settings will be used
+    # skip_loading_modules flag means that worker will not load modules to
+    # expose as service. All methods are actually defined in this file.
+    daemon = WorkerDaemon(skip_loading_modules=True)
     daemon.run()
 
 

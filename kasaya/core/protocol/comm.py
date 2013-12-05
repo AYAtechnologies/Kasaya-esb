@@ -457,7 +457,7 @@ class MessageLoop(object):
             if msg == messages.SET_SESSION_ID:
                 try:
                     ssid = msgdata['id']
-                    print("conn session id" , address, ssid)
+                    #print("conn session id" , address, ssid)
                 except KeyError:
                     pass
                 if resreq:

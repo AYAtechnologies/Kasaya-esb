@@ -16,6 +16,8 @@ class WorkerMethodsDB(object):
         if name is None:
             name = func.__name__
         if name in self.db:
+            if func==self.db[name]['func']:
+                return
             c = "Task %s is already registered" % name
             LOG.critical(c)
             raise Exception(c)

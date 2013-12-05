@@ -56,10 +56,9 @@ class ControlTasks(object):
            message - message body
            islocal - if true then request is from localhost
         """
-        method = ".".join(message['method'])
+        method = message['method']#".".join(message['method'])
         LOG.debug("Management call [%s]" % method)
         #LOG.debug(repr(message))
-
         try:
             func = self.__ctltasks[method] # get handler for method
         except KeyError:
