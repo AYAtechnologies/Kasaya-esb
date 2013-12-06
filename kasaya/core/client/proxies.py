@@ -54,14 +54,19 @@ class GenericProxy(object):
     def _send_message(self, addr, msg):
         global _namefix
         if _namefix:
-            s = msg['service']
-            if type(s)!=unicode:
-                msg['service'] = unicode(s,'ascii')
-
-            m = msg['method']
-            if type(s)!=unicode:
-                msg['method'] = unicode(m,'ascii')
-        res = send_and_receive_response(addr, msg, 30) # manual timeout!
+            try:
+                s = msg['service']
+                if type(s)!=unicode:
+                    msg['service'] = unicode(s,'ascii')
+            except KeyError:
+                pass
+            try:
+                m = msg['method']
+                if type(m)!=unicode:
+                    msg['method'] = unicode(m,'ascii')
+            except KeyError:
+                pass
+        res = send_and_receive_response(addr, msg, 30) # manual timeout !!!!!  fix it!
         return res
 
     def __call__(self, *args, **kwargs):
@@ -108,10 +113,8 @@ class AsyncProxy(GenericProxy):
         addr = self._find_worker("async")#[settings.ASYNC_DAEMON_SERVICE, "register_task"])
         # zbudowanie komunikatu
         msg = {
-            "message" : messages.SYNC_CALL,
-            "service" : "async",#settings.ASYNC_DAEMON_SERVICE,
-            "method"  : "add_task_to_queue",
-            "original_method" : ".".join(method),
+            "message" : messages.ASYNC_CALL,
+            "method" : ".".join(method),
             "context" : context,
             "args"    : args,
             "kwargs"  : kwargs
@@ -126,7 +129,7 @@ class ControlProxy(GenericProxy):
         method = self._names
         context = self._context
         msg = {
-            "message" : messages.CTL_CALL,
+            "message" : messages.ASYNC_CALL,
             "method" : ".".join(method),
             "context" : context,
             "args" : args,

@@ -10,6 +10,7 @@ class WorkerMethodsDB(object):
         self.db = {}
         self._before_start = []
         self._after_stop = []
+        self._raw_tasks = {}
 
     def register_task(self, name, func, timeout, anonymous, permissions):
         # task name
@@ -46,6 +47,15 @@ class WorkerMethodsDB(object):
 
         self.db[name] = taskdata
         LOG.debug("Registered task %s" % name)
+
+    def register_raw_task(self, message_type, raw_responce, func):
+        """
+        Raw task is used internally to enhance kasaya protocol
+        by handling special types of messages. It's used internally
+        by kasaya own daemons
+        """
+        self._raw_tasks[message_type] = {'func':func, 'raw_resp':raw_responce }
+        LOG.debug("Registered raw task handler %s -> %s" % (message_type, func.__name__) )
 
     def __getitem__(self, name):
         return self.db[name]

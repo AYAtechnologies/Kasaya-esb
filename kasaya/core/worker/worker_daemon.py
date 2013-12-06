@@ -141,8 +141,13 @@ class WorkerDaemon(WorkerBase):
         Called before worker starts serving tasks.
         It's called before worker connect's to kasaya daemon.
         """
+        # register raw message handlers...
+        for msg, fdata in worker_methods_db._raw_tasks.items():
+            self.loop.register_message( msg, fdata['func'], raw_msg_response=fdata['raw_resp'] )
+
+        # run functions before worker start
         for func in worker_methods_db._before_start:
-            func()
+            func(self.ID)
 
     def _worker_just_stopped(self):
         """

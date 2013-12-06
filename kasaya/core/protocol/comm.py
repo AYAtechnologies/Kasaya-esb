@@ -433,6 +433,8 @@ class MessageLoop(object):
             raw_msg_response - True means that function returns complete message,
                                False - result shoult be packed to message outside handler
         """
+        if message in self._msgdb:
+            raise Exception("Message %s is already registered" % message)
         self._msgdb[message]=(func, raw_msg_response)
 
 

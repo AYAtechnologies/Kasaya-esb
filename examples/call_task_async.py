@@ -9,7 +9,7 @@ from kasaya import async
 
 
 if __name__=="__main__":
-    async.fikumiku.do_work("parameter", 1, foo=123, baz=True )
+    print ">>>", async.fikumiku.do_work("parameter", 1, foo=123, baz=True )
 
 #    load_config_from_file("example.conf", optional=True)
 #

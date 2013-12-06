@@ -1,11 +1,19 @@
 #!/usr/bin/env python
 #coding: utf-8
+from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya import Task, before_worker_start, after_worker_stop
+from kasaya.core.worker.decorators import raw_task
+from kasaya.core.protocol import messages
 from kasaya.conf import settings
-#from kasaya.core.protocol import messages
+from kasaya.core.protocol import Serializer
+
+import time
+from pprint import pprint
+
 #from kasaya.core.client.proxies import SyncProxy
 #from async_backend import AsyncBackend
 #from gevent import *
+import gevent
 #from gevent.coros import Semaphore
 #from gevent.pool import Pool
 
@@ -13,25 +21,49 @@ from kasaya.conf import settings
 
 class AsyncWorker(object):
 
-    def __init__(self):
+    def __init__(self, worker_id):
+        # used in process of selecting jobs
+        #self.worker_id = worker_id
         # database setup
         dbb = settings.ASYNC_DB_BACKEND
         if dbb=="sqlite":
             from db.sqlite import SQLiteDatabase
-            self.DB = SQLiteDatabase("id")
+            self.DB = SQLiteDatabase( worker_id )
         else:
             raise Exception("Unknown database backend defined in configuration: %r" % dbb)
+        # serializer / deserializer
+        self.serializer = Serializer()
 
     def close(self):
         self.DB.close()
 
+    def register_task(self, task, context, args, kwargs):
+        #bin_2_data()
+        args = (args, kwargs)
+        taskid = self.DB.task_add(
+            taskname = task,
+            time = time.time(),
+            args = self.serializer.data_2_bin(args),
+            context = self.serializer.data_2_bin(context)
+        )
+        return taskid
+
+    def next_job(self):
+        #gevent.Greenlet()
+        self.DB.task_get_next()
+
+    def check(self):
+        self.next_job()
 
 
+
+
+# prepare
 
 @before_worker_start
-def setup_async():
+def setup_async(ID):
     global ASYNC
-    ASYNC = AsyncWorker()
+    ASYNC = AsyncWorker(ID)
 
 @after_worker_stop
 def stop_async():
@@ -39,10 +71,30 @@ def stop_async():
     ASYNC.close()
 
 
-@Task()
-def add_task_to_queue(task, context, args, kwargs):
+
+# catch tasks
+
+@raw_task(messages.ASYNC_CALL)
+def add_task_to_queue(msg):
+    """
+    Catch new task and store in database
+    """
     global ASYNC
-    pass
+    #pprint(msg)
+    #res = ASYNC.register_task(
+    #    msg['method'],
+    #    msg['context'],
+    #    msg['args'],
+    #    msg['kwargs']
+    #)
+    res="11"
+    ASYNC.check()
+    return res
+
+
+
+
+# normal task
 
 @Task()
 def get_task_result(task_id):

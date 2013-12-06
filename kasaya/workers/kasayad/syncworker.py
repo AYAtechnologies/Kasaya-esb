@@ -55,7 +55,6 @@ class SyncWorker(object):
         self.intersync.register_message(messages.WORKER_LIVE, self.handle_worker_live)
         self.intersync.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
         self.intersync.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
-        self.intersync.register_message(messages.CTL_CALL, self.handle_local_control_request)
         # service control tasks
         self.ctl = ControlTasks(allow_redirect=True)
         self.ctl.register_task("svbus.status",  self.CTL_global_services)
