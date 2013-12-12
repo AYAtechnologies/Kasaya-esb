@@ -51,7 +51,7 @@ class GenericProxy(object):
             raise exceptions.ServiceNotFound("No service '%s' found" % service_name)
         return addr
 
-    def _send_message(self, addr, msg):
+    def _send_and_response_message(self, addr, msg):
         global _namefix
         if _namefix:
             try:
@@ -101,7 +101,7 @@ class SyncProxy(GenericProxy):
         }
         #LOG.debug("Client is about to send this message: %r" % msg)
         # wysłanie żądania
-        return self._send_message(addr, msg)
+        return self._send_and_response_message(addr, msg)
 
 
 
@@ -119,7 +119,7 @@ class AsyncProxy(GenericProxy):
             "args"    : args,
             "kwargs"  : kwargs
         }
-        return self._send_message(addr, msg)
+        return self._send_and_response_message(addr, msg)
 
 
 

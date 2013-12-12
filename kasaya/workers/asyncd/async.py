@@ -34,6 +34,9 @@ class AsyncWorker(object):
         # serializer / deserializer
         self.serializer = Serializer()
 
+    def get_database_id(self):
+        return self.DB.CONF['databaseid']
+
     def close(self):
         self.DB.close()
 
@@ -47,13 +50,19 @@ class AsyncWorker(object):
             context = self.serializer.data_2_bin(context)
         )
         return taskid
+        self._check_next()
 
     def next_job(self):
-        #gevent.Greenlet()
+        print ("check_next_job")
         self.DB.task_get_next()
 
-    def check(self):
-        self.next_job()
+    def _check_next(self):
+        """
+        After each function which adds or removes task from queue
+        should be called this function.
+        """
+        grnlt = gevent.Greenlet(self.next_job)
+        grnlt.start()
 
 
 
@@ -64,6 +73,7 @@ class AsyncWorker(object):
 def setup_async(ID):
     global ASYNC
     ASYNC = AsyncWorker(ID)
+    print (">",ASYNC.get_database_id())
 
 @after_worker_stop
 def stop_async():
@@ -73,6 +83,7 @@ def stop_async():
 
 
 # catch tasks
+
 
 @raw_task(messages.ASYNC_CALL)
 def add_task_to_queue(msg):
@@ -88,7 +99,7 @@ def add_task_to_queue(msg):
     #    msg['kwargs']
     #)
     res="11"
-    ASYNC.check()
+    ASYNC._check_next()
     return res
 
 
