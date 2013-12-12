@@ -532,7 +532,6 @@ class MessageLoop(object):
             SOCK,
             self.serializer, {
                 "message":messages.NOOP,
-                "result":result,
             },
             resreq = False
         )

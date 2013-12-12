@@ -129,7 +129,7 @@ class ControlProxy(GenericProxy):
         method = self._names
         context = self._context
         msg = {
-            "message" : messages.ASYNC_CALL,
+            "message" : messages.CTL_CALL,
             "method" : ".".join(method),
             "context" : context,
             "args" : args,
