@@ -39,10 +39,11 @@ class SQLiteDatabase(object):
                 time_act INTEGER,            /* last activity time */
                 workerid TEXT,               /* worker id which received task */
                 task TEXT,                   /* task name */
+                error INTEGER,               /* error counter */
+                delay INTEGER,               /* next execution time */
                 args BLOB,                   /* args,kwargs */
                 context BLOB,                /* context */
-                result BLOB,                 /* stored result */
-                error INTEGER               /* error 0 - ok, 1 - error */
+                result BLOB                  /* stored result */
             )""")
         self.cur.execute("""
             CREATE TABLE IF NOT EXISTS conf (
@@ -90,19 +91,23 @@ class SQLiteDatabase(object):
         """
         Adds task to database for execution
         """
-        query = "INSERT INTO jobs (task, time_crt, args, context, status) VALUES (?,?,?,?,?)"
-        res = self.cur.execute( query, (taskname, time, SQ.Binary(args), SQ.Binary(context), 0 ) )
+        query = "INSERT INTO jobs (task, time_crt, args, context, status, error, delay) VALUES (?,?,?,?,0,0,0)"
+        res = self.cur.execute( query, (taskname, time, SQ.Binary(args), SQ.Binary(context) ) )
         rowid = res.lastrowid
         self.__db.commit()
         return "%s-%X" % (self.dbid, rowid)
 
-    def task_get_next(self):
+
+    def task_get_next_id(self):
         """
         Chooses one task waiting for execution.
         This function should use atomic database features to make sure that only
         one async daemon connected to this database choose task even if ask for
         job in same time.
+
+        statusy: 0 - waiting, 1 - selected to process, 2 - processing, 3 - finished
         """
+        now = time.time()
         # check if there is any missing task selected for processing
         query = "SELECT taskid FROM jobs WHERE status=1 AND asyncid=? LIMIT 1"
         self.cur.execute( query, (self.ID,) )
@@ -110,8 +115,8 @@ class SQLiteDatabase(object):
 
         if res is None:
             # nothing already selected, then select one
-            query = "UPDATE jobs SET asyncid=?, status=1, time_act=? WHERE status=0 LIMIT 1"
-            res = self.cur.execute( query, (self.ID,time.time() ) )
+            query = "UPDATE jobs SET asyncid=?, status=1, time_act=? WHERE status=0 AND delay<=? LIMIT 1"
+            res = self.cur.execute( query, (self.ID,time.time(), now ) )
             self.__db.commit()
             # nothing is waiting tasks in queue
             if res.rowcount==0:
@@ -126,13 +131,42 @@ class SQLiteDatabase(object):
             return None
 
         rowid = res[0]
-        print rowid
+        return rowid
 
 
-    def task_check(self, taskid):
+    def task_get_to_process(self, taskid):
+        # set task status to 2 (processing)
+        query = "UPDATE jobs SET status=2, time_act=? WHERE taskid=? AND status=1"
+        self.cur.execute( query, (taskid,time.time()) )
+        self.__db.commit()
+        # get all required task data
+        query = "SELECT asyncid,time_crt,task,args,context FROM jobs WHERE taskid=?"#" AND status=2"
+        self.cur.execute( query, (taskid,) )
+        res = self.cur.fetchone()
+        if res is None:
+            return None
+        return {
+            #'id'       : taskid,
+            'time_crt' : res[1],
+            'task'     : res[2],
+            'args'     : str(res[3]),
+            'context'  : str(res[4]),
+       }
+
+
+    def task_error_and_delay(self, taskid, delay):
+        """
+        Increase task error counter and set delay time before next try
+        """
+        now = time.time()
+        delay = now + delay
+        query = "UPDATE jobs SET status=0, time_act=?, error=error+1, delay=? WHERE taskid=?"
+        self.cur.execute( query, (now, delay, taskid) )
+        self.__db.commit()
+
+
+    def task_finished(self, taskid, result, error):
+        """
+        Set result of task
+        """
         pass
-
-    def task_get(self, taskid):
-        pass
-
-

@@ -149,6 +149,16 @@ class WorkerDaemon(WorkerBase):
         for func in worker_methods_db._before_start:
             func(self.ID)
 
+
+    def _worker_listening(self):
+        """
+        Called after worker start listening regular jobs
+        """
+        # run functions after worker start
+        for func in worker_methods_db._after_start:
+            func()
+
+
     def _worker_just_stopped(self):
         """
         After worker is shutted down, we cal this.
@@ -169,6 +179,7 @@ class WorkerDaemon(WorkerBase):
         self.__greens.append( gevent.spawn(self.loop.loop) )
         self.__greens.append( gevent.spawn(self.heartbeat_loop) )
         try:
+            print ("joinall")
             gevent.joinall(self.__greens)
         finally:
             self.stop()
@@ -210,6 +221,7 @@ class WorkerDaemon(WorkerBase):
         """
         LOG.debug("Connected to %s", addr)
         self.SYNC.notify_worker_live(self.status)
+
 
 
 
@@ -323,6 +335,9 @@ class WorkerDaemon(WorkerBase):
         if self.status==1:
             self.status = 2
             LOG.info("Received status: running.")
+            # call tasks after worker started listening
+            g = gevent.Greenlet( self._worker_listening )
+            g.start()
             return True
         return False
 

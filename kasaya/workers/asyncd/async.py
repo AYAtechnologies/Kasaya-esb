@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
-from kasaya import Task, before_worker_start, after_worker_stop
+from kasaya import Task, before_worker_start, after_worker_stop, after_worker_start
 from kasaya.core.worker.decorators import raw_task
 from kasaya.core.protocol import messages
 from kasaya.conf import settings
 from kasaya.core.protocol import Serializer
+from kasaya.core.client.proxies import RawProxy
+from kasaya.core import exceptions
+
+from kasaya.core.lib.logger import LOG
+LOG.stetupLogger("async")
 
 import time
 from pprint import pprint
@@ -16,6 +21,7 @@ from pprint import pprint
 import gevent
 #from gevent.coros import Semaphore
 #from gevent.pool import Pool
+
 
 
 
@@ -33,6 +39,8 @@ class AsyncWorker(object):
             raise Exception("Unknown database backend defined in configuration: %r" % dbb)
         # serializer / deserializer
         self.serializer = Serializer()
+        # caller
+        self.PROXY = RawProxy()
 
     def get_database_id(self):
         return self.DB.CONF['databaseid']
@@ -40,8 +48,10 @@ class AsyncWorker(object):
     def close(self):
         self.DB.close()
 
-    def register_task(self, task, context, args, kwargs):
-        #bin_2_data()
+    def task_add_new(self, task, context, args, kwargs):
+        """
+        Register task in database
+        """
         args = (args, kwargs)
         taskid = self.DB.task_add(
             taskname = task,
@@ -49,17 +59,52 @@ class AsyncWorker(object):
             args = self.serializer.data_2_bin(args),
             context = self.serializer.data_2_bin(context)
         )
-        return taskid
         self._check_next()
+        return taskid
+
+
+    def process_task(self, taskid):
+        """
+        Process job with given ID
+        """
+        LOG.debug("Processing task %i" % taskid)
+        # get task from database
+        data = self.DB.task_get_to_process(taskid)
+        if data is None:
+            return
+        # unpack data
+        data['args'],data['kwargs'] = self.serializer.bin_2_data(data['args'])
+        data['context'] = self.serializer.bin_2_data(data['context'])
+        # send task to realize
+        try:
+            result = self.PROXY.sync_call(
+                data['task'],
+                data['context'],
+                data['args'],
+                data['kwargs'],
+            )
+        except exceptions.ServiceNotFound:
+            self.DB.task_error_and_delay(taskid, settings.ASYNC_ERROR_TASK_DELAY)
+            return
+        #except Exception as e:
+
+
+        print (result)
+
 
     def next_job(self):
-        print ("check_next_job")
-        self.DB.task_get_next()
+        """
+        Check if there is waiting job to do,
+        and start processing if is available
+        """
+        taskid = self.DB.task_get_next_id()
+        if taskid is None: return
+        self.process_task( taskid )
 
     def _check_next(self):
         """
         After each function which adds or removes task from queue
-        should be called this function.
+        this function should be called.
         """
         grnlt = gevent.Greenlet(self.next_job)
         grnlt.start()
@@ -73,7 +118,12 @@ class AsyncWorker(object):
 def setup_async(ID):
     global ASYNC
     ASYNC = AsyncWorker(ID)
-    print (">",ASYNC.get_database_id())
+    LOG.info( "Database id: %s" % ASYNC.get_database_id() )
+
+@after_worker_start
+def async_started():
+    global ASYNC
+    ASYNC._check_next()
 
 @after_worker_stop
 def stop_async():
@@ -92,14 +142,12 @@ def add_task_to_queue(msg):
     """
     global ASYNC
     #pprint(msg)
-    #res = ASYNC.register_task(
-    #    msg['method'],
-    #    msg['context'],
-    #    msg['args'],
-    #    msg['kwargs']
-    #)
-    res="11"
-    ASYNC._check_next()
+    res = ASYNC.task_add_new(
+        msg['method'],
+        msg['context'],
+        msg['args'],
+        msg['kwargs']
+    )
     return res
 
 

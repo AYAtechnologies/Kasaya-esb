@@ -71,4 +71,4 @@ class LogProxy(object):
 
 
 
-LOG = LogProxy()#setup_logging(settings.LOGGER_NAME)
+LOG = LogProxy()

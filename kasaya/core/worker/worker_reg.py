@@ -9,6 +9,7 @@ class WorkerMethodsDB(object):
     def __init__(self):
         self.db = {}
         self._before_start = []
+        self._after_start = []
         self._after_stop = []
         self._raw_tasks = {}
 
@@ -68,6 +69,9 @@ class WorkerMethodsDB(object):
 
     def register_before_start(self, func):
         self._before_start.append( func )
+
+    def register_after_start(self, func):
+        self._after_start.append( func )
 
     def register_after_stop(self, func):
         self._after_stop.append( func )

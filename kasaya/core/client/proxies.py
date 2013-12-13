@@ -74,6 +74,23 @@ class GenericProxy(object):
 
 
 
+class RawProxy(GenericProxy):
+    """
+    Internal use proxy (by async worker)
+    """
+    def sync_call(self, fullmethod, context, args, kwargs):
+        service, method = fullmethod.split(".",1)
+        addr = self._find_worker(service)
+        msg = {
+            "message" : messages.SYNC_CALL,
+            "service" : service,
+            "method"  : method,
+            "context" : context,
+            "args"    : args,
+            "kwargs"  : kwargs
+        }
+        return self._send_and_response_message(addr, msg)
+
 
 
 

@@ -4,7 +4,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from .worker_reg import worker_methods_db
 import inspect
 
-__all__ = ("Task", "task", "before_worker_start", "after_worker_stop")
+__all__ = ("Task", "task", "before_worker_start", "after_worker_start", "after_worker_stop")
 
 
 
@@ -71,6 +71,14 @@ def before_worker_start(func):
     worker_methods_db.register_before_start(func)
     return func
 
+
+def after_worker_start(func):
+    """
+    Registers function to be executed after worker start listening for jobs
+    """
+    _func_only(func)
+    worker_methods_db.register_after_start(func)
+    return func
 
 
 def after_worker_stop(func):
