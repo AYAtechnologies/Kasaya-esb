@@ -39,9 +39,10 @@ setup(
     version = version,
     packages = packages,
     package_dir = package_dir,
-    #data_files = [
-    #    ("config", ["examples/example.conf"]),
-    #],
+    data_files = [
+        ("readme", ["README.md"]),
+        ("license", ["LICENSE"]),
+    ],
     # tools
     scripts=['bin/svbus'],
     # requirments

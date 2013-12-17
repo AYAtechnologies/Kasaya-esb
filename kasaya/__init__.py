@@ -1,7 +1,7 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 
-version = "0.0.5"
+version = "0.0.5.1"
 
 # kasaya client calls
 from kasaya.core.client import sync, async, trans, control
