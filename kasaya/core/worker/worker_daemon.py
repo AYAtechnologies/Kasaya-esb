@@ -24,13 +24,20 @@ from kasaya.core.lib import LOG
 __all__=("WorkerDaemon",)
 
 
+# django helpers
+try:
+    from django.db import close_connection as _close_dj_connection
+except Exception:
+    def _close_dj_connection():
+        pass
+
+
 class TaskTimeout(Exception): pass
 
-from kasaya.core.events import OnEvent
-
-@OnEvent("sender-conn-reconn")
-def mesydzek(addr):
-    LOG.debug ("Trying to reconnect with %s" % addr)
+#from kasaya.core.events import OnEvent
+#@OnEvent("sender-conn-reconn")
+#def mesydzek(addr):
+#    LOG.debug ("Trying to reconnect with %s" % addr)
 
 
 
@@ -78,7 +85,6 @@ class WorkerDaemon(WorkerBase):
         self.__hbloop=True
         #exposing methods
         self.exposed_methods = []
-        #MiddlewareCore.__init__(self)
         # control tasks
         self.ctl = ControlTasks()
         self.ctl.register_task("stop", self.CTL_stop )
@@ -179,7 +185,6 @@ class WorkerDaemon(WorkerBase):
         self.__greens.append( gevent.spawn(self.loop.loop) )
         self.__greens.append( gevent.spawn(self.heartbeat_loop) )
         try:
-            print ("joinall")
             gevent.joinall(self.__greens)
         finally:
             self.stop()
@@ -313,6 +318,11 @@ class WorkerDaemon(WorkerBase):
             LOG.info("Task [%s] exception [%s]. Message: %s" % (funcname, err['name'], err['description']) )
             LOG.debug(err['traceback'])
             return err
+
+        finally:
+            # close django connection
+            if task['close_djconn']:
+                _close_dj_connection()
 
 
     # worker internal control tasks

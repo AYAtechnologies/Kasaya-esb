@@ -23,26 +23,34 @@ class task(object):
     """
     Register task in service
     """
-    def __init__(self, name=None, timeout=None, anonymous=True, permissions=None):
+    def __init__(self, name=None, timeout=None,
+                 anonymous=True, permissions=None,
+                 close_django_conn=True ):
         """
         name - task name if different than function name
         timeout - maximum task execution time in seconds
         anonymous - this task can be called anonymous (unsuppoerted)
         permissions - permissions required to run this task (unsupported)
+        close_dj_conn - when working with django ORM set this flag to true to close
+                     db connection after fucntion ends.
         """
         self.name = name
         self.timeout = timeout
         self.anonymous = anonymous
         self.permissions = permissions
+        self.close_dj_conn = close_django_conn
 
     def __call__(self, func):
         _func_only(func)
         worker_methods_db.register_task(
-            self.name, func, self.timeout, self.anonymous, self.permissions)
+            self.name, func, self.timeout, self.anonymous, self.permissions, self.close_dj_conn)
         return func
 
-# in future Task will be replaced with task for consistency with other decorators
+
+# in future 'Task' will be removed, use 'task' instead
 Task = task
+
+
 
 
 class raw_task(object):

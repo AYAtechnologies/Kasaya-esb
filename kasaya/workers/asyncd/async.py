@@ -2,7 +2,7 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya import Task, before_worker_start, after_worker_stop, after_worker_start
-from kasaya.core.worker.decorators import raw_task
+from kasaya.core.worker.decorators import raw_task, task
 from kasaya.core.protocol import messages
 from kasaya.conf import settings
 from kasaya.core.protocol import Serializer
@@ -155,7 +155,7 @@ def add_task_to_queue(msg):
 
 # normal task
 
-@Task()
+@task()
 def get_task_result(task_id):
     global ASYNC
     pass
