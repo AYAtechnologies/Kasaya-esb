@@ -68,7 +68,7 @@ KASAYAD_CONTROL_PORT = 4041
 # GEVENT SETTINGS
 
 # use monkey-patching from gevent on workers
-WORKER_MONKEY = True
+GEVENT_MONKEY = True
 
 
 # KASAYA DAEMON INTERNAL SETTINGS

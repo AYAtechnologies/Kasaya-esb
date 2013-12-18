@@ -2,6 +2,12 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
+# monkey patching
+import gevent
+if settings.GEVENT_MONKEY:
+    import gevent.monkey
+    gevent.monkey.patch_all()
+# more kasaya imports
 from kasaya.core.protocol import messages
 from kasaya.core.worker.worker_base import WorkerBase
 from kasaya.core.protocol.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
@@ -12,12 +18,10 @@ from kasaya.core.lib.syncclient import KasayaLocalClient
 from kasaya.core.events import add_event_handler
 from kasaya.core import exceptions
 from .worker_reg import worker_methods_db
-import gevent
-import gevent.monkey
 
 import traceback
 import datetime, os
-import inspect
+#import inspect
 
 from kasaya.core.lib import LOG
 
@@ -98,9 +102,6 @@ class WorkerDaemon(WorkerBase):
         self._tasks_nonex = 0 # non existing tasks called
         self._tasks_control = 0 # control tasks received
         self._start_time = datetime.datetime.now() # time of worker start
-
-        if settings.WORKER_MONKEY:
-            gevent.monkey.patch_all()
 
 
     def __load_config(self):
