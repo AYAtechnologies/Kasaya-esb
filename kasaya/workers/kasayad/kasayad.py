@@ -106,7 +106,7 @@ class KasayaDaemon(WorkerBase):
         Send information about shutdown to all hosts in network
         """
         self.DB.host_unregister(self.ID)
-        self.BC.broadcast_host_stop()
+        #self.BC.broadcast_host_stop()
 
 
 
