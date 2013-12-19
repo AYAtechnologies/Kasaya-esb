@@ -3,7 +3,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.core.protocol import messages
 from kasaya.conf import settings
 from kasaya.core.lib.syncclient import KasayaLocalClient
-from kasaya.core.protocol.comm import send_and_receive_response
+from kasaya.core.protocol.comm import send_and_receive_response, send_and_receive
 from kasaya.core import exceptions
 from kasaya.core.lib import LOG
 
@@ -27,7 +27,7 @@ class GenericProxy(object):
     def __init__(self):
         self._names = []
         self._method = None
-        self._context = []
+        self._context = None
 
     def initialize(self, method, context):
         self._names = method
@@ -51,7 +51,8 @@ class GenericProxy(object):
             raise exceptions.ServiceNotFound("No service '%s' found" % service_name)
         return addr
 
-    def _send_and_response_message(self, addr, msg):
+    @staticmethod
+    def _namefixer(msg):
         global _namefix
         if _namefix:
             try:
@@ -66,8 +67,12 @@ class GenericProxy(object):
                     msg['method'] = unicode(m,'ascii')
             except KeyError:
                 pass
+
+    def _send_and_response_message(self, addr, msg):
+        self._namefixer(msg)
         res = send_and_receive_response(addr, msg, 30) # manual timeout !!!!!  fix it!
         return res
+
 
     def __call__(self, *args, **kwargs):
         raise NotImplemented("can't call proxy")
@@ -78,6 +83,15 @@ class RawProxy(GenericProxy):
     """
     Internal use proxy (by async worker)
     """
+    def _send_and_response(self, addr, msg):
+        """
+        Send request and return raw message
+        """
+        self._namefixer(msg)
+        return send_and_receive(addr, msg, 30) # manual timeout !!!!!  fix it!
+
+
+
     def sync_call(self, fullmethod, context, args, kwargs):
         service, method = fullmethod.split(".",1)
         addr = self._find_worker(service)
@@ -89,7 +103,7 @@ class RawProxy(GenericProxy):
             "args"    : args,
             "kwargs"  : kwargs
         }
-        return self._send_and_response_message(addr, msg)
+        return self._send_and_response(addr, msg)
 
 
 

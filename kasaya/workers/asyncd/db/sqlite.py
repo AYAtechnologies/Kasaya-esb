@@ -20,6 +20,7 @@ class SQLiteDatabase(DatabaseBase):
                 status INTEGER,              /* 0 - waiting, 1 - selected to process, 2 - processing, 3 - finished */
                 time_crt INTEGER,            /* task creation time */
                 time_act INTEGER,            /* last activity time */
+                ignore_result BOOL,          /* ignore result of task */
                 workerid TEXT,               /* worker id which received task */
                 task TEXT,                   /* task name */
                 error INTEGER,               /* error counter */
@@ -61,12 +62,12 @@ class SQLiteDatabase(DatabaseBase):
 
     # task database
 
-    def task_add(self, taskname, time, args, context):
+    def task_add(self, taskname, time, args, context, ign_result):
         """
         Adds task to database for execution
         """
-        query = "INSERT INTO jobs (task, time_crt, args, context, status, error, delay) VALUES (?,?,?,?,0,0,0)"
-        res = self.cur.execute( query, (taskname, time, SQ.Binary(args), SQ.Binary(context) ) )
+        query = "INSERT INTO jobs (task, time_crt, args, context, ignore_result, status, error, delay) VALUES (?,?,?,?,?,0,0,0)"
+        res = self.cur.execute( query, (taskname, time, SQ.Binary(args), SQ.Binary(context), ign_result ) )
         rowid = res.lastrowid
         self.__db.commit()
         return "%s-%X" % (self.dbid, rowid)
@@ -79,7 +80,7 @@ class SQLiteDatabase(DatabaseBase):
         one async daemon connected to this database choose task even if ask for
         job in same time.
 
-        statusy: 0 - waiting, 1 - selected to process, 2 - processing, 3 - finished
+        statusy: 0 - waiting, 1 - selected to process, 2 - processing, 3 - finished, 4 - error permanent
         """
         now = time.time()
         # check if there is any missing task selected for processing
@@ -111,7 +112,7 @@ class SQLiteDatabase(DatabaseBase):
     def task_get_to_process(self, taskid):
         # set task status to 2 (processing)
         query = "UPDATE jobs SET status=2, time_act=? WHERE taskid=? AND status=1"
-        self.cur.execute( query, (taskid,time.time()) )
+        self.cur.execute( query, (time.time(), taskid) )
         self.__db.commit()
         # get all required task data
         query = "SELECT asyncid,time_crt,task,args,context FROM jobs WHERE taskid=?"#" AND status=2"
@@ -127,10 +128,21 @@ class SQLiteDatabase(DatabaseBase):
             'context'  : str(res[4]),
        }
 
+    def task_unselect_to_process(self, taskid):
+        """
+        Unselect task back to "waiting" state (1). This is used when own task
+        is hanging up with status=2 (selected to process) too long.
+        """
+        query = "UPDATE jobs SET status=0, time_act=? WHERE taskid=? AND status=1"
+        self.cur.execute( query, (time.time(), taskid) )
+        self.__db.commit()
+
+
 
     def task_error_and_delay(self, taskid, delay):
         """
-        Increase task error counter and set delay time before next try
+        Increase task error counter and set delay time before next try.
+        This means that error is recoverable and task can be repeated.
         """
         now = time.time()
         delay = now + delay
@@ -139,8 +151,57 @@ class SQLiteDatabase(DatabaseBase):
         self.__db.commit()
 
 
-    def task_finished(self, taskid, result, error):
+    def task_finished_ok(self, taskid, result):
         """
-        Set result of task
+        Set result of task as successfull
         """
-        pass
+        now = time.time()
+        query = "UPDATE jobs SET status=3, time_act=?, delay=0, result=? WHERE taskid=?"
+        self.cur.execute( query, (now, SQ.Binary(result), taskid) )
+        self.__db.commit()
+
+
+    def task_fail_permanently(self, taskid, result=None):
+        """
+        Sets task as permanently failed. Task will be never repeated.
+        """
+        now = time.time()
+        query = "UPDATE jobs SET status=4, time_act=?, delay=0, result=? WHERE taskid=?"
+        if not result is None:
+            result = SQ.Binary(result)
+        self.cur.execute( query, (now, result, taskid) )
+        self.__db.commit()
+
+
+
+    def task_find_dead(self, seconds_limit):
+        """
+        Find task with status=1 (selected for processing), but with last time of activity
+        older than seconds_limit parameter.
+        """
+        badtime = time.time() - seconds_limit
+        query = "SELECT taskid FROM jobs WHERE status=1 AND time_act<? AND asyncid=? LIMIT 1"
+        self.cur.execute( query, (badtime, self.ID) )
+        res = self.cur.fetchone()
+        # found dead task
+        if not res is None:
+            return res[0]
+
+
+    def async_list(self):
+        """
+        Return list of all async workers registered in database. Exclude own ID.
+        """
+        query = "SELECT DISTINCT asyncid FROM jobs WHERE asyncid!=?"
+        self.cur.execute( query, (self.ID,) )
+        lst = self.cur.fetchall()
+        for row in lst:
+            yield row[0]
+
+    def take_over_tasks(self, asyncid):
+        """
+        Reassign all tasks of lost worker to self
+        """
+        res = self.cur.execute( "UPDATE jobs SET asyncid=? WHERE asyncid=?", (self.ID, asyncid) )
+        self.__db.commit()
+        return res.rowcount

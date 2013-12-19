@@ -60,6 +60,7 @@ class SyncWorker(object):
         self.ctl.register_task("svbus.status",  self.CTL_global_services)
         self.ctl.register_task("worker.stop",   self.CTL_worker_stop)
         self.ctl.register_task("worker.stats",  self.CTL_worker_stats)
+        self.ctl.register_task("worker.exists",  self.CTL_worker_exists)
         self.ctl.register_task("service.start", self.CTL_service_start)
         self.ctl.register_task("service.stop",  self.CTL_service_stop)
         self.ctl.register_task("host.rescan",   self.CTL_host_rescan)
@@ -357,6 +358,14 @@ class SyncWorker(object):
         return lst
 
 
+    def CTL_worker_exists(self, worker_id):
+        """
+        Check if worker with given id is existing
+        """
+        wrkr = self.DB.worker_get(worker_id)
+        return not wrkr is None
+
+
     def CTL_worker_stop(self, ID, terminate=False, sigkill=False):
         """
         Send stop signal to worker
@@ -446,5 +455,3 @@ class SyncWorker(object):
         svlist = self.local_services_list(rescan=True)
         # send nwe list of services to kasaya daemon instance
         #self.DAEMON.notify_kasayad_refresh(self.DAEMON.ID, svlist, True)
-
-
