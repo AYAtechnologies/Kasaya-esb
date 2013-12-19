@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
-# always monkey patching
-import gevent
-import gevent.monkey
-gevent.monkey.patch_all()
+# monkey patching
+from kasaya.core.lib.mpatcher import damonkey
+damonkey()
+del damonkey
 # imports
 from kasaya import Task, before_worker_start, after_worker_stop, after_worker_start
 from kasaya.core.worker.decorators import raw_task, task

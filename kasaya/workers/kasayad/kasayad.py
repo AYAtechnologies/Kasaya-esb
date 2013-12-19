@@ -2,9 +2,9 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 # monkey patching
-import gevent
-import gevent.monkey
-gevent.monkey.patch_all()
+from kasaya.core.lib.mpatcher import damonkey
+damonkey()
+del damonkey
 # imports
 from kasaya.conf import settings
 from kasaya.core.lib import LOG, system
@@ -14,6 +14,7 @@ from .syncworker import SyncWorker
 from .db.netstatedb import NetworkStateDB
 from .broadcast import UDPBroadcast
 from .dbsync import Synchronizer
+import gevent
 
 
 class KasayaDaemon(WorkerBase):

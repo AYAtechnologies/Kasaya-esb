@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
-from kasaya.conf import settings
 # monkey patching
-import gevent
-if settings.GEVENT_MONKEY:
-    import gevent.monkey
-    gevent.monkey.patch_all()
+from kasaya.core.lib.mpatcher import damonkey
+damonkey()
+del damonkey
 # more kasaya imports
+from kasaya.conf import settings
 from kasaya.core.protocol import messages
 from kasaya.core.worker.worker_base import WorkerBase
 from kasaya.core.protocol.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
@@ -24,6 +23,7 @@ import datetime, os
 #import inspect
 
 from kasaya.core.lib import LOG
+import gevent
 
 __all__=("WorkerDaemon",)
 
