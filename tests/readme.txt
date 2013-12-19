@@ -1,1 +1,0 @@
-To run tests start all demons from examples/syncserver and workers from examples/workers

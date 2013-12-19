@@ -50,8 +50,7 @@ setup(
         'gevent',
         'netifaces',
         'plac',
-        'pycrypto',
-    ],
+        'pycrypto',    ],
 
     #home_page = "http://github.com/AYAtechnologies/Kasaya-esb",
     license = file('LICENSE').read(),

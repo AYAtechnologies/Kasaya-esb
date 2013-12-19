@@ -3,31 +3,14 @@ from __future__ import unicode_literals, division, absolute_import#, print_funct
 from kasaya.conf import settings
 import sqlite3 as SQ
 import time
+from .base import DatabaseBase
 
 
-
-class kvstore(object):
-    def __init__(self, db):
-        self.db = db
-
-    def __getitem__(self, k):
-        return self.db._config_value_get(k)
-
-    def __setitem__(self, k,v):
-        self.db._config_value_set(k,v)
-
-    def __delitem__(self, k):
-        self.db._config_del(k)
-
-
-
-
-class SQLiteDatabase(object):
+class SQLiteDatabase(DatabaseBase):
 
     def __init__(self, workerid):
         self.__db = SQ.connect(settings.ASYNC_SQLITE_DB_PATH)
         self.cur = self.__db.cursor()
-        self.ID = workerid
 
         # creating tables
         self.cur.execute("""
@@ -51,16 +34,7 @@ class SQLiteDatabase(object):
                 val TEXT
             )""")
 
-        # dictionary interface for config
-        self.CONF = kvstore(self)
-
-        # database ID
-        self.dbid = self.CONF['databaseid']
-        if self.dbid is None:
-            import os, base64
-            code = base64.b32encode( os.urandom(5) )
-            self.dbid = code.decode("ascii").rstrip("=")
-            self.CONF['databaseid'] = self.dbid
+        super(SQLiteDatabase, self).__init__(workerid)
 
 
     def close(self):

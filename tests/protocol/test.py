@@ -75,14 +75,15 @@ class SerializerTests(unittest.TestCase):
             "żółw":"zażółć gęślą jaźń",
             b"bin":b"fooo"
         }
-        result1 = S.serialize(msg)
-        result2 = S.deserialize(result1)
-        txt = "Serialization / deserialization failed. Transport %s." % trans
+        result1 = S.serialize(msg, True)
+        result2,resreq = S.deserialize(result1)
+        txt = "serialization / deserialization failed. Transport: %s, " % trans
         if enc:
-            txt += "Encrypted"
+            txt += "encrypted"
         else:
-            txt += "Unencrypted"
-        self.assertEqual(msg, result2, txt)
+            txt += "unencrypted"
+        self.assertItemsEqual(msg, result2, txt)
+        self.assertEqual(resreq, True)
 
 
     def test_singleton_serializer(self):
