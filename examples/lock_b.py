@@ -5,7 +5,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya import Task, sync
 from gevent import monkey
 monkey.patch_all()
-
+import gevent
 
 @Task(name="task_b")
 def task_b(param):

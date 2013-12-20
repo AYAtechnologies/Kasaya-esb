@@ -11,6 +11,12 @@ class SerializationError(ServiceBusException):
     """
     pass
 
+class NetworkError(ServiceBusException):
+    """
+    Any network level error during message transmission
+    """
+    pass
+
 
 class NotOurMessage(ServiceBusException):
     pass

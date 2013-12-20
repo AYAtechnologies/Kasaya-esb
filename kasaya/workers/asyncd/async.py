@@ -46,12 +46,34 @@ class AsyncWorker(object):
         self.serializer = Serializer()
         # caller
         self.PROXY = RawProxy()
+        self._processing = True
+
 
     def get_database_id(self):
         return self.DB.CONF['databaseid']
 
     def close(self):
+        self._processing = False
         self.DB.close()
+
+
+    # task processing loop
+
+    def task_eater(self):
+        while self._processing:
+            taskproc = self.process_next_job()
+            if taskproc:
+                gevent.sleep(0)
+            else:
+                gevent.sleep(2)
+
+    def start_eat(self):
+        g = gevent.Greenlet(self.task_eater)
+        g.start()
+
+
+    # task scheduling
+
 
     def task_add_new(self, task, context, args, kwargs, ign_result=False):
         """
@@ -69,7 +91,7 @@ class AsyncWorker(object):
             context = self.serializer.data_2_bin(context),
             ign_result = ign_result,
         )
-        self._check_next()
+        #self._check_next()
         return taskid
 
 
@@ -95,78 +117,116 @@ class AsyncWorker(object):
             )
 
         except exceptions.SerializationError:
-            """
-            Exception raised when serialization or deserialization fails.
-            If this exception occurs here, we can't try to run this task again, because
-            data stored in async database are probably screwed up (for example async daemon
-            died or was stopped, but current configuration is different and uses other
-            serialization methods). We mark this task as permanently broken (and newer will be repeated).
-            """
+            # Exception raised when serialization or deserialization fails.
+            # If this exception occurs here, we can't try to run this task again, because
+            # data stored in async database are probably screwed up (for example async daemon
+            # died or was stopped, but current configuration is different and uses other
+            # serialization methods). We mark this task as permanently broken (and newer will be repeated).
             self.DB.task_fail_permanently(taskid)
+            return
 
         except exceptions.ServiceNotFound:
-            """
-            Worker not found occurs when destination service is currently not
-            available. Task will be repeated in future.
-            """
+            # Worker not found occurs when destination service is currently not
+            # available. Task will be repeated in future.
             self.DB.task_error_and_delay(taskid, settings.ASYNC_ERROR_TASK_DELAY)
+            return
+
+        except exceptions.ServiceBusException:
+            # Any other internal exception
+            # will bump error counter
+            self.DB.task_error_and_delay(taskid, settings.ASYNC_ERROR_TASK_DELAY)
+            return
+
+
+        if result['message'] == messages.ERROR:
+            # task prodoced error
+            # not kasaya exception, but task's own error
+            # it's not our fault ;-)
+
+            # get task context or create it if not exist
+            ctx = data['context']
+            if ctx is None:
+                ctx = {}
+
+            # increace error count
+            errcnt = ctx.get("err_count", 0) + 1
+            ctx['err_count'] = errcnt
+
+            # if error counter is limited, is that limit reached?
+            maxerr = ctx.get("err_max", None)
+            if not maxerr is None:
+                no_retry = errcnt>=maxerr
+            else:
+                no_retry = False
+
+            data['context'] = ctx
+            if no_retry:
+                self.DB.task_fail_permanently(
+                    taskid,
+                    settings.ASYNC_ERROR_TASK_DELAY,
+                    self.serializer.data_2_bin(result) )
+                self.DB.task_store_context(
+                    taskid,
+                    self.serializer.data_2_bin(ctx) )
+            else:
+                self.DB.task_error_and_delay(taskid,
+                    settings.ASYNC_ERROR_TASK_DELAY,
+                    self.serializer.data_2_bin(result) )
+                self.DB.task_store_context(
+                    taskid,
+                    self.serializer.data_2_bin(ctx) )
             return
 
         # task is processed succesfully
         self.DB.task_finished_ok(taskid, self.serializer.data_2_bin( result ) )
 
-        # and finally...
-        self._check_next()
 
 
     def process_next_job(self):
         """
-        Check if there is waiting job to do,
-        and start processing if is available
+        Check if is any job waiting and start processing it.
         """
         taskid = self.DB.task_get_next_id()
         if taskid is None:
-            # nothing to do, check for lost tasks
-            grnlt = gevent.Greenlet(self._check_dead_tasks)
-            grnlt.start()
-            return
+            return False
         else:
-            # task is waiting
+            # there is task to process
             self.process_task( taskid )
+            return True
 
 
-    def _check_dead_tasks(self):
+    def _check_lost_tasks(self, once=False):
         """
-        Check database for dead tasks:
-        - task waiting long with status=1 (selected to process, but unprocessed for long time)
+        Find tasks assigned to unexisting async workers and reassign them to self.
+        once - if true, then not register task to do it again in future
+        also:
+        Check database for dead tasks: task waiting long with status=1
+        (selected to process, but unprocessed)
         """
-        dt = self.DB.task_find_dead( settings.ASYNC_DEAD_TASK_TIME_LIMIT )
-        if dt is None:
-            return
-        self.DB.task_unselect_to_process(dt)
-        self._check_next()
-
-    def _check_lost_tasks(self):
-        """
-        Find tasks assigned to unexisting async workers and reassign them to self
-        """
+        lost_asyncd = 0
         for asyncid in self.DB.async_list():
             if control.worker.exists( asyncid ):
                 # worker exists
                 continue
-            print ("LOST ASYNC", asyncid)
-            rc = self.DB.take_over_tasks(asyncid)
-            print (rc)
-        self._check_dead_tasks()
+            # found lost async daemon tasks,
+            # reassign them to self
+            rc = self.DB.takeover_tasks(asyncid)
+            lost_asyncd =+ 1
 
+        # find dead tasks
+        #
+        # Poprawić wyszukiwanie martwych tasków (ze statusem=1)
+        # W tej chwili baza wyszukuje każdego zagubionego taska, również cudzego
+        #
+        dt = self.DB.task_find_dead( settings.ASYNC_DEAD_TASK_TIME_LIMIT )
+        if not dt is None:
+            self.DB.task_unselect_to_process(dt)
 
-    def _check_next(self):
-        """
-        After each function which adds or removes task from queue
-        this function should be called.
-        """
-        grnlt = gevent.Greenlet(self.process_next_job)
-        grnlt.start()
+        # do this task once per 10 minutes,
+        # but don't register this greenlet more
+        if not once:
+            g = gevent.Greenlet(self._check_lost_tasks)
+            g.start_later(10)
 
 
 
@@ -175,16 +235,21 @@ class AsyncWorker(object):
 
 @before_worker_start
 def setup_async(ID):
-    global ASYNC
+    global ASYNC, _triggered
+    _triggered = False
     ASYNC = AsyncWorker(ID)
     LOG.info( "Database id: %s" % ASYNC.get_database_id() )
 
 @after_worker_start
 def async_started():
-    global ASYNC
-    ASYNC._check_lost_tasks()
-    ASYNC._check_dead_tasks()
-    ASYNC._check_next()
+    global ASYNC, _triggered
+    # find tasks of async daemons which doesn't exists
+    ASYNC.start_eat()
+    ASYNC._check_lost_tasks( _triggered )
+    # find any waiting task for process
+    #ASYNC._check_next()
+    # triggered...
+    _triggered = True
 
 @after_worker_stop
 def stop_async():
@@ -202,7 +267,6 @@ def add_task_to_queue(msg):
     Catch new task and store in database
     """
     global ASYNC
-    #pprint(msg)
     res = ASYNC.task_add_new(
         msg['method'],
         msg['context'],

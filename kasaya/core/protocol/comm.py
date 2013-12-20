@@ -17,14 +17,14 @@ import gevent, errno
 # internal exceptions
 
 
-class ConnectionClosed(Exception):
+class ConnectionClosed(exceptions.NetworkError):
     """
     exception throwed in case of transmission,
     when current socket connection is unavailable
     sender should try to repeat transimission after some time
     """
     pass
-class NoData(Exception):
+class NoData(exceptions.NetworkError):
     """
     Connection is closed normally, no more data will be received
     """

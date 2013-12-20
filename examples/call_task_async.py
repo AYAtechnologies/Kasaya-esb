@@ -9,8 +9,13 @@ from kasaya import async
 
 
 if __name__=="__main__":
+    import sys
     #print ">>>", async.fikumiku.do_work("parameter", 1, foo=123, baz=True )
-    print async.locka.task_a("!")
+    for a in range(12):
+        async.locka.burak()
+        #async.locka.task_a("!")
+        print ".",
+        sys.stdout.flush()
 
 #    load_config_from_file("example.conf", optional=True)
 #

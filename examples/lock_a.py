@@ -5,6 +5,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya import Task, sync
 from gevent import monkey
 monkey.patch_all()
+import gevent
 
 @Task(name="task_a")
 def task_a(param):
@@ -22,9 +23,16 @@ def task_a(param):
 def task_c(param):
     print ("Starting C task")
     res = param+" c"
+    gevent.sleep(1)
     print ("Finishing C task")
     return res
 
+
+@Task(name="burak")
+def task_c():
+    print ("Test buraka")
+    #raise Exception("Task się wywalił :(")
+    return "Udane"
 
 
 if __name__=="__main__":
