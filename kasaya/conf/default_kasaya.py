@@ -107,3 +107,11 @@ USE_LOG_SERVICE = False
 
 # User workers directory
 LOCAL_WORKERS_DIR = "/opt/services"
+
+
+# DJANGO COMPATIBILITY SETTINGS
+
+# If worker is using django ORM internally, each task leaves unclosed
+# connection. By default kasaya try to close connection after each task.
+# You can disable this feature if not using django ORM in kasaya workers.
+DJANGO_ORM_CLOSE_CONN_AFTER_TASKS = True

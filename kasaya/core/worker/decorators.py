@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
+from kasaya.conf import settings
 from .worker_reg import worker_methods_db
 import inspect
 
@@ -25,7 +26,7 @@ class task(object):
     """
     def __init__(self, name=None, timeout=None,
                  anonymous=True, permissions=None,
-                 close_django_conn=True ):
+                 close_django_conn=None ):
         """
         name - task name if different than function name
         timeout - maximum task execution time in seconds
@@ -38,6 +39,8 @@ class task(object):
         self.timeout = timeout
         self.anonymous = anonymous
         self.permissions = permissions
+        if close_django_conn is None:
+            lose_django_conn = settings.DJANGO_ORM_CLOSE_CONN_AFTER_TASKS
         self.close_dj_conn = close_django_conn
 
     def __call__(self, func):

@@ -10,7 +10,7 @@ from kasaya import async
 
 if __name__=="__main__":
     #print ">>>", async.fikumiku.do_work("parameter", 1, foo=123, baz=True )
-    print async.locka.task_c("aaa")
+    print async.locka.task_a("!")
 
 #    load_config_from_file("example.conf", optional=True)
 #
