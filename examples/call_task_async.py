@@ -11,7 +11,7 @@ from kasaya import async
 if __name__=="__main__":
     import sys
     #print ">>>", async.fikumiku.do_work("parameter", 1, foo=123, baz=True )
-    for a in range(12):
+    for a in range(100):
         async.locka.burak()
         #async.locka.task_a("!")
         print ".",

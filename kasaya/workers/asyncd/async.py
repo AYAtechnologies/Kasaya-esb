@@ -24,6 +24,7 @@ from pprint import pprint
 #from async_backend import AsyncBackend
 #from gevent import *
 import gevent
+from gevent.coros import Semaphore
 #from gevent.coros import Semaphore
 #from gevent.pool import Pool
 
@@ -48,6 +49,8 @@ class AsyncWorker(object):
         self.PROXY = RawProxy()
         self._processing = True
 
+        self.SEMA = Semaphore()
+
 
     def get_database_id(self):
         return self.DB.CONF['databaseid']
@@ -60,12 +63,19 @@ class AsyncWorker(object):
     # task processing loop
 
     def task_eater(self):
+        rectime = time.time()
         while self._processing:
             taskproc = self.process_next_job()
             if taskproc:
-                gevent.sleep(0)
+                gevent.sleep()
             else:
                 gevent.sleep(2)
+            if rectime<time.time():
+                g = gevent.Greenlet(self.check_lost_tasks)
+                g.start()
+                rectime = time.time() + settings.ASYNC_RECOVERY_TIME
+                gevent.sleep()
+
 
     def start_eat(self):
         g = gevent.Greenlet(self.task_eater)
@@ -101,7 +111,7 @@ class AsyncWorker(object):
         """
         LOG.debug("Processing task %i" % taskid)
         # get task from database
-        data = self.DB.task_get_to_process(taskid)
+        data = self.DB.task_start_process(taskid)
         if data is None:
             return
         # unpack data
@@ -186,23 +196,31 @@ class AsyncWorker(object):
         """
         Check if is any job waiting and start processing it.
         """
-        taskid = self.DB.task_get_next_id()
+        self.SEMA.acquire()
+        try:
+            taskid = self.DB.task_choose_for_process()
+        finally:
+            self.SEMA.release()
+
         if taskid is None:
+            # nothing is waiting
             return False
         else:
-            # there is task to process
             self.process_task( taskid )
             return True
 
 
-    def _check_lost_tasks(self, once=False):
+    def check_lost_tasks(self):
         """
         Find tasks assigned to unexisting async workers and reassign them to self.
         once - if true, then not register task to do it again in future
         also:
         Check database for dead tasks: task waiting long with status=1
         (selected to process, but unprocessed)
+        also:
+        Find tasks with status=2 - processing, but without asyncid (after asyncid died).
         """
+        # get all tasks belonging to dead async workers
         lost_asyncd = 0
         for asyncid in self.DB.async_list():
             if control.worker.exists( asyncid ):
@@ -210,23 +228,14 @@ class AsyncWorker(object):
                 continue
             # found lost async daemon tasks,
             # reassign them to self
-            rc = self.DB.takeover_tasks(asyncid)
+            rc = self.DB.unlock_lost_tasks(asyncid)
             lost_asyncd =+ 1
 
-        # find dead tasks
-        #
-        # Poprawić wyszukiwanie martwych tasków (ze statusem=1)
-        # W tej chwili baza wyszukuje każdego zagubionego taska, również cudzego
-        #
-        dt = self.DB.task_find_dead( settings.ASYNC_DEAD_TASK_TIME_LIMIT )
-        if not dt is None:
-            self.DB.task_unselect_to_process(dt)
+        # process all tasks with status 1 -> selected for process but unprocessed long time
+        self.DB.recover_unprocessed_tasks( settings.ASYNC_DEAD_TASK_TIME_LIMIT )
 
-        # do this task once per 10 minutes,
-        # but don't register this greenlet more
-        if not once:
-            g = gevent.Greenlet(self._check_lost_tasks)
-            g.start_later(10)
+        # process all tasks with status 2 -> processing started, but async daemon died before receiving result
+        self.DB.recover_unfinished_tasks()
 
 
 
@@ -235,21 +244,14 @@ class AsyncWorker(object):
 
 @before_worker_start
 def setup_async(ID):
-    global ASYNC, _triggered
-    _triggered = False
+    global ASYNC
     ASYNC = AsyncWorker(ID)
     LOG.info( "Database id: %s" % ASYNC.get_database_id() )
 
 @after_worker_start
 def async_started():
-    global ASYNC, _triggered
-    # find tasks of async daemons which doesn't exists
+    global ASYNC
     ASYNC.start_eat()
-    ASYNC._check_lost_tasks( _triggered )
-    # find any waiting task for process
-    #ASYNC._check_next()
-    # triggered...
-    _triggered = True
 
 @after_worker_stop
 def stop_async():
@@ -259,7 +261,6 @@ def stop_async():
 
 
 # catch tasks
-
 
 @raw_task(messages.ASYNC_CALL)
 def add_task_to_queue(msg):

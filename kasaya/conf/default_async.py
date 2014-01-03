@@ -20,9 +20,12 @@ ASYNC_SQLITE_DB_SYNCHRONOUS = "off"
 # delay in seconds before task sended to unexisting worker will be retried
 ASYNC_ERROR_TASK_DELAY = 30
 
-# how many seconds task can be selected for processing but unprocessed
+# how many seconds task can wait in state 'selected for processing' before resetting
 ASYNC_DEAD_TASK_TIME_LIMIT = 10
 
 # how long task result will wait in database for check by client in seconds
 # default 48 hours
 ASYNC_RESULT_LIFETIME = 60*60*48
+
+# how often async will run task recovering jobs leaved by dead async daemon in seconds
+ASYNC_RECOVERY_TIME = 60*10

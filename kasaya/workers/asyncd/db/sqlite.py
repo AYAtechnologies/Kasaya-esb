@@ -77,7 +77,7 @@ class SQLiteDatabase(DatabaseBase):
         return "%s-%X" % (self.dbid, rowid)
 
 
-    def task_get_next_id(self):
+    def task_choose_for_process(self):
         """
         Chooses one task waiting for execution.
         This function should use atomic database features to make sure that only
@@ -87,27 +87,22 @@ class SQLiteDatabase(DatabaseBase):
         statusy: 0 - waiting, 1 - selected to process, 2 - processing, 3 - finished, 4 - error permanent
         """
         now = time.time()
-        # check if there is any missing task selected for processing
+
+        # select free task
+        query = "UPDATE jobs SET asyncid=?, status=1, time_act=? WHERE status=0 AND delay<=? LIMIT 1"
+        res = self.cur.execute( query, (self.ID,time.time(), now ) )
+        try:
+            self.__db.commit()
+        except SQ.OperationalError:
+            # database is locked, can't select task for processing
+            return None
+        # nothing is waiting in task queue
+        if res.rowcount==0:
+            return None
+
         query = "SELECT taskid FROM jobs WHERE status=1 AND asyncid=? LIMIT 1"
         self.cur.execute( query, (self.ID,) )
         res = self.cur.fetchone()
-
-        if res is None:
-            # nothing already selected, then select one
-            query = "UPDATE jobs SET asyncid=?, status=1, time_act=? WHERE status=0 AND delay<=? LIMIT 1"
-            res = self.cur.execute( query, (self.ID,time.time(), now ) )
-            try:
-                self.__db.commit()
-            except SQ.OperationalError:
-                # database is locked, can't select task for processing
-                return None
-            # nothing is waiting tasks in queue
-            if res.rowcount==0:
-                return None
-
-            query = "SELECT taskid FROM jobs WHERE status=1 AND asyncid=? LIMIT 1"
-            self.cur.execute( query, (self.ID,) )
-            res = self.cur.fetchone()
 
         # nothing found in this place is strange...
         if res is None:
@@ -117,13 +112,23 @@ class SQLiteDatabase(DatabaseBase):
         return rowid
 
 
-    def task_get_to_process(self, taskid):
+    def task_start_process(self, taskid):
+        """
+        Get next free task for processing. This method guarantee that only one
+        async daemon take same task by setting status of task to 1 and then selecting
+        this task in next step.
+
+        TODO: join function into single one with  'task_choose_for_process'
+        """
         # set task status to 2 (processing)
         query = "UPDATE jobs SET status=2, time_act=? WHERE taskid=? AND status=1"
         self.cur.execute( query, (time.time(), taskid) )
-        self.__db.commit()
+        try:
+            self.__db.commit()
+        except SQ.OperationalError:
+            return None
         # get all required task data
-        query = "SELECT asyncid,time_crt,task,args,context FROM jobs WHERE taskid=?"#" AND status=2"
+        query = "SELECT asyncid,time_crt,task,args,context FROM jobs WHERE taskid=? AND status=2"
         self.cur.execute( query, (taskid,) )
         res = self.cur.fetchone()
         if res is None:
@@ -136,15 +141,75 @@ class SQLiteDatabase(DatabaseBase):
             'context'  : str(res[4]),
        }
 
-    def task_unselect_to_process(self, taskid):
-        """
-        Unselect task back to "waiting" state (1). This is used when own task
-        is hanging up with status=2 (selected to process) too long.
-        """
-        query = "UPDATE jobs SET status=0, time_act=? WHERE taskid=? AND status=1"
-        self.cur.execute( query, (time.time(), taskid) )
-        self.__db.commit()
 
+    # tasks recovery
+
+
+    def recover_unprocessed_tasks(self, time_limit):
+        """
+        Find all tasks unassigned to any asyncid with status=1 (selected for process) and restore
+        their status to 0 (waiting for process).
+        """
+        badtime = time.time() - time_limit
+        query = "UPDATE jobs SET asyncid=?, status=0, time_act=? WHERE asyncid is Null AND status=1 AND time_act<?"
+        c = self.cur.execute( query, (None, time.time(), badtime) )
+        try:
+            self.__db.commit()
+        except SQ.OperationalError:
+            return 0
+        return c.rowcount
+
+
+    def recover_unfinished_tasks(self):
+        """
+        Find tasks with processing started, but with never unreceived result.
+        This can happen, when async daemon died after sending task to worker,
+        but before receiving response.
+        Return number of affected rows.
+        """
+        query = "UPDATE jobs SET asyncid=?, status=0, error=error+1 WHERE status=2 AND asyncid is Null"
+        c = self.cur.execute( query, (self.ID,) )
+        try:
+            self.__db.commit()
+        except SQ.OperationalError:
+            return 0
+        return c.rowcount
+
+
+    def async_list(self):
+        """
+        Return list of all async workers registered in database.
+        Exclude self and tasks finished or permanently broken.
+        """
+        query = "SELECT DISTINCT asyncid FROM jobs WHERE asyncid!=? AND status<3"
+        self.cur.execute( query, (self.ID,) )
+        lst = self.cur.fetchall()
+        for row in lst:
+            yield row[0]
+
+
+    def unlock_lost_tasks(self, asyncid):
+        """
+        Reassign all tasks of specified asyncd worker to None.
+        Don't change finished or permanently broken tasks.
+        This allow to process tasks again by other async daemon.
+        """
+        res = self.cur.execute( "UPDATE jobs SET asyncid=? WHERE asyncid=? AND status<3", (None, asyncid) )
+        self.__db.commit()
+        return res.rowcount
+
+
+    # task processing
+
+
+    def task_finished_ok(self, taskid, result):
+        """
+        Set result of task as successfull
+        """
+        now = time.time()
+        query = "UPDATE jobs SET status=3, time_act=?, delay=0, result=? WHERE taskid=?"
+        self.cur.execute( query, (now, SQ.Binary(result), taskid) )
+        self.__db.commit()
 
 
     def task_error_and_delay(self, taskid, delay, result=None):
@@ -162,17 +227,6 @@ class SQLiteDatabase(DatabaseBase):
 
 
 
-    def task_finished_ok(self, taskid, result):
-        """
-        Set result of task as successfull
-        """
-        now = time.time()
-        query = "UPDATE jobs SET status=3, time_act=?, delay=0, result=? WHERE taskid=?"
-        self.cur.execute( query, (now, SQ.Binary(result), taskid) )
-        self.__db.commit()
-
-
-
     def task_fail_permanently(self, taskid, result=None):
         """
         Sets task as permanently failed. Task will be never repeated.
@@ -185,6 +239,7 @@ class SQLiteDatabase(DatabaseBase):
         self.__db.commit()
 
 
+
     def task_store_context(self, taskid, context):
         query = "UPDATE jobs SET context=? WHERE taskid=?"
         if not context is None:
@@ -193,37 +248,3 @@ class SQLiteDatabase(DatabaseBase):
         self.__db.commit()
 
 
-    def task_find_dead(self, seconds_limit):
-        """
-        Find task with status=1 (selected for processing), but with last time of activity
-        older than seconds_limit parameter.
-        """
-        badtime = time.time() - seconds_limit
-        query = "SELECT taskid FROM jobs WHERE status=1 AND time_act<? LIMIT 1"
-        self.cur.execute( query, (badtime,) )
-        res = self.cur.fetchone()
-        # found dead task
-        if not res is None:
-            return res[0]
-
-
-    def async_list(self):
-        """
-        Return list of all async workers registered in database.
-        Exclude self and tasks finished or permanently broken.
-        """
-        query = "SELECT DISTINCT asyncid FROM jobs WHERE asyncid!=? AND status<3"
-        self.cur.execute( query, (self.ID,) )
-        lst = self.cur.fetchall()
-        for row in lst:
-            yield row[0]
-
-
-    def takeover_tasks(self, asyncid):
-        """
-        Reassign all tasks of specified asyncd worker to self.
-        Don't change finished or permanently broken tasks.
-        """
-        res = self.cur.execute( "UPDATE jobs SET asyncid=? WHERE asyncid=? AND status<3", (None, asyncid) )
-        self.__db.commit()
-        return res.rowcount
