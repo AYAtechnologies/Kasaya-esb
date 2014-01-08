@@ -32,7 +32,7 @@ package_finder("kasaya")
 #pprint (packages)
 #pprint (package_dir)
 
-from kasaya import version
+version = open('kasaya/version.py').read().split('=')[1].replace('\'', '').strip()
 
 setup(
     name = 'Kasaya ESB',
@@ -53,8 +53,8 @@ setup(
         'pycrypto',    ],
 
     #home_page = "http://github.com/AYAtechnologies/Kasaya-esb",
-    license = file('LICENSE').read(),
-    long_description = file('README.md').read(),
+    license = open('LICENSE').read(),
+    long_description = open('README.md').read(),
     author = "AYA Technologies",
     author_email = "kb@ayatechnologies.net",
 )
