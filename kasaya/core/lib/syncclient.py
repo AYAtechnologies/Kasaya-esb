@@ -7,14 +7,16 @@ from kasaya.core import SingletonCreator
 from kasaya.core.exceptions import ReponseTimeout
 from gevent.coros import Semaphore
 from kasaya.core.protocol.comm import Sender, ConnectionClosed
+from kasaya.core.lib import LOG
 import gevent
 from gevent.coros import Semaphore
-from kasaya.core.lib import LOG
+
+
 
 #, SingletonCreator
 class KasayaLocalClient(Sender):
     """
-    KasayaLocalClient is communication class to talk with kasaya daemon.
+    KasayaLocalClient it is low level interface to communicate with kasaya daemon.
     It's used by workers and clients.
     """
 
@@ -73,6 +75,18 @@ class KasayaLocalClient(Sender):
         jest serwis o żądanej nazwie
         """
         msg = {'message':messages.QUERY, 'service':service}
+        self.SEMA.acquire()
+        try:
+            return self.send_and_receive(msg)
+        finally:
+            self.SEMA.release()
+
+
+    def query_multi(self, service):
+        """
+        Get all active workers realising given service
+        """
+        msg = {'message':messages.QUERY_MULTI, 'service':service}
         self.SEMA.acquire()
         try:
             return self.send_and_receive(msg)

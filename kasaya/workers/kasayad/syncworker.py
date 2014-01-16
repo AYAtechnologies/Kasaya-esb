@@ -55,6 +55,7 @@ class SyncWorker(object):
         self.intersync.register_message(messages.WORKER_LIVE, self.handle_worker_live)
         self.intersync.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
         self.intersync.register_message(messages.QUERY, self.handle_name_query, raw_msg_response=True)
+        self.intersync.register_message(messages.QUERY_MULTI, self.handle_name_query_multi, raw_msg_response=True)
         # service control tasks
         self.ctl = ControlTasks(allow_redirect=True)
         self.ctl.register_task("svbus.status",  self.CTL_global_services)
@@ -194,6 +195,21 @@ class SyncWorker(object):
             'message':messages.WORKER_ADDR,
             'service':name,
             'addr':addr,
+        }
+
+    def handle_name_query_multi(self, msg):
+        """
+        Send all workers for given service
+        """
+        name = msg['service']
+        addrlst = self.DB.list_workers_for_service(name)
+        if not addrlst is None:
+            addrlst = [ a['addr'] for a in addrlst ]
+        return {
+            'message':messages.WORKER_ADDR,
+            'service':name,
+            'addrlst': addrlst,
+            'timeout':10,
         }
 
     def handle_local_control_request(self, msg):

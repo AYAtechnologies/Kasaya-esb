@@ -15,6 +15,7 @@ PING = "wrkr/ping"
 PONG = "wrkr/pong"
 # local worker <--> syncd dialog
 QUERY = "sync/query"
+QUERY_MULTI = "sync/mulquery"
 WORKER_ADDR = "wrkr/addr"
 WORKER_REREG = "wrkr/rereg" # requet worker to register again
 CTL_CALL = "wrkr/ctrl" # internal service bus control request

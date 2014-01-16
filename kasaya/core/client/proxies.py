@@ -2,10 +2,12 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.protocol import messages
 from kasaya.conf import settings
-from kasaya.core.lib.syncclient import KasayaLocalClient
 from kasaya.core.protocol.comm import send_and_receive_response, send_and_receive
 from kasaya.core import exceptions
 from kasaya.core.lib import LOG
+from kasaya.core.lib.syncclient import KasayaLocalClient
+from kasaya.core.client.worker_finder import WorkerFinder
+
 
 # on python 2 we need to fix some strings to unicode
 # this is required to work with python 3 workers called with python 2 clients
@@ -19,9 +21,8 @@ __all__ = ("SyncProxy", "AsyncProxy", "ControlProxy", "TransactionProxy")
 
 class GenericProxy(object):
     """
-    Ta klasa przekształca normalne pythonowe wywołanie z kropkami:
-    a.b.c.d
-    na pojedyncze wywołanie z listą użytych metod ['a','b','c','d']
+    Catch calls separated by dots:
+    module.submodule.function(...)
     """
 
     def __init__(self):
@@ -42,14 +43,16 @@ class GenericProxy(object):
         """
         Ask kasaya daemon where is service
         """
-        kasaya = KasayaLocalClient()
-        msg = kasaya.query( service_name )
-        if not msg['message']==messages.WORKER_ADDR:
-            raise exceptions.ServiceBusException("Wrong response from sync server")
-        addr = msg['addr']
-        if addr is None:
-            raise exceptions.ServiceNotFound("No service '%s' found" % service_name)
-        return addr
+        wfinder = WorkerFinder()
+        return wfinder.find_worker(service_name)
+        #kasaya = KasayaLocalClient()
+        #msg = kasaya.query( service_name )
+        #if not msg['message']==messages.WORKER_ADDR:
+        #    raise exceptions.ServiceBusException("Wrong response from sync server")
+        #addr = msg['addr']
+        #if addr is None:
+        #    raise exceptions.ServiceNotFound("No service '%s' found" % service_name)
+        #return addr
 
     @staticmethod
     def _namefixer(msg):

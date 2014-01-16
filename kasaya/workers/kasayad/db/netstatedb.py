@@ -210,3 +210,10 @@ class NetworkStateDB(object):
         if len(lst)==0:
             return None
         return choice(lst)
+
+    def list_workers_for_service(self, service):
+        lst = self.LLDB.workers_for_service(service, True)
+        lst = list(lst)
+        if len(lst)==0:
+            return None
+        return lst
