@@ -73,9 +73,12 @@ def _serialize_and_send(SOCK, serializer, message, timeout=None, resreq=True):
     try:
         SOCK.sendall( message )
     except socket.error as e:
-        if e.errno in (errno.EPIPE, errno.ECONNRESET):
-            raise ConnectionClosed
-        raise
+        #if e.errno in (errno.EPIPE, errno.ECONNRESET):
+        raise ConnectionClosed("connection closed or pipe broken")
+        #raise e
+    except Exception as e:
+        # shouldn't happen....
+        raise ConnectionClosed("abnormal connection error")
 
 
 def _receive_and_deserialize(SOCK, serializer, timeout=None):
@@ -113,17 +116,21 @@ def _receive_and_deserialize(SOCK, serializer, timeout=None):
             data = SOCK.recv( rest )
             if not data:
                 # transmission broken before receiving full message body
-                raise ConnectionClosed
+                raise ConnectionClosed("connection closed or pipe broken")
             body += data
 
     except socket.error as e:
         # socket error
         #print ("ERROR NO",e.errno)
-        if e.errno==errno.ECONNRESET:
+        #if e.errno==errno.ECONNRESET:
             # connection reset by peer (104)
-            raise ConnectionClosed
-        else:
-            raise
+        raise ConnectionClosed("connection closed or pipe broken")
+        #else:
+        #    raise ConnectionClosed("abnormal connection error")
+
+    except Exception as e:
+        # other unknown error
+        raise ConnectionClosed("abnormal connection error")
 
     return serializer.deserialize(
         ((psize, iv, cmpr, trim, resreq),

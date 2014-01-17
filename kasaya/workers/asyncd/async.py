@@ -13,6 +13,7 @@ from kasaya.conf import settings
 from kasaya.core.protocol import Serializer
 from kasaya.core.client.proxies import RawProxy
 from kasaya.core import exceptions
+from kasaya.core.client.worker_finder import WorkerFinder
 
 from kasaya.core.lib.logger import LOG
 LOG.stetupLogger("async")
@@ -94,15 +95,29 @@ class AsyncWorker(object):
             ign_result - ignore result flag (True / False)
         """
         args = (args, kwargs)
+        try:
+            svc,task = task.split(".",1)
+        except IndexError:
+            raise Exception("wrong task name")
         taskid = self.DB.task_add(
+            service = svc,
             taskname = task,
             time = time.time(),
             args = self.serializer.data_2_bin(args),
             context = self.serializer.data_2_bin(context),
             ign_result = ign_result,
         )
-        #self._check_next()
         return taskid
+
+
+    def _flush_cache_for_service(self, servicename):
+        """
+        Flushes local worker list cache for service.
+        It's used after worker down during task processing, to avoid sending
+        next jobs to same worker again. Kasaya daemon should detect worker
+        problem and will not send this worker address again.
+        """
+        WorkerFinder()._reset_cache(servicename)
 
 
     def process_task(self, taskid):
@@ -120,6 +135,7 @@ class AsyncWorker(object):
         # send task to realize
         try:
             result = self.PROXY.sync_call(
+                data['service'],
                 data['task'],
                 data['context'],
                 data['args'],
@@ -131,7 +147,7 @@ class AsyncWorker(object):
             # If this exception occurs here, we can't try to run this task again, because
             # data stored in async database are probably screwed up (for example async daemon
             # died or was stopped, but current configuration is different and uses other
-            # serialization methods). We mark this task as permanently broken (and newer will be repeated).
+            # serialization methods). We mark this task as permanently broken (it will be never repeated).
             self.DB.task_fail_permanently(taskid)
             return
 
@@ -139,12 +155,27 @@ class AsyncWorker(object):
             # Worker not found occurs when destination service is currently not
             # available. Task will be repeated in future.
             self.DB.task_error_and_delay(taskid, settings.ASYNC_ERROR_TASK_DELAY)
+            # mark all other tasks to same service as delayed,
+            # to avoid spamming kasaya dameon
+            self.DB.delay_tasks_for_service(data['service'], settings.ASYNC_ERROR_TASK_DELAY)
             return
 
         except exceptions.ServiceBusException:
             # Any other internal exception
             # will bump error counter
             self.DB.task_error_and_delay(taskid, settings.ASYNC_ERROR_TASK_DELAY)
+            return
+
+        except exceptions.NetworkError:
+            # worker died, network fault or other low level networking error
+            self.DB.task_error_and_delay(taskid, settings.ASYNC_ERROR_TASK_DELAY)
+            self._flush_cache_for_service(data['service'])
+            return
+
+        except Exception as e:
+            # other errors uncatched before
+            self.DB.task_error_and_delay(taskid, settings.ASYNC_ERROR_TASK_DELAY)
+            self._flush_cache_by_task_name(data['task'])
             return
 
 

@@ -22,6 +22,7 @@ class SQLiteDatabase(DatabaseBase):
                 time_act INTEGER,            /* last activity time */
                 ignore_result BOOL,          /* ignore result of task */
                 workerid TEXT,               /* worker id which received task */
+                service TEXT,                /* service name */
                 task TEXT,                   /* task name */
                 error INTEGER,               /* error counter */
                 delay INTEGER,               /* next execution time */
@@ -64,14 +65,16 @@ class SQLiteDatabase(DatabaseBase):
         self.cur.execute("DELETE FROM conf WHERE key=?", (key,) )
         self.__db.commit()
 
+
     # task database
 
-    def task_add(self, taskname, time, args, context, ign_result):
+
+    def task_add(self, service, taskname, time, args, context, ign_result):
         """
         Adds task to database for execution
         """
-        query = "INSERT INTO jobs (task, time_crt, args, context, ignore_result, status, error, delay) VALUES (?,?,?,?,?,0,0,0)"
-        res = self.cur.execute( query, (taskname, time, SQ.Binary(args), SQ.Binary(context), ign_result ) )
+        query = "INSERT INTO jobs (service, task, time_crt, args, context, ignore_result, status, error, delay) VALUES (?,?,?,?,?,?,0,0,0)"
+        res = self.cur.execute( query, (service, taskname, time, SQ.Binary(args), SQ.Binary(context), ign_result ) )
         rowid = res.lastrowid
         self.__db.commit()
         return "%s-%X" % (self.dbid, rowid)
@@ -128,18 +131,37 @@ class SQLiteDatabase(DatabaseBase):
         except SQ.OperationalError:
             return None
         # get all required task data
-        query = "SELECT asyncid,time_crt,task,args,context FROM jobs WHERE taskid=? AND status=2"
+        query = "SELECT time_crt,service,task,args,context FROM jobs WHERE taskid=? AND status=2"
         self.cur.execute( query, (taskid,) )
         res = self.cur.fetchone()
         if res is None:
             return None
         return {
             #'id'       : taskid,
-            'time_crt' : res[1],
+            'time_crt' : res[0],
+            'service'  : res[1],
             'task'     : res[2],
             'args'     : str(res[3]),
             'context'  : str(res[4]),
        }
+
+
+    # service related methods
+
+    def delay_tasks_for_service(self, servicename, delay):
+        """
+        Delays all tasks assigned to specified service.
+        Delay will touch all own tasks and unassigned tasks (with asyncid=None).
+        """
+        now = time.time()
+        delay = now+delay
+        query = "UPDATE jobs SET delay=? WHERE service=? AND delay<=? AND status=0 AND ((asyncid=?) OR (asyncid is Null))"
+        self.cur.execute( query, (delay, servicename, now, self.ID) )
+        try:
+            self.__db.commit()
+        except SQ.OperationalError:
+            return None
+
 
 
     # tasks recovery

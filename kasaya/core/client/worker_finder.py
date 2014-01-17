@@ -12,10 +12,11 @@ from time import time
 class WorkerFinder(object):
     __metaclass__ = SingletonCreator
 
-    def __init__(self):
+    def __init__(self, allow_caching=False):
         self._allow_caching = False
         self._kasaya = KasayaLocalClient()
-        self.enable_cache()
+        if allow_caching:
+            self.enable_cache()
 
 
     def enable_cache(self):
@@ -42,7 +43,14 @@ class WorkerFinder(object):
 
 
     def _reset_cache(self, servicename):
-        pass
+        """
+        Flush cache with workes list for specified servicename
+        """
+        if self._allow_caching:
+            try:
+                del self._cache[servicename]
+            except KeyError:
+                pass
 
 
     def find_worker(self, service_name, tag=None):
@@ -70,7 +78,7 @@ class WorkerFinder(object):
                 return choice( wdata['w'] )
             else:
                 # cache data is outdated
-                del wdata[service_name]
+                self._reset_cache(service_name)
         except KeyError:
             pass
 

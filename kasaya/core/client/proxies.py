@@ -45,14 +45,12 @@ class GenericProxy(object):
         """
         wfinder = WorkerFinder()
         return wfinder.find_worker(service_name)
-        #kasaya = KasayaLocalClient()
-        #msg = kasaya.query( service_name )
-        #if not msg['message']==messages.WORKER_ADDR:
-        #    raise exceptions.ServiceBusException("Wrong response from sync server")
-        #addr = msg['addr']
-        #if addr is None:
-        #    raise exceptions.ServiceNotFound("No service '%s' found" % service_name)
-        #return addr
+
+    def _flush_cache(self, service_name):
+        """
+        Called in case of worker death
+        """
+        self.wfinder._reset_cache(service_name)
 
     @staticmethod
     def _namefixer(msg):
@@ -95,8 +93,7 @@ class RawProxy(GenericProxy):
 
 
 
-    def sync_call(self, fullmethod, context, args, kwargs):
-        service, method = fullmethod.split(".",1)
+    def sync_call(self, service, method, context, args, kwargs):
         addr = self._find_worker(service)
         msg = {
             "message" : messages.SYNC_CALL,
