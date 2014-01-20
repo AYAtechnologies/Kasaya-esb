@@ -46,12 +46,6 @@ class GenericProxy(object):
         wfinder = WorkerFinder()
         return wfinder.find_worker(service_name)
 
-    def _flush_cache(self, service_name):
-        """
-        Called in case of worker death
-        """
-        self.wfinder._reset_cache(service_name)
-
     @staticmethod
     def _namefixer(msg):
         global _namefix

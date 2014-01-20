@@ -173,9 +173,11 @@ class AsyncWorker(object):
             return
 
         except Exception as e:
-            # other errors uncatched before
+            # other errors uncatched earlier
+            # should never happend, but happens sometimes when
+            # killing worker during processing of task.
             self.DB.task_error_and_delay(taskid, settings.ASYNC_ERROR_TASK_DELAY)
-            self._flush_cache_by_task_name(data['task'])
+            self._flush_cache_for_service(data['service'])
             return
 
 
