@@ -1,7 +1,7 @@
 #encoding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from .proxies import SyncProxy, AsyncProxy, ControlProxy, TransactionProxy
-
+from .context import Context
 
 
 class ExecContext(object):
@@ -10,7 +10,12 @@ class ExecContext(object):
     """
 
     def __init__(self, context=None):
-        self._context = context
+        if context is None:
+            self._context = None
+        elif isinstance(context, Context):
+            self._context = context.copy()
+        else:
+            raise Exception("Context can be only Context type or None")
 
     def __getattr__(self, itemname):
         """
@@ -29,13 +34,12 @@ class ExecContext(object):
         To wywołanie używane jest przy tworzeniu context managera lub wywołaniu z określonym contekstem wywołania.
         W takim przypadku należy utworzyć nową instancję tej klasy z ustawionym kontekstem.
         """
-        authexec = cls( context )
-        return authexec
+        return cls( context )
 
     def __enter__(self):
         """
         Ta metoda wywoływana jest przy wejściu do utworzonego context managera.
-        W tym miejscu self reprezentuje obiekt authexec utworzony przez __call__.
+        W tym miejscu self reprezentuje obiekt typu ExecContext utworzony przez __call__.
         """
         return self
 

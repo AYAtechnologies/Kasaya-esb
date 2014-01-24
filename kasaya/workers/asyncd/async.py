@@ -54,16 +54,27 @@ class AsyncWorker(object):
 
 
     def get_database_id(self):
-        return self.DB.CONF['databaseid']
+        """
+        Gets database ID used by current async daemon instance
+        """
+        try:
+            return self.__dbid
+        except AttributeError:
+            self.__dbid = self.DB.CONF['databaseid']
+        return self.__dbid
+
 
     def close(self):
+        """
+        Stop processing tasks and close database
+        """
         self._processing = False
         self.DB.close()
 
 
     # task processing loop
 
-    def task_eater(self):
+    def task_processing_loop(self):
         rectime = time.time()
         while self._processing:
             taskproc = self.process_next_job()
@@ -78,15 +89,35 @@ class AsyncWorker(object):
                 gevent.sleep()
 
 
-    def start_eat(self):
-        g = gevent.Greenlet(self.task_eater)
+    def start_processing(self):
+        """
+        Run task processing loop in separated gevent loop
+        """
+        g = gevent.Greenlet(self.task_processing_loop)
         g.start()
+
+
+    def task_get(self, taskid):
+        """
+        Returns current task status and result if done
+        """
+        dbid, tid = taskid.split("-",1)
+        if dbid!=self.get_database_id():
+            return None
+        tid = int(tid, 16)
+        ts = self.DB.task_get_status(tid)
+
+        # if task is processed, then get result too
+        if ts['status']>=3:
+            res = self.DB.task_get_result(tid)
+            print (res)
+        print (ts)
 
 
     # task scheduling
 
 
-    def task_add_new(self, task, context, args, kwargs, ign_result=False):
+    def task_add_new(self, task, context, args, kwargs):
         """
         Register task in database.
             task - task name with worker
@@ -105,9 +136,8 @@ class AsyncWorker(object):
             time = time.time(),
             args = self.serializer.data_2_bin(args),
             context = self.serializer.data_2_bin(context),
-            ign_result = ign_result,
         )
-        return taskid
+        return "%s-%X" % (self.get_database_id(), taskid)
 
 
     def _flush_cache_for_service(self, servicename):
@@ -284,7 +314,7 @@ def setup_async(ID):
 @after_worker_start
 def async_started():
     global ASYNC
-    ASYNC.start_eat()
+    ASYNC.start_processing()
 
 @after_worker_stop
 def stop_async():
@@ -293,7 +323,7 @@ def stop_async():
 
 
 
-# catch tasks
+# catch tasks and store in database
 
 @raw_task(messages.ASYNC_CALL)
 def add_task_to_queue(msg):
@@ -311,13 +341,14 @@ def add_task_to_queue(msg):
 
 
 
-
-# normal task
-
 @task()
 def get_task_result(task_id):
+    """
+    Check task status and return result
+    """
     global ASYNC
-    pass
+    print ('CHECKING TASK ',task_id)
+    ASYNC.task_get(task_id)
 
 
 

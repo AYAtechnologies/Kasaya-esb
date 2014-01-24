@@ -20,7 +20,6 @@ class SQLiteDatabase(DatabaseBase):
                 status INTEGER,              /* 0 - waiting, 1 - selected to process, 2 - processing, 3 - finished */
                 time_crt INTEGER,            /* task creation time */
                 time_act INTEGER,            /* last activity time */
-                ignore_result BOOL,          /* ignore result of task */
                 workerid TEXT,               /* worker id which received task */
                 service TEXT,                /* service name */
                 task TEXT,                   /* task name */
@@ -69,15 +68,47 @@ class SQLiteDatabase(DatabaseBase):
     # task database
 
 
-    def task_add(self, service, taskname, time, args, context, ign_result):
+    def task_add(self, service, taskname, time, args, context):
         """
         Adds task to database for execution
         """
-        query = "INSERT INTO jobs (service, task, time_crt, args, context, ignore_result, status, error, delay) VALUES (?,?,?,?,?,?,0,0,0)"
-        res = self.cur.execute( query, (service, taskname, time, SQ.Binary(args), SQ.Binary(context), ign_result ) )
+        query = "INSERT INTO jobs (service, task, time_crt, args, context, status, error, delay) VALUES (?,?,?,?,?,0,0,0)"
+        res = self.cur.execute( query, (service, taskname, time, SQ.Binary(args), SQ.Binary(context) ) )
         rowid = res.lastrowid
         self.__db.commit()
-        return "%s-%X" % (self.dbid, rowid)
+        return rowid
+
+
+    def task_get_status(self, taskid):
+        """
+        Get task status by task id
+        """
+        query = "SELECT time_act, status, error FROM jobs WHERE taskid=?"
+        self.cur.execute( query, (taskid,) )
+        res = self.cur.fetchone()
+        print (res)
+        if res is None:
+            return None
+        return {
+            'time_act' : res[0],
+            'status' : res[1],
+            'error' : res[2],
+        }
+
+
+    def task_get_result(self, taskid):
+        """
+        Return task result by task id. It return None if task is not yet processed or task is not found.
+        """
+        query = "SELECT context, result FROM jobs WHERE taskid=? AND status>=3"
+        self.cur.execute( query, (taskid,) )
+        res = self.cur.fetchone()
+        if res is None:
+            return None
+        return {
+            'result'  : str(res[0]),
+            'context' : str(res[1]),
+       }
 
 
     def task_choose_for_process(self):

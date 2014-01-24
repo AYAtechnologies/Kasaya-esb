@@ -62,3 +62,11 @@ class MethodNotFound(ServiceBusException):
     Żądana funkcja nie istnieje w tym serwisie
     """
     pass
+
+# async daeomn specific
+
+class NotProcessedTask(Exception):
+    """
+    Task is not yet processed, no result is available.
+    """
+    pass

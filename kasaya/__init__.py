@@ -4,7 +4,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from .version import version
 
 # kasaya client calls
-from kasaya.core.client import sync, async, trans, control
+from kasaya.core.client import sync, async, trans, control, AsyncResult, Context
 # worker task decorator
 from kasaya.core.worker.decorators import *
 # worker class

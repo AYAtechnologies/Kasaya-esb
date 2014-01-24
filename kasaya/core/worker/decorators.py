@@ -26,12 +26,14 @@ class task(object):
     """
     def __init__(self, name=None, timeout=None,
                  anonymous=True, permissions=None,
+                 retry_limit=0,
                  close_django_conn=None ):
         """
         name - task name if different than function name
         timeout - maximum task execution time in seconds
         anonymous - this task can be called anonymous (unsuppoerted)
         permissions - permissions required to run this task (unsupported)
+        retry_limit - how many times this task can be automatically repeated in case of exception during task processing
         close_dj_conn - when working with django ORM set this flag to true to close
                      db connection after fucntion ends.
         """
@@ -39,6 +41,7 @@ class task(object):
         self.timeout = timeout
         self.anonymous = anonymous
         self.permissions = permissions
+        self.retry_limit = retry_limit
         if close_django_conn is None:
             lose_django_conn = settings.DJANGO_ORM_CLOSE_CONN_AFTER_TASKS
         self.close_dj_conn = close_django_conn

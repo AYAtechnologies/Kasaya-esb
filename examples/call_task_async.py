@@ -6,16 +6,23 @@ from __future__ import unicode_literals
 #from kasaya.core import client
 from kasaya import async
 
-
+from time import sleep
 
 if __name__=="__main__":
     import sys
     #print ">>>", async.fikumiku.do_work("parameter", 1, foo=123, baz=True )
-    for a in range(1000):
-        async.locka.burak()
+    for a in range(2):
+        res = async.locka.burak()
+        print res.result
+        sleep(1)
+        print res.result
+        sleep(1)
+        print res.result
+    #sleep(1)
+    #print res.result
         #async.locka.task_a("!")
-        print ".",
-        sys.stdout.flush()
+        #print ".",
+        #sys.stdout.flush()
 
 #    load_config_from_file("example.conf", optional=True)
 #

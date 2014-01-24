@@ -9,5 +9,5 @@ if __name__=="__main__":
     #load_config_from_file("example.conf", optional=True)
     #res = sync.locka.jajo.foo.baar.task_a("start!")
     #res = sync.locka.task_a("start!")
-    for a in xrange(100):
+    for a in xrange(2):
         print "res", sync.locka.burak()

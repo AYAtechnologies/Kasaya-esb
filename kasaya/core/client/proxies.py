@@ -7,6 +7,7 @@ from kasaya.core import exceptions
 from kasaya.core.lib import LOG
 from kasaya.core.lib.syncclient import KasayaLocalClient
 from kasaya.core.client.worker_finder import WorkerFinder
+from kasaya.core.client.asyncresult import AsyncResult
 
 
 # on python 2 we need to fix some strings to unicode
@@ -30,10 +31,10 @@ class GenericProxy(object):
         self._method = None
         self._context = None
 
-    def initialize(self, method, context):
-        self._names = method
-        self._context = context
-        self._addr = self.find_worker(method)
+    #def initialize(self, method, context):
+    #    self._names = method
+    #    self._context = context
+    #    self._addr = self.find_worker(method)
 
     def __getattr__(self, itemname):
         self._names.append(itemname)
@@ -76,7 +77,7 @@ class GenericProxy(object):
 
 class RawProxy(GenericProxy):
     """
-    Internal use proxy (by async worker)
+    Internal proxy (used by async worker)
     """
     def _send_and_response(self, addr, msg):
         """
@@ -110,6 +111,8 @@ class SyncProxy(GenericProxy):
         """
         method = self._names
         context = self._context
+        print ("ID",id(context))
+        print ("IDmethod",id(method))
         #if self._allow_method_mocking:
         #    m = '.'.join(method)
         #    if m in self._mock_methods:
@@ -135,6 +138,8 @@ class AsyncProxy(GenericProxy):
     def __call__(self, *args, **kwargs):
         method = self._names
         context = self._context
+        #print ("ID",id(context))
+        #print ("IDmethod",id(method))
         addr = self._find_worker("async")#[settings.ASYNC_DAEMON_SERVICE, "register_task"])
         # zbudowanie komunikatu
         msg = {
@@ -144,7 +149,8 @@ class AsyncProxy(GenericProxy):
             "args"    : args,
             "kwargs"  : kwargs
         }
-        return self._send_and_response_message(addr, msg)
+        aid = self._send_and_response_message(addr, msg)
+        return AsyncResult(aid)
 
 
 
