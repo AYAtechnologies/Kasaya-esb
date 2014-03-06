@@ -9,6 +9,7 @@ from kasaya import sync, async, trans, control, Context
 
 from kasaya.core.client.exec_context import SyncExec, AsyncExec, TransactionExec, ControlExec
 from kasaya.core.client.proxies import SyncProxy, AsyncProxy, ControlProxy, TransactionProxy
+from kasaya.core.lib.syncclient import KasayaLocalClient
 
 
 class TestExecutionCalls(TestCase):
@@ -64,35 +65,56 @@ class TestExecutionCalls(TestCase):
         cll = exc.foo.baz.bar.bim
         self.assertEqual( ".".join(cll._names), "foo.baz.bar.bim" )
 
+        # closures in python2.x are possible only through dict
+        proper_ctx = {'ctx':None, 'testcase':self}
 
         def own_send(self, addr, msg):
-            print self
-            print "addr", addr
-            print "msg", msg
+            """ fake _send_and_response_message method """
+            # check context passed in message
+            proper_ctx['testcase'].assertEqual( msg['context'], proper_ctx['ctx'] )
+            return "fake_result"
 
         def own_fw(self, sname, mname=None):
+            """ fake _find_worker method """
             return "tcp://127.0.0.1:5000"
 
+        def own_connect(self):
+            """ Fake socket connector """
+            return True
+
+        # replace internal methods to avoid calling real kasaya services
         oldmethod1 = getattr(Proxy, "_send_and_response_message")
         setattr(Proxy, "_send_and_response_message", types.MethodType(own_send, Proxy))
         oldmethod2 = getattr(Proxy, "_find_worker")
         setattr(Proxy, "_find_worker", types.MethodType(own_fw, Proxy))
+        oldmethod3 = getattr(KasayaLocalClient, "_connect")
+        setattr(KasayaLocalClient, "_connect", types.MethodType(own_connect, KasayaLocalClient))
+        #oldmethod4 = getattr(KasayaLocalClient, "send_and_receive")
+        #setattr(KasayaLocalClient, "send_and_receive", types.MethodType(own_send, KasayaLocalClient))
 
         ctx = Context()
-        ctx['jajo']=10
+        ctx['foo']=10
+        ctx['bar']="abc"
         f = exc( ctx ).a.b.c
-        print(f._names)
+
+        # calling!
+        proper_ctx['ctx'] = ctx
+        f()
+        exc(ctx).a()
+        exc(ctx).a.b()
 
         # repair classes
         setattr(Proxy, "_send_and_response_message", oldmethod1)
         setattr(Proxy, "_find_worker", oldmethod2)
+        setattr(KasayaLocalClient, "_connect", oldmethod3)
+        #setattr(KasayaLocalClient, "send_and_receive", oldmethod4)
 
 
 
     def test_exec_context(self):
-        #self.subtest_exec_context(SyncExec, SyncProxy)
+        self.subtest_exec_context(SyncExec, SyncProxy)
         self.subtest_exec_context(AsyncExec, AsyncProxy)
-        #self.subtest_exec_context(TransactionExec, TransactionProxy)
+        self.subtest_exec_context(TransactionExec, TransactionProxy)
         #self.subtest_exec_context(ControlExec, ControlProxy)
 
 

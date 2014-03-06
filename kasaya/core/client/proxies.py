@@ -77,7 +77,8 @@ class GenericProxy(object):
 
 class RawProxy(GenericProxy):
     """
-    Internal proxy (used by async worker)
+    Internal proxy (used by async worker).
+    It's used to send manually created messages to workers.
     """
     def _send_and_response(self, addr, msg):
         """
@@ -110,9 +111,9 @@ class SyncProxy(GenericProxy):
         Wywołanie synchroniczne jest wykonywane natychmiast.
         """
         method = self._names
-        context = self._context
-        print ("ID",id(context))
-        print ("IDmethod",id(method))
+        #context = self._context
+        #print ("ID",id(context))
+        #print ("IDmethod",id(method))
         #if self._allow_method_mocking:
         #    m = '.'.join(method)
         #    if m in self._mock_methods:
@@ -123,7 +124,7 @@ class SyncProxy(GenericProxy):
             "message" : messages.SYNC_CALL,
             "service" : method[0],
             "method" : ".".join( method[1:] ),
-            "context" : context,
+            "context" : self._context,
             "args" : args,
             "kwargs" : kwargs
         }
@@ -136,16 +137,16 @@ class SyncProxy(GenericProxy):
 class AsyncProxy(GenericProxy):
 
     def __call__(self, *args, **kwargs):
-        method = self._names
-        context = self._context
+        #method = self._names
+        #context = self._context
         #print ("ID",id(context))
         #print ("IDmethod",id(method))
         addr = self._find_worker("async")#[settings.ASYNC_DAEMON_SERVICE, "register_task"])
         # zbudowanie komunikatu
         msg = {
             "message" : messages.ASYNC_CALL,
-            "method" : ".".join(method),
-            "context" : context,
+            "method" : ".".join(self._names),
+            "context" : self._context,
             "args"    : args,
             "kwargs"  : kwargs
         }
@@ -157,12 +158,12 @@ class AsyncProxy(GenericProxy):
 class ControlProxy(GenericProxy):
 
     def __call__(self, *args, **kwargs):
-        method = self._names
-        context = self._context
+        #method = self._names
+        #context = self._context
         msg = {
             "message" : messages.CTL_CALL,
-            "method" : ".".join(method),
-            "context" : context,
+            "method" : ".".join(self._names),
+            "context" : self._context,
             "args" : args,
             "kwargs" : kwargs
         }

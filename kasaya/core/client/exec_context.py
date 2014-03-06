@@ -15,7 +15,7 @@ class ExecContext(object):
         elif isinstance(context, Context):
             self._context = context.copy()
         else:
-            raise Exception("Context can be only Context type or None")
+            raise Exception("context parameter can be only Context instance or None")
 
     def __getattr__(self, itemname):
         """

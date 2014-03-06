@@ -10,8 +10,8 @@ from kasaya.core.lib.system import all_interfaces
 from binascii import hexlify
 import traceback, sys, os
 from gevent.server import StreamServer
-from gevent import socket
 import gevent, errno
+import socket
 
 
 # internal exceptions
@@ -452,6 +452,8 @@ class MessageLoop(object):
                 msgdata, resreq = _receive_and_deserialize(SOCK, self.serializer)
             except (NoData, ConnectionClosed):
                 return
+            except NotOurMessage:
+                continue
 
             try:
                 msg = msgdata['message']

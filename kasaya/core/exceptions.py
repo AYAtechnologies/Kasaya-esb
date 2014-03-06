@@ -19,6 +19,9 @@ class NetworkError(ServiceBusException):
 
 
 class NotOurMessage(ServiceBusException):
+    """
+    Incoming message is coming from other service bus network.
+    """
     pass
 
 class ReponseTimeout(ServiceBusException):

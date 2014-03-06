@@ -11,9 +11,8 @@ __all__ = ("AsyncResult",)
 class AsyncResult(object):
 
     def __init__(self, taskid):
-        print ("             taskid",taskid)
         if not type(taskid) in (str, unicode):
-            raise Exception("Not valid task id")
+            raise Exception("Invalid task id: %r" % taskid)
         self.__id = taskid
 
     def __get_result(self):
