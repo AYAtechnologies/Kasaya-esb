@@ -410,7 +410,7 @@ class MessageLoop(object):
 
 
     def kill(self):
-        self.SERVER.kill()
+        self.SERVER.stop(0)
 
 
     def stop(self):

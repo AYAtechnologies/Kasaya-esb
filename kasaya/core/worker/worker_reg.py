@@ -13,7 +13,7 @@ class WorkerMethodsDB(object):
         self._after_stop = []
         self._raw_tasks = {}
 
-    def register_task(self, name, func, timeout, anonymous, permissions, close_dj_conn):
+    def register_task(self, name, func, timeout, permissions, close_dj_conn):
         # task name
         if name is None:
             name = func.__name__
@@ -39,7 +39,7 @@ class WorkerMethodsDB(object):
             'func' : func,
             'doc' : doc, # docstring
             'timeout' : timeout, # timeout in seconds
-            'anon' : anonymous, # can task be executed without authorisation
+            #'anon' : anonymous, # can task be executed without authorisation
             'perms' : permissions, # permissions required to call task
             'close_djconn' : close_dj_conn, # close django connection on exit
             'res_succ' : 0, # successful calls

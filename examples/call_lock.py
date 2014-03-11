@@ -11,5 +11,5 @@ if __name__=="__main__":
     #res = sync.locka.task_a("start!")
     for a in xrange(2):
         print "res", sync.locka.burak()
-import socket
-print socket.socket
+#import socket
+#print socket.socket

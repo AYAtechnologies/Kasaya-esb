@@ -5,7 +5,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 import unittest, os
 # misc
 from kasaya.conf import set_value, settings
-from kasaya.core.lib import comm
+from kasaya.core.protocol import comm
 from gevent import socket
 import gevent, random
 

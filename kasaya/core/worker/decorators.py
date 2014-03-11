@@ -24,22 +24,24 @@ class task(object):
     """
     Register task in service
     """
-    def __init__(self, name=None, timeout=None,
-                 anonymous=True, permissions=None,
+    def __init__(self, name=None,
+                 timeout=None,
+                 permissions=None,
                  retry_limit=0,
-                 close_django_conn=None ):
+                 delay_time=3,
+                 close_django_conn=None,
+                ):
         """
         name - task name if different than function name
         timeout - maximum task execution time in seconds
-        anonymous - this task can be called anonymous (unsuppoerted)
         permissions - permissions required to run this task (unsupported)
         retry_limit - how many times this task can be automatically repeated in case of exception during task processing
+        delay_time - if task will be executed again after exception, how many seconds should we wait before re-run
         close_dj_conn - when working with django ORM set this flag to true to close
                      db connection after fucntion ends.
         """
         self.name = name
         self.timeout = timeout
-        self.anonymous = anonymous
         self.permissions = permissions
         self.retry_limit = retry_limit
         if close_django_conn is None:
@@ -49,7 +51,7 @@ class task(object):
     def __call__(self, func):
         _func_only(func)
         worker_methods_db.register_task(
-            self.name, func, self.timeout, self.anonymous, self.permissions, self.close_dj_conn)
+            self.name, func, self.timeout, self.permissions, self.close_dj_conn)
         return func
 
 

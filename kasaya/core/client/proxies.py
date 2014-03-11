@@ -70,8 +70,8 @@ class GenericProxy(object):
         return res
 
 
-    def __call__(self, *args, **kwargs):
-        raise NotImplemented("can't call proxy")
+    #def __call__(self, *args, **kwargs):
+    #    raise NotImplemented("can't call proxy")
 
 
 
