@@ -7,6 +7,16 @@ class Context(dict):
     Task context
     """
 
+    @classmethod
+    def init_from_dict(cls, data):
+        """
+        Context creator using dict data as data source
+        """
+        ctx = cls()
+        cls.update(data)
+        return ctx
+
+
     def set_auth_token(self, token):
         """
         Setting authentication token in context
@@ -23,6 +33,7 @@ class Context(dict):
             return self['__token__']
         except KeyError:
             return None
+
 
     # calling task in current context
     @property
@@ -57,6 +68,8 @@ class Context(dict):
         except AttributeError:
             self.__control = ControlExec(self)
         return self.__control
+
+
 
     # context manager
     #@classmethod

@@ -18,6 +18,8 @@ from kasaya.core.events import add_event_handler
 from kasaya.core import exceptions
 from .worker_reg import worker_methods_db
 
+from kasaya.core.lib import django_integration as DJI
+
 import traceback
 import datetime, os
 #import inspect
@@ -27,12 +29,6 @@ import gevent
 
 __all__=("WorkerDaemon",)
 
-
-# django helpers
-try:
-    from django.db import close_connection as _close_dj_connection
-except Exception:
-    _close_dj_connection = lambda:None
 
 
 class TaskTimeout(Exception): pass
@@ -256,13 +252,11 @@ class WorkerDaemon(WorkerBase):
         if self.status!=2:
             raise exceptions.ServiceBusException("Worker is currently offline")
 
-        #msgdata = self.prepare_message(msgdata)
         result = self.run_task(
             funcname = msgdata['method'],
             args = msgdata['args'],
             kwargs = msgdata['kwargs']
         )
-        #result = self.postprocess_message(result)
         return result
 
 
@@ -270,7 +264,6 @@ class WorkerDaemon(WorkerBase):
         self._tasks_control += 1
         result = self.ctl.handle_request(message)
         return result
-        #return {"message":messages.RESULT, "result":result }
 
 
     def run_task(self, funcname, args, kwargs):
@@ -324,14 +317,7 @@ class WorkerDaemon(WorkerBase):
             # if worker is using Django ORM we must close database connection manually,
             # or each task will leave one unclosed connection. This is done automatically.
             if task['close_djconn']:
-                try:
-                    _close_dj_connection()
-                except Exception as e:
-                    if e.__class__.__name__ == "ImproperlyConfigured":
-                        # django connection is not required or diango orm is not used at all,
-                        # because of that we replace _close_dj_connection function by empty lambda
-                        global _close_dj_connection
-                        _close_dj_connection = lambda:None
+                DJI.close_django_conn()
 
 
     # worker internal control tasks

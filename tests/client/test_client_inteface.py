@@ -73,13 +73,17 @@ class TestExecutionCalls(TestCase):
 
         ctx = Context()
         def context_should_be_ctx(msg):
+            # check if context was transferred
             c = msg['context']
             self.assertEqual(c['foo'],'test1')
+            self.assertEqual(c.get_auth_token(), "token")
         msg_callback = context_should_be_ctx
 
         ctx['foo'] = "test1"
         with ctx as C:
+            C.set_auth_token("token")
             C.sync.aaa.bbb()
+
             #C.async.aaa.bbb()
             #C.control.aaa.bbb()
             C.trans.aaa.bbb()
