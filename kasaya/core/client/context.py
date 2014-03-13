@@ -2,6 +2,7 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 __all__ = ("Context",)
 
+
 class Context(dict):
     """
     Task context
@@ -83,7 +84,6 @@ class Context(dict):
     def __enter__(self):
         """
         Ta metoda wywoływana jest przy wejściu do utworzonego context managera.
-        W tym miejscu self reprezentuje obiekt typu ExecContext utworzony przez __call__.
         """
         return self
 

@@ -36,6 +36,7 @@ class WorkerMethodsDB(object):
         if not doc is None:
             doc = doc.strip()
         taskdata = {
+            'name' : name,
             'func' : func,
             'doc' : doc, # docstring
             'timeout' : timeout, # timeout in seconds

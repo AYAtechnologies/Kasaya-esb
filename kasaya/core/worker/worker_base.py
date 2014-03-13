@@ -2,79 +2,135 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.lib import LOG, make_kasaya_id
+from kasaya.core.lib import django_integration as DJI
 from kasaya.core.client import Context
+from kasaya.core.protocol import messages
+import gevent
+import weakref
 
 
 class WorkerBase(object):
 
     def __init__(self, is_host=False):
         self.ID = make_kasaya_id(host=is_host)
+        self.stats = {}
 
+
+    def stat_increment(self, name, increment=1):
+        """
+        Increment counter with given name by value increment (default=1)
+        """
+        if name in self.stats:
+            self.stats[name]+=increment
+        else:
+            self.stats[name]=increment
 
 
 
 class TaskExecutor(object):
 
-    def find_task(self, taskname):
+
+    def _find_task(self, taskname):
         raise NotImplemented
         #raise KeyError
 
-    def run_task(self, funcname, context, args, kwargs):
+
+    def context_prepare(self, ctx):
+        """
+        Called before executing task
+        """
+        pass
+
+    def context_postprocess(self, ctx):
+        """
+        Called after execution of task
+        """
+        pass
+
+
+
+    def handle_task_request(self, msgdata):
+        """
+        Prepare data for processing in task. Extracts parameters from message and check context.
+        Valid request requires in message such fields: method, context, args, kwargs
+        """
+        if msgdata['service']!=self.servicename:
+            # this task is adressed for other service!
+            raise exceptions.ServiceBusException("Wrong service task received %s" % str(service) )
+
+        # worker is not online
+        if self.status!=2:
+            raise exceptions.ServiceBusException("Worker is currently offline")
+
         # find task in worker db
         try:
-            task = find_task(funcname)
+            task = self._find_task( msgdata['method'] )
         except KeyError:
-            self._tasks_nonex += 1
-            LOG.info("Unknown worker task called [%s]" % funcname)
-            return exception_serialize_internal( 'Method %s not found' % funcname )
+            self.stat_increment('tasks_nonex')
+            LOG.info("Unknown worker task called [%s]" % task['name'])
+            return exception_serialize_internal( 'Method %s not found' % task['name'] )
 
-        # try to run function and catch exceptions
+        # logging
+        LOG.debug("task %s, args %s, kwargs %s" % (msgdata['method'], repr(msgdata['args']), repr(msgdata['kwargs'])))
+
+        ctx = Context()
+        if not msgdata['context'] is None:
+            ctx.update(msgdata['context'])
+        # execute!
+        result = self.run_task(
+            task = task,
+            context = ctx,
+            args = msgdata['args'],
+            kwargs = msgdata['kwargs']
+        )
+        return result
+
+
+
+    def run_task(self, task, context, args, kwargs):
+        """
+        Execute task and return result or raised exception.
+        """
+
+        # create greenlet
+        grn = gevent.Greenlet( task['func'], *args, **kwargs )
+        grn.context = context
+
+        # run it!
+        grn.start()
         try:
-            LOG.debug("task %s, args %s, kwargs %s" % (funcname, repr(args), repr(kwargs)))
-            func = task['func']
-            tout = task['timeout']
-            if tout is None:
-                # call task without timeout
-                result = func(*args, **kwargs)
+            if task['timeout'] is None:
+                grn.join()
             else:
-                # call task with timeout
-                with gevent.Timeout(tout, TaskTimeout):
-                    result = func(*args, **kwargs)
-            self._tasks_succes += 1
-            task['res_succ'] += 1
+                # detect timeout!
+                try:
+                    with gevent.Timeout(task['timeout'], TaskTimeout):
+                        grn.join()
+                except TaskTimeout as e:
+                    LOG.info("Task [%s] timeout (after %i s)." % (task['name'], task['timeout']) )
+                    self.stat_increment('tasks_error')
+                    task['res_tout'] += 1   # increment task's timeout exception counter
+                    err = exception_serialize(e, internal=False)
+                    return err
 
-            return {
-                'message' : messages.RESULT,
-                'result' : result
-            }
-
-        except TaskTimeout as e:
-            # timeout exceeded
-            self._tasks_error += 1
-            task['res_tout'] += 1
-            err = exception_serialize(e, internal=False)
-            LOG.info("Task [%s] timeout (after %i s)." % (funcname, tout) )
-            return err
-
-        except Exception as e:
-            # exception occured
-            self._tasks_error += 1
-            task['res_err'] += 1
-            err = exception_serialize(e, internal=False)
-            LOG.info("Task [%s] exception [%s]. Message: %s" % (funcname, err['name'], err['description']) )
-            LOG.debug(err['traceback'])
-            return err
 
         finally:
-            # close django connection
-            # if worker is using Django ORM we must close database connection manually,
-            # or each task will leave one unclosed connection. This is done automatically.
             if task['close_djconn']:
-                try:
-                    _close_dj_connection()
-                except Exception as e:
-                    if e.__class__.__name__ == "ImproperlyConfigured":
-                        # django connection is not required or diango orm is not used at all,
-                        # because of that we replace _close_dj_connection function by empty lambda
-                        global _close_dj_connection
-                        _close_dj_connection = lambda:None
+                DJI.close_django_conn()
+
+        if grn.successful():
+            # task processed succesfully
+            self.stat_increment('tasks_succes')
+            task['res_succ'] += 1
+            return {
+                'message' : messages.RESULT,
+                'result' : grn.value
+            }
+        else:
+            # task raised error
+            self.stat_increment('tasks_error')
+            task['res_err'] += 1
+            err = exception_serialize(grn.exception, internal=False)
+            LOG.info("Task [%s] exception [%s]. Message: %s" % (task['name'], err['name'], err['description']) )
+            LOG.debug(err['traceback'])
+            return err

@@ -10,6 +10,12 @@ if __name__=="__main__":
     #res = sync.locka.jajo.foo.baar.task_a("start!")
     #res = sync.locka.task_a("start!")
     for a in xrange(2):
-        print "res", sync.locka.burak()
+        print "res",
+        try:
+            print sync.locka.burak()
+        except Exception as e:
+            print e.traceback
+            break
+
 #import socket
 #print socket.socket

@@ -8,7 +8,7 @@ del damonkey
 # more kasaya imports
 from kasaya.conf import settings
 from kasaya.core.protocol import messages
-from kasaya.core.worker.worker_base import WorkerBase
+from kasaya.core.worker.worker_base import WorkerBase, TaskExecutor
 from kasaya.core.protocol.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
@@ -40,7 +40,7 @@ class TaskTimeout(Exception): pass
 
 
 
-class WorkerDaemon(WorkerBase):
+class WorkerDaemon(WorkerBase, TaskExecutor):
 
     def __init__(self,
             servicename=None,
@@ -78,7 +78,7 @@ class WorkerDaemon(WorkerBase):
         LOG.debug("Binded to socket [%s]" % (",".join(self.loop.binded_ip_list()) ) )
 
         # registering handlers
-        self.loop.register_message( messages.SYNC_CALL, self.handle_sync_call, raw_msg_response=True )
+        self.loop.register_message( messages.SYNC_CALL, self.handle_task_request, raw_msg_response=True )
         self.loop.register_message( messages.CTL_CALL, self.handle_control_request )
         # heartbeat
         self.__hbloop=True
@@ -239,85 +239,14 @@ class WorkerDaemon(WorkerBase):
     # --------------------
 
 
-    def handle_sync_call(self, msgdata):
-        """
-        This is main function to process all requests.
-        """
-        name = msgdata['service']
-        # not our task
-        if name!=self.servicename:
-            raise exceptions.ServiceBusException("Wrong service task received %s" % str(service) )
-
-        # not in working state
-        if self.status!=2:
-            raise exceptions.ServiceBusException("Worker is currently offline")
-
-        result = self.run_task(
-            funcname = msgdata['method'],
-            args = msgdata['args'],
-            kwargs = msgdata['kwargs']
-        )
-        return result
-
-
     def handle_control_request(self, message):
         self._tasks_control += 1
         result = self.ctl.handle_request(message)
         return result
 
 
-    def run_task(self, funcname, args, kwargs):
-        # find task in worker db
-        try:
-            task = worker_methods_db[funcname]
-        except KeyError:
-            self._tasks_nonex += 1
-            LOG.info("Unknown worker task called [%s]" % funcname)
-            return exception_serialize_internal( 'Method %s not found' % funcname )
-
-        # try to run function and catch exceptions
-        try:
-            LOG.debug("task %s, args %s, kwargs %s" % (funcname, repr(args), repr(kwargs)))
-            func = task['func']
-            tout = task['timeout']
-            if tout is None:
-                # call task without timeout
-                result = func(*args, **kwargs)
-            else:
-                # call task with timeout
-                with gevent.Timeout(tout, TaskTimeout):
-                    result = func(*args, **kwargs)
-            self._tasks_succes += 1
-            task['res_succ'] += 1
-
-            return {
-                'message' : messages.RESULT,
-                'result' : result
-            }
-
-        except TaskTimeout as e:
-            # timeout exceeded
-            self._tasks_error += 1
-            task['res_tout'] += 1
-            err = exception_serialize(e, internal=False)
-            LOG.info("Task [%s] timeout (after %i s)." % (funcname, tout) )
-            return err
-
-        except Exception as e:
-            # exception occured
-            self._tasks_error += 1
-            task['res_err'] += 1
-            err = exception_serialize(e, internal=False)
-            LOG.info("Task [%s] exception [%s]. Message: %s" % (funcname, err['name'], err['description']) )
-            LOG.debug(err['traceback'])
-            return err
-
-        finally:
-            # close django connection
-            # if worker is using Django ORM we must close database connection manually,
-            # or each task will leave one unclosed connection. This is done automatically.
-            if task['close_djconn']:
-                DJI.close_django_conn()
+    def _find_task(self, taskname):
+        return worker_methods_db[taskname]
 
 
     # worker internal control tasks
