@@ -9,6 +9,7 @@ from binascii import hexlify, unhexlify
 # tested modules
 from Crypto.Cipher import AES
 from kasaya.core.protocol.encryption import encrypt_aes, decrypt_aes, encrypt, decrypt
+from kasaya import Context
 
 
 # sample data
@@ -68,12 +69,15 @@ class SerializerTests(unittest.TestCase):
         self.transports = ("pickle","bson",)#"msgpack")
 
     def _single_test(self, S, trans, enc):
+        ctx = Context()
+        ctx['aaa'] = 123,
         msg = {
             "field_1":12345678,
             "field_2":"trololo",
             "flo":274.123,
             "żółw":"zażółć gęślą jaźń",
-            b"bin":b"fooo"
+            b"bin":b"fooo",
+            "context":ctx
         }
         result1 = S.serialize(msg, True)
         result2,resreq = S.deserialize(result1)
