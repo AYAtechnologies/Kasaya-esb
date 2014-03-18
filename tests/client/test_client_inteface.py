@@ -61,7 +61,6 @@ class TestExecutionCalls(TestCase):
         #restore_method(AsyncProxy, "_find_worker")
         #restore_method(AsyncProxy, "_send_and_response_message")
 
-
     def test_anonymous_calls(self):
         global msg_callback
         def context_should_be_empty(msg):
@@ -87,6 +86,15 @@ class TestExecutionCalls(TestCase):
             #C.async.aaa.bbb()
             #C.control.aaa.bbb()
             C.trans.aaa.bbb()
+
+
+class TestContext(TestCase):
+
+    def test_context(self):
+        ctx = Context()
+        ctx['a'] = 1
+        ctx['b'] = 2
+        del ctx['a']
 
 
 

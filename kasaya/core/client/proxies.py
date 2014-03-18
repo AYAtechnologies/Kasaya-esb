@@ -111,7 +111,6 @@ class SyncProxy(GenericProxy):
         Wywołanie synchroniczne jest wykonywane natychmiast.
         """
         method = self._names
-        #context = self._context
         #print ("ID",id(context))
         #print ("IDmethod",id(method))
         #if self._allow_method_mocking:
@@ -119,6 +118,11 @@ class SyncProxy(GenericProxy):
         #    if m in self._mock_methods:
         #        return self._mock_methods[m](*args, **kwargs)
         addr = self._find_worker(method[0])
+        #if not self._context is None:
+        #    c={}
+        #    c.update(self._context)
+        #else:
+        #    c=None
         # zbudowanie komunikatu
         msg = {
             "message" : messages.SYNC_CALL,
@@ -137,8 +141,6 @@ class SyncProxy(GenericProxy):
 class AsyncProxy(GenericProxy):
 
     def __call__(self, *args, **kwargs):
-        #method = self._names
-        #context = self._context
         #print ("ID",id(context))
         #print ("IDmethod",id(method))
         addr = self._find_worker("async")#[settings.ASYNC_DAEMON_SERVICE, "register_task"])

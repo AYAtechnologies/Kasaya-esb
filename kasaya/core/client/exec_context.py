@@ -16,41 +16,41 @@ class _ExecBase(object):
     """
 
     def __init__(self, context=None):
-        if isinstance(context, Context):
-            # context ist given directly
-            # this means that uderlying context derived from remote
-            # client with task request will be not used here.
-            self._context = weakref.proxy( context )
-        elif context is None:
-            # context is none, this means that context can be empty (anonymous),
-            # or derived from task request via greenlet locals.
-            # TODO: greenlet locals check
-            ctx = self.__get_current_context()
-            if not ctx is None:
-                self._context = weakref.proxy( ctx )
-            else:
-                self._context = ctx
+        """
+        context parameter should be used only when creating new root context or when overriding existing context
+        """
+        # context override
+        if context is None:
+            self.__ctx_ovrr = None
         else:
-            raise Exception("context parameter can be only Context instance or None")
+            self.__ctx_ovrr = context
 
-    def __get_current_context(self):
+    def _get_current_context(self):
+        """
+        Return current request context
+        """
+        if not self.__ctx_ovrr is None:
+            return self.__ctx_ovrr
         global _gev
         if not _gev:
             return None
         grnlt = gevent.getcurrent()
         try:
-            return grnlt.context
+            # current greenlet context
+            return weakref.proxy( grnlt.context )
         except AttributeError:
-            return None
+            # no context
+            pass
+        return None
 
     def __getattr__(self, itemname):
         """
-        When called immediatelly without context:
-            sync.service.function()
-        we must create proxy instance and return it back as result
+        create proxy instance and return it back as result
         """
+        if itemname[0]=="_":
+            raise AttributeError("No attribute %s in %r" % (itemname,self) )
         proxy = self._create_proxy()
-        proxy._context = self._context
+        proxy._context = self._get_current_context()
         proxy._names.append(itemname)
         return proxy
 

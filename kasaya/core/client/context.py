@@ -3,38 +3,60 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 __all__ = ("Context",)
 
 
-class Context(dict):
+class Context(object):
     """
     Task context
     """
+    def __init__(self, data=None):
+        if data is None:
+            self.__data = {}
+        elif type(data)==dict:
+            self.__data = data
 
-    @classmethod
-    def init_from_dict(cls, data):
-        """
-        Context creator using dict data as data source
-        """
-        ctx = cls()
-        cls.update(data)
-        return ctx
+    # dictionary-like access
+    def __setitem__(self, k,v):
+        self.__data.__setitem__(k,v)
+    def __getitem__(self, k):
+        return self.__data.__getitem__(k)
+    def __delitem__(self, k):
+        self.__data.__delitem__(k)
+    def __iter__(self):
+        return self.__data.__iter__()
+    def __len__(self):
+        return self.__data.__len__()
+    def __in__(self, k):
+        return self.__data.__in__(k)
+    def keys(self):
+        return self.__data.keys()
+    def items(self):
+        return self.__data.items()
+    def __repr__(self):
+        return repr(self.__data)
+
+    # data pickling
+    def __getstate__(self):
+        return self.__data
+    def __setstate__(self, state):
+        self.__data = state
 
 
+    # authenticatin tokens
     def set_auth_token(self, token):
         """
         Setting authentication token in context
         """
-        if '__token__' in self:
+        if 'token' in self:
             raise Exception("Context is already authenticated")
-        self['__token__'] = token
+        self['token'] = token
 
     def get_auth_token(self):
         """
         Read auth token
         """
         try:
-            return self['__token__']
+            return self['token']
         except KeyError:
             return None
-
 
     # calling task in current context
     @property
@@ -47,7 +69,6 @@ class Context(dict):
 
     @property
     def async(self):
-        print ("async")
         try:
             return self.__async
         except AttributeError:
@@ -85,6 +106,7 @@ class Context(dict):
         """
         Ta metoda wywoływana jest przy wejściu do utworzonego context managera.
         """
+        #print ("enter context", self.__data)
         return self
 
     def __exit__(self, typ, val, tback):

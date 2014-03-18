@@ -4,7 +4,6 @@ from kasaya.conf import settings
 from kasaya.core import exceptions
 from kasaya.core.lib import LOG
 import struct
-from decimal import Decimal
 import datetime
 
 
@@ -69,9 +68,9 @@ class ConfiguredSerializer(object):
         except Exception as e:
             raise exceptions.SerializationError("Serialization error")
         h = self.make_header(
-            len(payload),
-            0,
-            response_required=resreq )
+                len(payload),
+                0,
+                response_required=resreq )
         return h+payload
 
 
@@ -205,7 +204,7 @@ class ConfiguredSerializer(object):
 
         if silentinit:
             return
-        LOG.debug("Service bus is configured to use %s as transport protocol." % settings.TRANSPORT_PROTOCOL )
+        #LOG.debug("Service bus is configured to use %s as transport protocol." % settings.TRANSPORT_PROTOCOL )
 
 
 

@@ -11,6 +11,11 @@ def test_empty(param):
     pass
 
 
+@Task(name="aa.bb")
+def test_empty2(param):
+    pass
+
+
 @Task()
 def test_subrequests(param):
     return sync.kasatest_b.subcall_1( param )

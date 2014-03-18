@@ -5,6 +5,7 @@ from kasaya.core.lib import LOG, make_kasaya_id
 from kasaya.core.lib import django_integration as DJI
 from kasaya.core.client import Context
 from kasaya.core.protocol import messages
+from kasaya.core.protocol.comm import send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
 import gevent
 import weakref
 
@@ -73,9 +74,11 @@ class TaskExecutor(object):
         # logging
         LOG.debug("task %s, args %s, kwargs %s" % (msgdata['method'], repr(msgdata['args']), repr(msgdata['kwargs'])))
 
-        ctx = Context()
-        if not msgdata['context'] is None:
-            ctx.update(msgdata['context'])
+        # context instance
+        ctx = msgdata['context']
+        if not isinstance(ctx, Context):
+            ctx = Context(msgdata['context'])
+
         # execute!
         result = self.run_task(
             task = task,
@@ -91,7 +94,7 @@ class TaskExecutor(object):
         """
         Execute task and return result or raised exception.
         """
-
+        print(context)
         # create greenlet
         grn = gevent.Greenlet( task['func'], *args, **kwargs )
         grn.context = context

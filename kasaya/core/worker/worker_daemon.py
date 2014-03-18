@@ -9,7 +9,7 @@ del damonkey
 from kasaya.conf import settings
 from kasaya.core.protocol import messages
 from kasaya.core.worker.worker_base import WorkerBase, TaskExecutor
-from kasaya.core.protocol.comm import MessageLoop, send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
+from kasaya.core.protocol.comm import MessageLoop
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system, make_kasaya_id

@@ -2,6 +2,8 @@
 #coding: utf-8
 from __future__ import unicode_literals
 #from kasaya.conf import load_config_from_file
+import sys
+import gevent.monkey; gevent.monkey.patch_thread()
 from kasaya import sync,Context
 
 
@@ -12,10 +14,18 @@ if __name__=="__main__":
     #    print e.traceback
 
     #try:
-    with Context() as C:
-        C.sync.kasatest_a.test_subrequests("A")
-    #except Exception as e:
-    #    print e#.traceback
+    #CC = Context()
+    #s = CC.sync
+    #print CC.sync.kasatest_a.aa.bb("A")#test_empty("A")
+
+    cc = Context()
+    cc['test'] = "jajeczko"
+    with cc as C:
+        try:
+            print "RESULT:",C.sync.kasatest_a.test_subrequests("A")
+        except Exception as e:
+            print "EXCEPTION"
+            print e.traceback
 
     #load_config_from_file("example.conf", optional=True)
     #res = sync.locka.jajo.foo.baar.task_a("start!")
