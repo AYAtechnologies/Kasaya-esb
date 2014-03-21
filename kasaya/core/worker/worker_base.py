@@ -115,8 +115,8 @@ class TaskExecutor(object):
                     err = exception_serialize(e, internal=False)
                     return err
 
-
         finally:
+            # cleanup after task execution
             if task['close_djconn']:
                 DJI.close_django_conn()
 

@@ -37,8 +37,7 @@ class task(object):
         permissions - permissions required to run this task (unsupported)
         retry_limit - how many times this task can be automatically repeated in case of exception during task processing
         delay_time - if task will be executed again after exception, how many seconds should we wait before re-run
-        close_dj_conn - when working with django ORM set this flag to true to close
-                     db connection after fucntion ends.
+        close_dj_conn - when working with django ORM set this flag to true to close db connection after fucntion ends.
         """
         self.name = name
         self.timeout = timeout
