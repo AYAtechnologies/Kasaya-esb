@@ -94,7 +94,6 @@ class TaskExecutor(object):
         """
         Execute task and return result or raised exception.
         """
-        print(context)
         # create greenlet
         grn = gevent.Greenlet( task['func'], *args, **kwargs )
         grn.context = context
