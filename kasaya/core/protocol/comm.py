@@ -279,7 +279,7 @@ class Sender(object):
             raise
 
 
-    def send_and_receive(self, message, timeout=10):
+    def send_and_receive(self, message, timeout=None):
         """
         message - message payload (will be automatically serialized)
         timeout - time in seconds after which TimeoutError will be raised.
@@ -311,10 +311,10 @@ class Sender(object):
 
 class MessageLoop(object):
     """
-    Loop receiving messages
+    Message loop is used by workers for receiving incoming messages.
     """
 
-    def __init__(self, address, maxport=None, backlog=50 ):
+    def __init__(self, address, maxport=None, backlog=50):
         # session id is received from connecting side for each connection
         # by default it's unset and unused. When set it will be sended after
         # connection lost in event.
@@ -468,7 +468,6 @@ class MessageLoop(object):
             if msg == messages.SET_SESSION_ID:
                 try:
                     ssid = msgdata['id']
-                    #print("conn session id" , address, ssid)
                 except KeyError:
                     pass
                 if resreq:
@@ -493,8 +492,6 @@ class MessageLoop(object):
             except Exception as e:
                 result = exception_serialize(e, False)
                 LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
-                #LOG.debug("Message dump: %s" % repr(msgdata) )
-                #LOG.debug(result['traceback'])
 
                 if not resreq:
                     # if response is not required, then don't send exceptions
@@ -546,7 +543,7 @@ class MessageLoop(object):
         )
 
 
-def send_and_receive(address, message, timeout=10):
+def send_and_receive(address, message, timeout=None):
     """
     address - full destination address (eg: tcp://127.0.0.1:1234)
     message - message payload (will be automatically serialized)
@@ -577,14 +574,18 @@ def send_and_receive(address, message, timeout=10):
     return res
 
 
-def send_and_receive_response(address, message, timeout=10):
+def send_and_receive_response(address, message, timeout=None):
     """
-    j.w. ale dekoduje wynik i go zwraca, lub rzuca otrzymany w wiadomości exception
+    Extended version of send_and_receive. Response is automatically decoded and value is returned.
+    If incoming result is exception, then exception will be unpacked and raised.
+    If incoming response is not carrying any result, ServiceBusException exception will be thrown.
     """
     result = send_and_receive(address, message, timeout)
     typ = result['message']
     if typ==messages.RESULT:
         return result['result']
+    elif typ==messages.NOOP:
+        return None
 
     elif typ==messages.ERROR:
         e = exception_deserialize(result)
