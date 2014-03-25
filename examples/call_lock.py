@@ -27,6 +27,8 @@ if __name__=="__main__":
             print "EXCEPTION"
             print e.traceback
 
+    C.sync.kasatest_a.test_infinite_loop(0)
+
     #load_config_from_file("example.conf", optional=True)
     #res = sync.locka.jajo.foo.baar.task_a("start!")
     #res = sync.locka.task_a("start!")

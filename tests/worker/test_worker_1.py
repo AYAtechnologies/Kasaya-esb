@@ -15,14 +15,22 @@ def test_empty(param):
 def test_empty2(param):
     pass
 
-
+# embedded calls
 @Task()
 def test_subrequests(param):
     return sync.kasatest_b.subcall_1( param )
-
 @Task()
 def subcall_2(param):
-    return param+"C"
+    return sync.kasatest_b.subcall_3( param+"C" )
+@Task()
+def subcall_3(param):
+    return sync.kasatest_b.subcall_5( param+"E" )
+
+
+@Task()
+def test_infinite_loop(num):
+    return sync.kasatest_b.test_infinite_loop(num+1)
+
 
 
 if __name__=="__main__":

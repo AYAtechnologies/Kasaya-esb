@@ -21,7 +21,7 @@ from .worker_reg import worker_methods_db
 from kasaya.core.lib import django_integration as DJI
 
 import traceback
-import datetime, os
+import time, os
 #import inspect
 
 from kasaya.core.lib import LOG
@@ -96,7 +96,7 @@ class WorkerDaemon(WorkerBase, TaskExecutor):
         self._tasks_error = 0 # task which triggered exceptions
         self._tasks_nonex = 0 # non existing tasks called
         self._tasks_control = 0 # control tasks received
-        self._start_time = datetime.datetime.now() # time of worker start
+        self._start_time = time.time() # time of worker start
 
 
     def __load_config(self):
@@ -280,7 +280,7 @@ class WorkerDaemon(WorkerBase, TaskExecutor):
         """
         Return current worker stats
         """
-        now = datetime.datetime.now()
+        now = time.time()
         uptime = now - self._start_time
         uptime = uptime.seconds # temporary workaround
         return {

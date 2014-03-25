@@ -40,11 +40,18 @@ class TaskExecutor(object):
         """
         Called before executing task
         """
+        LOG.debug ("prepare " +  repr(ctx) )
         pass
 
     def context_postprocess(self, ctx):
         """
-        Called after execution of task
+        Called after execution of task if task is completed properly.
+        """
+        pass
+
+    def context_postprocess_exception(self, ctx, exception):
+        """
+        Called after task execution if task raised exception.
         """
         pass
 
@@ -57,7 +64,7 @@ class TaskExecutor(object):
         """
         if msgdata['service']!=self.servicename:
             # this task is adressed for other service!
-            raise exceptions.ServiceBusException("Wrong service task received %s" % str(service) )
+            raise exceptions.ServiceBusException("Wrong service called %s" % str(service) )
 
         # worker is not online
         if self.status!=2:
@@ -97,10 +104,11 @@ class TaskExecutor(object):
         # create greenlet
         grn = gevent.Greenlet( task['func'], *args, **kwargs )
         grn.context = context
-
         # run it!
         grn.start()
         try:
+            # process context
+            self.context_prepare(context)
             if task['timeout'] is None:
                 grn.join()
             else:
@@ -113,7 +121,11 @@ class TaskExecutor(object):
                     self.stat_increment('tasks_error')
                     task['res_tout'] += 1   # increment task's timeout exception counter
                     err = exception_serialize(e, internal=False)
+                    self.context_postprocess_exception(context,e)
                     return err
+
+        except Exception as e:
+            err = exception_serialize(e, internal=False)
 
         finally:
             # cleanup after task execution
@@ -124,6 +136,7 @@ class TaskExecutor(object):
             # task processed succesfully
             self.stat_increment('tasks_succes')
             task['res_succ'] += 1
+            self.context_postprocess(context)
             return {
                 'message' : messages.RESULT,
                 'result' : grn.value
@@ -133,6 +146,7 @@ class TaskExecutor(object):
             self.stat_increment('tasks_error')
             task['res_err'] += 1
             err = exception_serialize(grn.exception, internal=False)
+            self.context_postprocess_exception(context, grn.exception)
             LOG.info("Task [%s] exception [%s]. Message: %s" % (task['name'], err['name'], err['description']) )
             LOG.debug(err['traceback'])
             return err

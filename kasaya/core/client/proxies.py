@@ -111,6 +111,8 @@ class SyncProxy(GenericProxy):
         Wywołanie synchroniczne jest wykonywane natychmiast.
         """
         method = self._names
+        if self._context['depth'] == 0:
+            raise exceptions.MaximumDepthLevelReached("Maximum level of requests depth reached")
         #print ("ID",id(context))
         #print ("IDmethod",id(method))
         #if self._allow_method_mocking:
@@ -118,12 +120,8 @@ class SyncProxy(GenericProxy):
         #    if m in self._mock_methods:
         #        return self._mock_methods[m](*args, **kwargs)
         addr = self._find_worker(method[0])
-        #if not self._context is None:
-        #    c={}
-        #    c.update(self._context)
-        #else:
-        #    c=None
         # zbudowanie komunikatu
+        self._context['depth'] -= 1
         msg = {
             "message" : messages.SYNC_CALL,
             "service" : method[0],
@@ -132,17 +130,17 @@ class SyncProxy(GenericProxy):
             "args" : args,
             "kwargs" : kwargs
         }
-        #LOG.debug("Client is about to send this message: %r" % msg)
         # wysłanie żądania
-        return self._send_and_response_message(addr, msg)
+        try:
+            return self._send_and_response_message(addr, msg)
+        finally:
+            self._context['depth'] += 1
 
 
 
 class AsyncProxy(GenericProxy):
 
     def __call__(self, *args, **kwargs):
-        #print ("ID",id(context))
-        #print ("IDmethod",id(method))
         addr = self._find_worker("async")#[settings.ASYNC_DAEMON_SERVICE, "register_task"])
         # zbudowanie komunikatu
         msg = {
@@ -160,8 +158,8 @@ class AsyncProxy(GenericProxy):
 class ControlProxy(GenericProxy):
 
     def __call__(self, *args, **kwargs):
-        #method = self._names
-        #context = self._context
+        if self._context['depth'] == 0:
+            raise exceptions.MaximumDepthLevelReached
         msg = {
             "message" : messages.CTL_CALL,
             "method" : ".".join(self._names),

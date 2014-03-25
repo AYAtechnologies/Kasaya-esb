@@ -1,5 +1,6 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
+from kasaya.conf import settings
 __all__ = ("Context",)
 
 
@@ -9,7 +10,9 @@ class Context(object):
     """
     def __init__(self, data=None):
         if data is None:
-            self.__data = {}
+            self.__data = {
+                'depth':settings.REQUEST_MAX_DEPTH,
+            }
         elif type(data)==dict:
             self.__data = data
 

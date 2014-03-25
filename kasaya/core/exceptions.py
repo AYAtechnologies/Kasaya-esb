@@ -34,23 +34,29 @@ class MessageCorrupted(ServiceBusException):
     pass
 
 
-class ExecutionRejected(ServiceBusException):
+class MaximumDepthLevelReached(ServiceBusException):
     """
-    Wykonanie metody odrzucone z powodu braku uprawnień.
-    """
-    pass
-
-class AnonymousExecutionDisabled(ExecutionRejected):
-    """
-    Wykonanie metody anonimowo jest zabronione
+    Maximum depth of requests reached
     """
     pass
 
-class NotEnoughPriviliges(ExecutionRejected):
-    """
-    Niewystarczajace uprawnienia do wykonania metody
-    """
-    pass
+#class ExecutionRejected(ServiceBusException):
+#    """
+#    Wykonanie metody odrzucone z powodu braku uprawnień.
+#    """
+#    pass
+
+#class AnonymousExecutionDisabled(ExecutionRejected):
+#    """
+#    Wykonanie metody anonimowo jest zabronione
+#    """
+#    pass
+
+#class NotEnoughPriviliges(ExecutionRejected):
+#    """
+#    Niewystarczajace uprawnienia do wykonania metody
+#    """
+#    pass
 
 
 class ServiceNotFound(ServiceBusException):

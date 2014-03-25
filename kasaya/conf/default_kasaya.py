@@ -115,3 +115,7 @@ LOCAL_WORKERS_DIR = "/opt/services"
 # connection. By default kasaya try to close connection after each task.
 # You can disable this feature if not using django ORM in kasaya workers.
 DJANGO_ORM_CLOSE_CONN_AFTER_TASKS = True
+
+# maximum level of subrequests depth between workers
+REQUEST_MAX_DEPTH = 20
+
