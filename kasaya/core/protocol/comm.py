@@ -601,53 +601,79 @@ def send_and_receive_response(address, message, timeout=None):
 
 def exception_serialize(exc, internal=None):
     """
-    Serialize exception object into message
+    Serialize exception object into message.
     """
-    # try to extract traceback
-    tb = traceback.format_exc()
-
-    if sys.version_info<(3,0):
-        # python 2
-        if not type(tb)==unicode:
-            try:
-                tb = unicode(tb,"utf-8")
-            except:
-                tb = repr(tb)
-
-        # error message
-        errmsg = exc.message
-        try:
-            errmsg = unicode(errmsg, "utf-8")
-        except:
-            errmsg = repr(errmsg)
-
+    if hasattr(exc, 'remote'):
+        remote = exc.remote
     else:
-        # python 3
-        errmsg = str(exc)
+        remote = False
 
-    if internal is None:
-        # try to guess if exception is servicebus internal internal,
-        # or client code external exception
-        internal = isinstance(exc, exceptions.ServiceBusException)
-
-    return {
-        "message" : messages.ERROR,
-        "name" : exc.__class__.__name__,
-        "description" : errmsg,
-        "internal" : internal,
-        "traceback" : tb,
+    result = {
+        'message': messages.ERROR,
+        'remote': remote,
     }
 
+    if remote:
+        # remote exception (contain additional information)
+        result['traceback'] = exc.traceback
+        result['description'] = exc.message
+        result['name'] = exc.name
+        result['request_path'] = exc.request_path
+    else:
+        # local exceptions
+        result['request_path'] = []
+        # extract traceback
+        try:
+            tb = exc.traceback
+        except AttributeError:
+            tb = traceback.format_exc()
+
+        if sys.version_info<(3,0):
+            # python 2
+            if type(tb)==str:
+                try:
+                    tb = unicode(tb,"utf-8")
+                except:
+                    pass
+
+            # error message
+            errmsg = exc.message
+            try:
+                errmsg = unicode(errmsg, "utf-8")
+            except:
+                errmsg = errmsg
+        else:
+            # python 3
+            errmsg = str(exc)
+
+        result['traceback'] = tb
+        result['description'] = errmsg
+        result['name'] = exc.__class__.__name__
+
+    if internal is None:
+        # try to guess if exception is servicebus internal exception,
+        # or client code exception
+        result['internal'] = isinstance(exc, exceptions.ServiceBusException)
+    else:
+        result['internal'] = internal
+
+    return result
 
 
 def exception_serialize_internal(description):
     """
     Simple internal errors serializer
     """
+    try:
+        remote = exc.remote
+    except AttributeError:
+        remote = False
     return {
         "message" : messages.ERROR,
         "description" : description,
         "internal" : True,
+        "remote" : remote,
+        "request_path" : [],
     }
 
 
@@ -655,12 +681,16 @@ def exception_serialize_internal(description):
 def exception_deserialize(msg):
     """
     Deserialize exception from message into exception object which can be raised.
-    #If message doesn't contains exception, then result will be None.
     """
-    if msg['internal']:
-        e = exceptions.ServiceBusException(msg['description'])
-    else:
-        e = Exception(msg['description'])
+    #if msg['internal']:
+    #else:
+    #    e = Exception(msg['description'])
+    e = exceptions.RemoteException(msg['description'])
+    e.internal = msg['internal']
+    # deserialized exception is always remote
+    e.remote = True
+    # request path
+    e.request_path = msg['request_path']
     try:
         e.name = msg['name']
     except KeyError:
@@ -672,3 +702,5 @@ def exception_deserialize(msg):
     if not tb is None:
         e.traceback = tb
     return e
+
+

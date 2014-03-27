@@ -95,16 +95,6 @@ class Context(object):
         return self.__control
 
 
-
-    # context manager
-    #@classmethod
-    #def __call__(cls, context):
-    #    """
-    #    To wywołanie używane jest przy tworzeniu context managera lub wywołaniu z określonym kontekstem wywołania.
-    #    W takim przypadku należy utworzyć nową instancję tej klasy z ustawionym kontekstem.
-    #    """
-    #    return cls( context )
-
     def __enter__(self):
         """
         Ta metoda wywoływana jest przy wejściu do utworzonego context managera.
@@ -119,4 +109,4 @@ class Context(object):
         pass
 
 # circular import
-from .exec_context import SyncExec, AsyncExec, TransactionExec, ControlExec
+from .proxies import SyncExec, AsyncExec, TransactionExec, ControlExec

@@ -2,6 +2,29 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 
 
+
+class RemoteException(Exception):
+    """
+    All exceptions raised by remote worker will be locally raised as RemoteException
+    """
+
+    def info(self):
+        res = "REMOTE EXCEPTION\n"
+        # request path
+        res += "Request path:\n"
+        for i,p in enumerate(self.request_path):
+            res += "{0: >2} - {1}\n".format(i+1,p)
+        # traceback
+        try:
+            tb = self.traceback
+        except AttributeError:
+            tb = None
+        if tb is None:
+            tb = "No traceback found"
+        res += tb
+        return res
+
+
 class ServiceBusException(Exception):
     pass
 

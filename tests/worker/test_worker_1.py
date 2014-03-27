@@ -31,6 +31,10 @@ def subcall_3(param):
 def test_infinite_loop(num):
     return sync.kasatest_b.test_infinite_loop(num+1)
 
+@Task()
+def test_exception(param):
+    return param/0
+
 
 
 if __name__=="__main__":

@@ -1,7 +1,7 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from .context import Context
-from .exec_context import SyncExec, AsyncExec, TransactionExec, ControlExec
+from .proxies import SyncExec, AsyncExec, TransactionExec, ControlExec
 from .asyncresult import AsyncResult
 
 __all__ = ("sync", "async", "trans", "control", "AsyncResult", "Context")
