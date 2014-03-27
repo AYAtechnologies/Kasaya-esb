@@ -8,6 +8,16 @@ from kasaya.core.lib import LOG
 from kasaya.core.lib.syncclient import KasayaLocalClient
 from kasaya.core.client.worker_finder import WorkerFinder
 from kasaya.core.client.asyncresult import AsyncResult
+from .context import Context
+import weakref
+
+
+# is gevent available?
+try:
+    import gevent
+    _gev = True
+except ImportError:
+    _gev = False
 
 
 # on python 2 we need to fix some strings to unicode
@@ -15,6 +25,7 @@ from kasaya.core.client.asyncresult import AsyncResult
 import sys
 _namefix = sys.version_info<(3,0)
 del sys
+
 
 __all__ = ("SyncProxy", "AsyncProxy", "ControlProxy", "TransactionProxy")
 
@@ -30,11 +41,6 @@ class GenericProxy(object):
         self._names = []
         self._method = None
         self._context = None
-
-    #def initialize(self, method, context):
-    #    self._names = method
-    #    self._context = context
-    #    self._addr = self.find_worker(method)
 
     def __getattr__(self, itemname):
         self._names.append(itemname)
@@ -66,12 +72,9 @@ class GenericProxy(object):
 
     def _send_and_response_message(self, addr, msg):
         self._namefixer(msg)
-        res = send_and_receive_response(addr, msg, 30) # manual timeout !!!!!  fix it!
+        res = send_and_receive_response(addr, msg)
         return res
 
-
-    #def __call__(self, *args, **kwargs):
-    #    raise NotImplemented("can't call proxy")
 
 
 
@@ -85,9 +88,7 @@ class RawProxy(GenericProxy):
         Send request and return raw message
         """
         self._namefixer(msg)
-        return send_and_receive(addr, msg, 30) # manual timeout !!!!!  fix it!
-
-
+        return send_and_receive(addr, msg)
 
     def sync_call(self, service, method, context, args, kwargs):
         addr = self._find_worker(service)
@@ -107,9 +108,8 @@ class RawProxy(GenericProxy):
 class SyncProxy(GenericProxy):
 
     def __call__(self, *args, **kwargs):
-        """
-        Wywołanie synchroniczne jest wykonywane natychmiast.
-        """
+        if self._context is None:
+            self._context = Context()
         method = self._names
         if self._context['depth'] == 0:
             raise exceptions.MaximumDepthLevelReached("Maximum level of requests depth reached")
@@ -141,6 +141,8 @@ class SyncProxy(GenericProxy):
 class AsyncProxy(GenericProxy):
 
     def __call__(self, *args, **kwargs):
+        if self._context is None:
+            self._context = Context()
         addr = self._find_worker("async")#[settings.ASYNC_DAEMON_SERVICE, "register_task"])
         # zbudowanie komunikatu
         msg = {
@@ -158,6 +160,8 @@ class AsyncProxy(GenericProxy):
 class ControlProxy(GenericProxy):
 
     def __call__(self, *args, **kwargs):
+        if self._context is None:
+            self._context = Context()
         if self._context['depth'] == 0:
             raise exceptions.MaximumDepthLevelReached
         msg = {
@@ -177,3 +181,68 @@ class ControlProxy(GenericProxy):
 
 class TransactionProxy(SyncProxy):
     pass
+
+
+
+# task caller
+
+class _ExecBase(object):
+    """
+    Uruchamia zadania i tworzy context.
+    """
+
+    def __init__(self, context=None):
+        """
+        Context parameter should be used only when creating new root context or when overriding existing context.
+        """
+        # context override
+        if context is None:
+            self.__ctx_ovrr = None
+        else:
+            self.__ctx_ovrr = context
+
+    def __get_current_context(self):
+        """
+        Return current request context
+        """
+        if not self.__ctx_ovrr is None:
+            return self.__ctx_ovrr
+        global _gev
+        if not _gev:
+            return None
+        grnlt = gevent.getcurrent()
+        try:
+            # current greenlet context
+            return weakref.proxy( grnlt.context )
+        except AttributeError:
+            # no context
+            pass
+        return None
+
+    def __getattr__(self, itemname):
+        """
+        create proxy instance and return it back as result
+        """
+        if itemname[0]=="_":
+            raise AttributeError("No attribute %s in %r" % (itemname,self) )
+        proxy = self._create_proxy()
+        proxy._context = self.__get_current_context()
+        proxy._names.append(itemname)
+        return proxy
+
+
+class SyncExec(_ExecBase):
+    def _create_proxy(self):
+        return SyncProxy()
+
+class AsyncExec(_ExecBase):
+    def _create_proxy(self):
+        return AsyncProxy()
+
+class TransactionExec(_ExecBase):
+    def _create_proxy(self):
+        return TransactionProxy()
+
+class ControlExec(_ExecBase):
+    def _create_proxy(self):
+        return ControlProxy()

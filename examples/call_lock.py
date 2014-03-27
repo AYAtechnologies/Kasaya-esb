@@ -21,13 +21,22 @@ if __name__=="__main__":
     cc = Context()
     cc['test'] = "jajeczko"
     with cc as C:
-        try:
-            print "RESULT:",C.sync.kasatest_a.test_subrequests("A")
-        except Exception as e:
-            print "EXCEPTION"
-            print e.traceback
+        #try:
+        #    print "RESULT:",C.sync.kasatest_a.test_subrequests("A")
+        #except Exception as e:
+        #    print "EXCEPTION"
+        #    print e.traceback
 
-    C.sync.kasatest_a.test_infinite_loop(0)
+        try:
+            C.sync.kasatest_a.test_infinite_loop(0)
+        except Exception as e:
+            #print type(e)
+            print( e.info() )
+        #pass
+
+    #sync.kasatest_a.test_infinite_loop(0)
+    sync.kasatest_a.test_exception(10)
+    #sync.kasatest_a.test_subrequests("A")
 
     #load_config_from_file("example.conf", optional=True)
     #res = sync.locka.jajo.foo.baar.task_a("start!")

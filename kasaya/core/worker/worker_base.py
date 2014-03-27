@@ -8,14 +8,21 @@ from kasaya.core.protocol import messages
 from kasaya.core.protocol.comm import send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
 import gevent
 import weakref
+import traceback
 
 
 class WorkerBase(object):
 
-    def __init__(self, is_host=False):
+    def __init__(self, servicename, is_host=False):
         self.ID = make_kasaya_id(host=is_host)
+        self.servicename = servicename
         self.stats = {}
 
+    def verbose_name(self):
+        """
+        Return verbose name of worker for exceptions
+        """
+        return "[%s] %s" % (self.ID, self.servicename)
 
     def stat_increment(self, name, increment=1):
         """
@@ -28,6 +35,18 @@ class WorkerBase(object):
 
 
 
+def exception_catcher(func, *args, **kwargs):
+    """
+    This function catches exceptions and tracebacks inside greenlets.
+    """
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        tb = traceback.format_exc()
+    e.traceback = tb
+    raise e
+
+
 class TaskExecutor(object):
 
 
@@ -35,26 +54,32 @@ class TaskExecutor(object):
         raise NotImplemented
         #raise KeyError
 
-
     def context_prepare(self, ctx):
         """
         Called before executing task
         """
-        LOG.debug ("prepare " +  repr(ctx) )
         pass
 
-    def context_postprocess(self, ctx):
+    def process_exception_message(self, task, context, msg):
         """
-        Called after execution of task if task is completed properly.
+        Process result message of task if thrown exception.
+        This function can change message in place (msg prameter).
+        """
+        name = self.verbose_name()
+        name += ".%s" % task['name']
+        if not msg['remote']:
+            name += " (exception thrown)"
+        msg['request_path'].insert(0, name )
+
+    def process_result_message(self, task, context, msg):
+        """
+        Process result message of task.
+        This function can change message in place (msg parameter).
         """
         pass
 
-    def context_postprocess_exception(self, ctx, exception):
-        """
-        Called after task execution if task raised exception.
-        """
-        pass
 
+    # task handling
 
 
     def handle_task_request(self, msgdata):
@@ -102,7 +127,8 @@ class TaskExecutor(object):
         Execute task and return result or raised exception.
         """
         # create greenlet
-        grn = gevent.Greenlet( task['func'], *args, **kwargs )
+        grn = gevent.Greenlet( exception_catcher, task['func'], *args, **kwargs )
+        #grn = gevent.Greenlet( task['func'], *args, **kwargs )
         grn.context = context
         # run it!
         grn.start()
@@ -117,15 +143,21 @@ class TaskExecutor(object):
                     with gevent.Timeout(task['timeout'], TaskTimeout):
                         grn.join()
                 except TaskTimeout as e:
-                    LOG.info("Task [%s] timeout (after %i s)." % (task['name'], task['timeout']) )
+                    #LOG.info("Task [%s] timeout (after %i s)." % (task['name'], task['timeout']) )
                     self.stat_increment('tasks_error')
-                    task['res_tout'] += 1   # increment task's timeout exception counter
-                    err = exception_serialize(e, internal=False)
-                    self.context_postprocess_exception(context,e)
-                    return err
+                    task['res_tout'] += 1  # increment task's timeout exception counter
+                    msg = exception_serialize(e, internal=False)
+                    self.process_exception_message(task, context, msg)
+                    return msg
 
         except Exception as e:
-            err = exception_serialize(e, internal=False)
+            # this exception can be raised only by context_prepare,
+            # because tasks exceptions will be stored in greenlet object
+            self.stat_increment('tasks_error')
+            task['res_err'] += 1
+            msg = exception_serialize_internal(e)
+            self.process_exception_message(task, context, msg)
+            return msg
 
         finally:
             # cleanup after task execution
@@ -136,17 +168,13 @@ class TaskExecutor(object):
             # task processed succesfully
             self.stat_increment('tasks_succes')
             task['res_succ'] += 1
-            self.context_postprocess(context)
-            return {
-                'message' : messages.RESULT,
-                'result' : grn.value
-            }
+            msg = messages.result2message(grn.value)
+            self.process_result_message(task, context, msg)
+            return msg
         else:
             # task raised error
             self.stat_increment('tasks_error')
             task['res_err'] += 1
-            err = exception_serialize(grn.exception, internal=False)
-            self.context_postprocess_exception(context, grn.exception)
-            LOG.info("Task [%s] exception [%s]. Message: %s" % (task['name'], err['name'], err['description']) )
-            LOG.debug(err['traceback'])
-            return err
+            msg = exception_serialize(grn.exception, internal=False)
+            self.process_exception_message(task, context, msg)
+            return msg

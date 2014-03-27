@@ -47,8 +47,6 @@ class WorkerDaemon(WorkerBase, TaskExecutor):
             load_config=True,
             skip_loading_modules=False):
 
-        super(WorkerDaemon, self).__init__()
-
         # config loader
         if servicename is None:
             load_config = True
@@ -56,7 +54,9 @@ class WorkerDaemon(WorkerBase, TaskExecutor):
             LOG.info("Loading service.conf")
             if servicename is None:
                 servicename = self.__load_config()
-        self.servicename = servicename
+
+        super(WorkerDaemon, self).__init__(servicename)
+
         self.__skip_loading_modules = skip_loading_modules
 
         # worker status
