@@ -2,19 +2,27 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 
 
-
-class RemoteException(Exception):
-    """
-    All exceptions raised by remote worker will be locally raised as RemoteException
-    """
+class ExtendedInfo(object):
 
     def info(self):
-        res = "REMOTE EXCEPTION\n"
-        # request path
-        res += "Request path:\n"
-        for i,p in enumerate(self.request_path):
-            res += "{0: >2} - {1}\n".format(i+1,p)
-        # traceback
+        try:
+            remote = self.remote
+        except AttributeError:
+            remote = False
+
+        if remote:
+            res = "REMOTE EXCEPTION\n"
+        else:
+            res = "LOCAL EXCEPTION\n"
+
+        try:
+            rp = self.request_path
+            res += "Request path:\n"
+            for i,p in enumerate(self.request_path):
+                res += "{0: >2} - {1}\n".format(i+1,p)
+        except AttributeError:
+            pass
+
         try:
             tb = self.traceback
         except AttributeError:
@@ -25,8 +33,21 @@ class RemoteException(Exception):
         return res
 
 
-class ServiceBusException(Exception):
+
+class RemoteException(Exception, ExtendedInfo):
+    """
+    All exceptions raised by remote worker will be locally raised as RemoteException
+    """
     pass
+
+
+class ServiceBusException(Exception, ExtendedInfo):
+    """
+    All internal exceptions are inherited from this class
+    """
+    pass
+
+
 
 class SerializationError(ServiceBusException):
     """

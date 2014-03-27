@@ -20,7 +20,7 @@ import gevent
 class KasayaDaemon(WorkerBase):
 
     def __init__(self):
-        super(KasayaDaemon, self).__init__(is_host=True)
+        super(KasayaDaemon, self).__init__("kasayad", is_host=True)
 
         # event handlers
         add_event_handler("host-join", self.on_remote_kasayad_start)

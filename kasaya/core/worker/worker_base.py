@@ -5,7 +5,7 @@ from kasaya.core.lib import LOG, make_kasaya_id
 from kasaya.core.lib import django_integration as DJI
 from kasaya.core.client import Context
 from kasaya.core.protocol import messages
-from kasaya.core.protocol.comm import send_and_receive, exception_serialize_internal, exception_serialize, ConnectionClosed
+from kasaya.core.protocol.comm import send_and_receive, ConnectionClosed
 import gevent
 import weakref
 import traceback
@@ -101,7 +101,7 @@ class TaskExecutor(object):
         except KeyError:
             self.stat_increment('tasks_nonex')
             LOG.info("Unknown worker task called [%s]" % task['name'])
-            return exception_serialize_internal( 'Method %s not found' % task['name'] )
+            return messages.exception2message( 'Method %s not found' % task['name'], True )
 
         # logging
         LOG.debug("task %s, args %s, kwargs %s" % (msgdata['method'], repr(msgdata['args']), repr(msgdata['kwargs'])))
@@ -146,7 +146,7 @@ class TaskExecutor(object):
                     #LOG.info("Task [%s] timeout (after %i s)." % (task['name'], task['timeout']) )
                     self.stat_increment('tasks_error')
                     task['res_tout'] += 1  # increment task's timeout exception counter
-                    msg = exception_serialize(e, internal=False)
+                    msg = messages.exception2message(e)
                     self.process_exception_message(task, context, msg)
                     return msg
 
@@ -155,7 +155,7 @@ class TaskExecutor(object):
             # because tasks exceptions will be stored in greenlet object
             self.stat_increment('tasks_error')
             task['res_err'] += 1
-            msg = exception_serialize_internal(e)
+            msg = messages.exception2message(e)
             self.process_exception_message(task, context, msg)
             return msg
 
@@ -175,6 +175,6 @@ class TaskExecutor(object):
             # task raised error
             self.stat_increment('tasks_error')
             task['res_err'] += 1
-            msg = exception_serialize(grn.exception, internal=False)
+            msg = messages.exception2message(grn.exception)
             self.process_exception_message(task, context, msg)
             return msg
