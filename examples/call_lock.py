@@ -35,7 +35,10 @@ if __name__=="__main__":
         #pass
 
     #sync.kasatest_a.test_infinite_loop(0)
-    sync.kasatest_a.test_exception(10)
+    try:
+        sync.kasatest_a.test_exception(10)
+    except Exception as e:
+        print( e.info() )
     #sync.kasatest_a.test_subrequests("A")
 
     #load_config_from_file("example.conf", optional=True)

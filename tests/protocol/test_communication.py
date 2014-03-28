@@ -19,7 +19,7 @@ class AddrDecoderTest(unittest.TestCase):
         self.assertItemsEqual( res,  ('ipc',"/tmp/my_socket.sock", socket.AF_UNIX, socket.SOCK_STREAM) )
 
 
-class MaliciousSender(comm.Sender):
+class EvilSender(comm.Sender):
     """
     Special sender which is able to send broken messages
     """
@@ -35,7 +35,7 @@ def _setup_connecion():
     MLOOP = comm.MessageLoop(addr)
     grlt = gevent.spawn(MLOOP.loop) # spawn listener
     # sender
-    SENDER = MaliciousSender(addr)
+    SENDER = EvilSender(addr)
 
 def _cleanup_connection():
     global MLOOP, SENDER
@@ -81,7 +81,7 @@ class SocketServerTest(unittest.TestCase):
             self.test_size -= 1
 
         # spawn listener
-        MLOOP.register_message("test", response)
+        MLOOP.register_message("test", response, replace_handler=True)
         # send bunch of messages
         for msg in range(10):
             self.test_size += 1
@@ -111,7 +111,7 @@ class SocketServerTest(unittest.TestCase):
             self.test_size -= 1
 
         # spawn listener
-        MLOOP.register_message("test", response)
+        MLOOP.register_message("test", response, replace_handler=True)
 
         self.test_size += 1
         msg = {"message":"test"}

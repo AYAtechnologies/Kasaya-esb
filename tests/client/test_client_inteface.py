@@ -64,7 +64,8 @@ class TestExecutionCalls(TestCase):
     def test_anonymous_calls(self):
         global msg_callback
         def context_should_be_empty(msg):
-            self.assertEqual( msg['context'], None)
+            self.assertEqual( len(msg['context']), 1 )
+            self.assertIn( 'depth', msg['context'] )
         msg_callback = context_should_be_empty
 
         sync.aa()

@@ -8,7 +8,7 @@ from kasaya.conf import settings
 from kasaya.core import exceptions
 from kasaya.core.lib.system import all_interfaces
 from binascii import hexlify
-import traceback, sys, os
+import sys, os
 from gevent.server import StreamServer
 import gevent, errno
 import socket
@@ -187,7 +187,7 @@ class Sender(object):
                 }
                 try:
                     self.send(msg)
-                except ConnectionClosed:
+                except exceptions.NetworkError:
                     return False
             return True
 
@@ -274,7 +274,7 @@ class Sender(object):
             raise ConnectionClosed
         try:
             _serialize_and_send(self.SOCK, self.serializer, message, resreq=False)
-        except ConnectionClosed:
+        except exceptions.NetworkError:
             self.__broken_connection()  # notify about connection loose
             raise
 
@@ -290,7 +290,7 @@ class Sender(object):
             raise ConnectionClosed
         try:
             _serialize_and_send(self.SOCK, self.serializer, message, resreq=True)
-        except ConnectionClosed:
+        except exceptions.NetworkError:
             self.__broken_connection()  # notify about connection loose
             raise
 
@@ -371,8 +371,7 @@ class MessageLoop(object):
 
     def __ip_translate(self, ip):
         """
-        Translate interface to ip adress, and stores
-        all used ip adresses used to bind socket to
+        Translate interface to ip adress, and stores all used ip adresses
         """
         self.__listening_on = []
         if ip=="127.0.0.1":
@@ -433,7 +432,7 @@ class MessageLoop(object):
         """
         self.SERVER.serve_forever()
 
-    def register_message(self, message, func, raw_msg_response=False):
+    def register_message(self, message, func, raw_msg_response=False, replace_handler=False):
         """
             message - handled message type
             func - handler function
@@ -441,7 +440,8 @@ class MessageLoop(object):
                                False - result shoult be packed to message outside handler
         """
         if message in self._msgdb:
-            raise Exception("Message %s is already registered" % message)
+            if not replace_handler:
+                raise Exception("Message %s is already registered" % message)
         self._msgdb[message]=(func, raw_msg_response)
 
 
@@ -483,16 +483,14 @@ class MessageLoop(object):
                 if resreq:
                     self._send_noop(SOCK)
                 LOG.warning("Unknown message received [%s]" % msg)
-                LOG.debug("Message body dump:\n%s" % repr(msgdata) )
+                #LOG.debug("Message body dump:\n%s" % repr(msgdata) )
                 continue
 
             # run handler
             try:
                 result = handler(msgdata)
             except Exception as e:
-                result = exception_serialize(e, False)
-                LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
-
+                #LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
                 if not resreq:
                     # if response is not required, then don't send exceptions
                     continue
@@ -500,7 +498,7 @@ class MessageLoop(object):
                 _serialize_and_send(
                     SOCK,
                     self.serializer,
-                    exception_serialize(e, False),
+                    messages.exception2message(e),
                     resreq = False, # response never require another response
                 )
                 continue
@@ -509,9 +507,12 @@ class MessageLoop(object):
             if not resreq:
                 continue
 
+
             try:
                 # send result
                 if rawmsg:
+                    # raw messages should return properly builded message,
+                    # so we send data directly awithout building own message
                     _serialize_and_send(
                         SOCK,
                         self.serializer,
@@ -521,10 +522,8 @@ class MessageLoop(object):
                 else:
                     _serialize_and_send(
                         SOCK,
-                        self.serializer, {
-                            "message":messages.RESULT,
-                            "result":result,
-                        },
+                        self.serializer,
+                        messages.result2message(result),
                         resreq = False
                     )
             except ConnectionClosed:
@@ -536,9 +535,8 @@ class MessageLoop(object):
         """
         _serialize_and_send(
             SOCK,
-            self.serializer, {
-                "message":messages.NOOP,
-            },
+            self.serializer,
+            messages.noop_message(),
             resreq = False
         )
 
@@ -588,7 +586,7 @@ def send_and_receive_response(address, message, timeout=None):
         return None
 
     elif typ==messages.ERROR:
-        e = exception_deserialize(result)
+        e = messages.message2exception(result)
         if e is None:
             raise exceptions.MessageCorrupted()
         raise e
@@ -598,86 +596,7 @@ def send_and_receive_response(address, message, timeout=None):
 
 # serialize and deserialize exceptions
 
-
-def exception_serialize(exc, internal=None):
-    """
-    Serialize exception object into message.
-    """
-    if hasattr(exc, 'remote'):
-        remote = exc.remote
-    else:
-        remote = False
-
-    result = {
-        'message': messages.ERROR,
-        'remote': remote,
-    }
-
-    if remote:
-        # remote exception (contain additional information)
-        result['traceback'] = exc.traceback
-        result['description'] = exc.message
-        result['name'] = exc.name
-        result['request_path'] = exc.request_path
-    else:
-        # local exceptions
-        result['request_path'] = []
-        # extract traceback
-        try:
-            tb = exc.traceback
-        except AttributeError:
-            tb = traceback.format_exc()
-
-        if sys.version_info<(3,0):
-            # python 2
-            if type(tb)==str:
-                try:
-                    tb = unicode(tb,"utf-8")
-                except:
-                    pass
-
-            # error message
-            errmsg = exc.message
-            try:
-                errmsg = unicode(errmsg, "utf-8")
-            except:
-                errmsg = errmsg
-        else:
-            # python 3
-            errmsg = str(exc)
-
-        result['traceback'] = tb
-        result['description'] = errmsg
-        result['name'] = exc.__class__.__name__
-
-    if internal is None:
-        # try to guess if exception is servicebus internal exception,
-        # or client code exception
-        result['internal'] = isinstance(exc, exceptions.ServiceBusException)
-    else:
-        result['internal'] = internal
-
-    return result
-
-
-def exception_serialize_internal(description):
-    """
-    Simple internal errors serializer
-    """
-    try:
-        remote = exc.remote
-    except AttributeError:
-        remote = False
-    return {
-        "message" : messages.ERROR,
-        "description" : description,
-        "internal" : True,
-        "remote" : remote,
-        "request_path" : [],
-    }
-
-
-
+'''
 def exception_deserialize(msg):
     """
     Deserialize exception from message into exception object which can be raised.
@@ -703,4 +622,4 @@ def exception_deserialize(msg):
         e.traceback = tb
     return e
 
-
+'''
