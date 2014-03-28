@@ -432,7 +432,7 @@ class MessageLoop(object):
         """
         self.SERVER.serve_forever()
 
-    def register_message(self, message, func, raw_msg_response=False):
+    def register_message(self, message, func, raw_msg_response=False, replace_handler=False):
         """
             message - handled message type
             func - handler function
@@ -440,7 +440,8 @@ class MessageLoop(object):
                                False - result shoult be packed to message outside handler
         """
         if message in self._msgdb:
-            raise Exception("Message %s is already registered" % message)
+            if not replace_handler:
+                raise Exception("Message %s is already registered" % message)
         self._msgdb[message]=(func, raw_msg_response)
 
 
@@ -585,7 +586,7 @@ def send_and_receive_response(address, message, timeout=None):
         return None
 
     elif typ==messages.ERROR:
-        e = exception_deserialize(result)
+        e = messages.message2exception(result)
         if e is None:
             raise exceptions.MessageCorrupted()
         raise e
@@ -595,7 +596,7 @@ def send_and_receive_response(address, message, timeout=None):
 
 # serialize and deserialize exceptions
 
-
+'''
 def exception_deserialize(msg):
     """
     Deserialize exception from message into exception object which can be raised.
@@ -621,4 +622,4 @@ def exception_deserialize(msg):
         e.traceback = tb
     return e
 
-
+'''

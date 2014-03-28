@@ -135,3 +135,30 @@ def internal_exception2message(description):
         "request_path" : [],
     }
 
+
+def message2exception(msg):
+    """
+    Deserialize exception from message into exception object which can be raised.
+    """
+    #if msg['internal']:
+    #else:
+    #    e = Exception(msg['description'])
+    e = exceptions.RemoteException(msg['description'])
+    e.internal = msg['internal']
+    # deserialized exception is always remote
+    e.remote = True
+    # request path
+    e.request_path = msg['request_path']
+    try:
+        e.name = msg['name']
+    except KeyError:
+        e.name = "Exception"
+    try:
+        tb = msg['traceback']
+    except KeyError:
+        tb = None
+    if not tb is None:
+        e.traceback = tb
+    return e
+
+

@@ -66,7 +66,12 @@ class SerializerTests(unittest.TestCase):
         set_value("COMPRESSION","no")
         set_value("ENCRYPTION","yes")
         # skip messagepack testing, because it's fucked up by design
-        self.transports = ("pickle","bson",)#"msgpack")
+        self.transports = ["pickle"]
+        try:
+            import bson
+            self.transports.append("bson")
+        except ImportError:
+            pass
 
     def _single_test(self, S, trans, enc):
         ctx = Context()
