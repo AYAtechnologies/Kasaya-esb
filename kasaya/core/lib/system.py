@@ -2,7 +2,7 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from kasaya.conf import settings
-from gevent import socket
+from socket import socket
 import resource
 
 

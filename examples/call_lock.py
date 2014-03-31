@@ -3,7 +3,7 @@
 from __future__ import unicode_literals
 #from kasaya.conf import load_config_from_file
 import sys
-import gevent.monkey; gevent.monkey.patch_thread()
+#import gevent.monkey; gevent.monkey.patch_thread()
 from kasaya import sync,Context
 
 

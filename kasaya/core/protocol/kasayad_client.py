@@ -2,10 +2,8 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.conf import settings
-from kasaya.core.protocol import Serializer, messages
+from kasaya.core.protocol import messages
 from kasaya.core import SingletonCreator
-from kasaya.core.exceptions import ReponseTimeout
-from gevent.coros import Semaphore
 from kasaya.core.protocol.comm import Sender, ConnectionClosed
 from kasaya.core.lib import LOG
 import gevent

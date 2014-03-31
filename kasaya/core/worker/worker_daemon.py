@@ -13,7 +13,7 @@ from kasaya.core.protocol.comm import MessageLoop
 from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
 from kasaya.core.lib import LOG, system, make_kasaya_id
-from kasaya.core.lib.syncclient import KasayaLocalClient
+from kasaya.core.protocol.kasayad_client import KasayaLocalClient
 from kasaya.core.events import add_event_handler
 from kasaya.core import exceptions
 from .worker_reg import worker_methods_db

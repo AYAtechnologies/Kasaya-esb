@@ -1,6 +1,6 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
-from kasaya.core.lib.syncclient import KasayaLocalClient
+from kasaya.core.protocol.kasayad_client import KasayaLocalClient
 from kasaya.core.protocol import messages
 from kasaya.core import SingletonCreator
 from kasaya.core import exceptions
