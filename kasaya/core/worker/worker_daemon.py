@@ -2,9 +2,9 @@
 #coding: utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 # monkey patching
-from kasaya.core.lib.mpatcher import damonkey
-damonkey()
-del damonkey
+#from kasaya.core.lib.mpatcher import damonkey
+#damonkey()
+#del damonkey
 # more kasaya imports
 from kasaya.conf import settings
 from kasaya.core.protocol import messages

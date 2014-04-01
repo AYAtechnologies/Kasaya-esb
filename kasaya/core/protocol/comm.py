@@ -3,22 +3,140 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.protocol import Serializer, messages
 from kasaya.core.lib import LOG
-from kasaya.core.events import emit
+#from kasaya.core.events import emit
 from kasaya.conf import settings
 from kasaya.core import exceptions
 from kasaya.core.lib.system import all_interfaces
 from binascii import hexlify
 from .sendrecv import *
 
-import gevent, errno
-from gevent.server import StreamServer
 import socket
+import errno
 import sys, os
+#import gevent
+
+
+
+class SimpleSender(object):
+
+    def __init__(self, address, sessionid=None):
+        """
+        address - destination address inf format: tcp://ipnumber:port
+        sessionid - optional session id which will be send immediately after connection.
+        """
+        self.__working = False
+        self.__sessionid = sessionid
+        self._address = address
+        self.serializer = Serializer()
+        self._connect()
+
+    def _connect(self):
+        """
+        Connect to address. Return True if success, False if fails.
+        """
+        self.SOCK = None
+        self.socket_type, addr, so1, so2 = decode_addr(self._address)
+        SOCK = socket.socket(so1, so2)
+        try:
+            SOCK.connect(addr)
+            self.SOCK = SOCK
+            if self.__sessionid!=None:
+                # send session id if is configured
+                msg = messages.message_session_id( self.__sessionid )
+                self.send(msg)
+            self._on_conn_started()
+            return True
+        except (socket.error, exceptions.NetworkError) as e:
+            self._on_conn_closed()
+            return False
+
+    def close(self):
+        """
+        Close socket and stop reconnecting process
+        """
+        if self.__working:
+            self.SOCK.close()
+
+    def _on_conn_started(self):
+        """
+        called when connection is started
+        """
+        self.__working = True
+        #emit("sender-conn-started", self._address)
+
+    def _on_conn_closed(self):
+        """
+        called on lost or closed connection
+        """
+        self.SOCK = None
+        self.__working = False
+        #emit("sender-conn-closed", self._address)
+
+
+    @property
+    def is_active(self):
+        return self.__working
+
+    # communication
+
+    def send(self, message):
+        """
+        Sends message to target. Return True if success, False if no connection.
+        """
+        retries = 2 # one extra try only
+        while retries>0:
+            # not connected already
+            retries-=1
+            if not self.__working:
+                if not self._connect():
+                    continue
+            # is connected, try send
+            try:
+                serialize_and_send(self.SOCK, self.serializer, message, resreq=False)
+                return
+            except exceptions.NetworkError:
+                # connection is broken
+                self._on_conn_closed()
+                continue
+        raise exceptions.ConnectionClosed("Broken connection")
+
+
+    def send_and_receive(self, message, timeout=None):
+        """
+        message - message payload (will be automatically serialized)
+        timeout - time in seconds after which TimeoutError will be raised.
+                  Note that timeout only for receive response, not for sending.
+        """
+        retries = 2 # one extra try only
+        while retries>0:
+            # not connected already
+            retries-=1
+            if not self.__working:
+                if not self._connect():
+                    continue
+            # is connected, try send
+            try:
+                serialize_and_send(self.SOCK, self.serializer, message, resreq=True)
+            except exceptions.NetworkError:
+                # connection is broken
+                self._on_conn_closed()
+                continue
+            # receive response
+            try:
+                res, resreq = receive_and_deserialize(self.SOCK, self.serializer, timeout)
+                return res
+            except exceptions.NetworkError:
+                # connection is broken
+                self._on_conn_closed()
+                continue
+        raise exceptions.ConnectionClosed("Broken connection")
+
+
 
 
 class Sender(object):
     """
-    Sending multiple messages to one target. Not receiving any data
+    Connect to target and send multiple messages with or without response.
     autoreconnect - if True enables autoreconnection process
     sessionid - optional session id which will be send immediately after connection.
     """
@@ -129,12 +247,6 @@ class Sender(object):
     def is_active(self):
         return self.__working
 
-    def on_connection_close(self, func):
-        pass
-
-    def on_connection_start(self, func):
-        pass
-
 
     # communication
 
@@ -186,9 +298,11 @@ class Sender(object):
 class MessageLoop(object):
     """
     Message loop is used by workers for receiving incoming messages.
+    MessageLoop imports gevent.server.StreamServer class
     """
 
     def __init__(self, address, maxport=None, backlog=50):
+        from gevent.server import StreamServer
         # session id is received from connecting side for each connection
         # by default it's unset and unused. When set it will be sended after
         # connection lost in event.
@@ -308,10 +422,10 @@ class MessageLoop(object):
 
     def register_message(self, message, func, raw_msg_response=False, replace_handler=False):
         """
-            message - handled message type
-            func - handler function
-            raw_msg_response - True means that function returns complete message,
-                               False - result shoult be packed to message outside handler
+        message - handled message type
+        func - handler function
+        raw_msg_response - True means that function returns complete message,
+                           False - result shoult be packed to message outside handler
         """
         if message in self._msgdb:
             if not replace_handler:

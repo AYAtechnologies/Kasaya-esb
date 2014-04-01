@@ -55,7 +55,16 @@ def result2message(result):
         'result' : result
     }
 
+# status messages
 
+def message_session_id(self, sid):
+    return {
+        "message" : SET_SESSION_ID,
+        "id" : self.__sessionid,
+    }
+
+
+# exceptions
 
 def exception2message(exc, internal=None):
     """

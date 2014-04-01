@@ -8,4 +8,4 @@ from kasaya.core.client import sync, async, trans, control, AsyncResult, Context
 # worker task decorator
 from kasaya.core.worker.decorators import *
 # worker class
-from kasaya.core.worker.worker_daemon import WorkerDaemon
+#from kasaya.core.worker.worker_daemon import WorkerDaemon

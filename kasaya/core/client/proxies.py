@@ -5,8 +5,7 @@ from kasaya.conf import settings
 from kasaya.core.protocol.sendrecv import send_and_receive_response, send_and_receive
 from kasaya.core import exceptions
 from kasaya.core.lib import LOG
-from kasaya.core.protocol.kasayad_client import KasayaLocalClient
-from kasaya.core.client.worker_finder import WorkerFinder
+from kasaya.core.protocol.kasayad_client import KasayaLocalClient, WorkerFinder
 from kasaya.core.client.asyncresult import AsyncResult
 from .context import Context
 import weakref
