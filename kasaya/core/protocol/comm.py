@@ -40,6 +40,7 @@ class SimpleSender(object):
         try:
             SOCK.connect(addr)
             self.SOCK = SOCK
+            self.__working = True
             if self.__sessionid!=None:
                 # send session id if is configured
                 msg = messages.message_session_id( self.__sessionid )

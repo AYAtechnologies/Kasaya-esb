@@ -10,22 +10,18 @@ from kasaya.conf import settings
 from kasaya.core.protocol import messages
 from kasaya.core.worker.worker_base import WorkerBase, TaskExecutor
 from kasaya.core.protocol.comm import MessageLoop
-from kasaya.core.middleware.core import MiddlewareCore
 from kasaya.core.lib.control_tasks import ControlTasks
-from kasaya.core.lib import LOG, system, make_kasaya_id
+from kasaya.core.lib import LOG, system
 from kasaya.core.protocol.kasayad_client import KasayaLocalClient
-from kasaya.core.events import add_event_handler
 from kasaya.core import exceptions
 from .worker_reg import worker_methods_db
 
-from kasaya.core.lib import django_integration as DJI
+#from kasaya.core.lib import django_integration as DJI
 
 import traceback
 import time, os
-#import inspect
-
+from kasaya.core.lib.system import monkey
 from kasaya.core.lib import LOG
-import gevent
 
 __all__=("WorkerDaemon",)
 
@@ -46,6 +42,12 @@ class WorkerDaemon(WorkerBase, TaskExecutor):
             servicename=None,
             load_config=True,
             skip_loading_modules=False):
+
+        # gevent import and patching
+        monkey()
+        global gevent, add_event_handler
+        import gevent
+        from kasaya.core.events import add_event_handler
 
         # config loader
         if servicename is None:
@@ -73,7 +75,7 @@ class WorkerDaemon(WorkerBase, TaskExecutor):
         add_event_handler( "sender-conn-closed", self.kasaya_connection_broken )
         add_event_handler( "sender-conn-started", self.kasaya_connection_started )
 
-        self.SYNC = KasayaLocalClient( autoreconnect=True, sessionid=self.ID )
+        self.SYNC = KasayaLocalClient( sessionid=self.ID )
         self.SYNC.setup( servicename, self.loop.address, self.ID, os.getpid() )
         LOG.debug("Binded to socket [%s]" % (",".join(self.loop.binded_ip_list()) ) )
 

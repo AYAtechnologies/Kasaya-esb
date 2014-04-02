@@ -57,10 +57,10 @@ def result2message(result):
 
 # status messages
 
-def message_session_id(self, sid):
+def message_session_id(sid):
     return {
         "message" : SET_SESSION_ID,
-        "id" : self.__sessionid,
+        "id" : sid,
     }
 
 

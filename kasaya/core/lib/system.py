@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 #coding: utf-8
 from __future__ import unicode_literals
-from socket import gethostname
+from kasaya.conf import settings
 import resource
+import os
 
 __all__=("get_memory_used", "get_hostname", "all_interfaces")
 
@@ -10,7 +11,11 @@ __all__=("get_memory_used", "get_hostname", "all_interfaces")
 def get_memory_used():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
+
 def get_hostname():
+    # import here because we dont want to keep imported
+    # socket library in case of monkey pathing later
+    from socket import gethostname
     return gethostname()
 
 
@@ -31,3 +36,12 @@ def all_interfaces():
             #interface is not supporting IP address
             pass
     return res
+
+
+def monkey():
+    """
+    Perform gevent monkey patching if is not disabled
+    """
+    if not os.environ.get('DISABLE_MONKEY_PATCH',False):
+        from gevent import monkey
+        monkey.patch_all()
