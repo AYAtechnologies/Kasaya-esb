@@ -3,7 +3,6 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 from kasaya.core.protocol import Serializer, messages
 from kasaya.core.lib import LOG
-#from kasaya.core.events import emit
 from kasaya.conf import settings
 from kasaya.core import exceptions
 from kasaya.core.lib.system import all_interfaces
@@ -13,7 +12,6 @@ from .sendrecv import *
 import socket
 import errno
 import sys, os
-#import gevent
 
 
 
@@ -146,6 +144,10 @@ class Sender(object):
         address - destination address inf format: tcp://ipnumber:port
         autoreconnect - will try to connect in background until success if connection fails or is unavailable
         """
+        global emit, gevent
+        import gevent
+        from kasaya.core.events import emit
+
         self.__working = False
         self.__recon = None
         self._address = address
@@ -303,7 +305,10 @@ class MessageLoop(object):
     """
 
     def __init__(self, address, maxport=None, backlog=50):
+        global emit
         from gevent.server import StreamServer
+        from kasaya.core.events import emit
+
         # session id is received from connecting side for each connection
         # by default it's unset and unused. When set it will be sended after
         # connection lost in event.
