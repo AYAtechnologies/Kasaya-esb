@@ -6,7 +6,6 @@ from kasaya.core.lib import django_integration as DJI
 from kasaya.core.client import Context
 from kasaya.core.protocol import messages
 from kasaya.core.protocol.comm import send_and_receive, ConnectionClosed
-import gevent
 import weakref
 import traceback
 
@@ -14,6 +13,8 @@ import traceback
 class WorkerBase(object):
 
     def __init__(self, servicename, is_host=False):
+        global gevent
+        import gevent
         self.ID = make_kasaya_id(host=is_host)
         self.servicename = servicename
         self.stats = {}

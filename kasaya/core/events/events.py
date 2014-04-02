@@ -2,7 +2,6 @@
 #coding: utf-8
 from __future__ import unicode_literals
 import gevent
-
 EVENTDB = {}
 
 
@@ -28,7 +27,6 @@ class OnEvent(object):
 
 
 def emit(name, *args, **kwargs):
-    global EVENTDB
     try:
         funclist = EVENTDB[name]
     except KeyError:

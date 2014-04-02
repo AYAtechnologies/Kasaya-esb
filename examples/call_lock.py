@@ -3,7 +3,7 @@
 from __future__ import unicode_literals
 #from kasaya.conf import load_config_from_file
 import sys
-import gevent.monkey; gevent.monkey.patch_thread()
+#import gevent.monkey; gevent.monkey.patch_thread()
 from kasaya import sync,Context
 
 
@@ -13,11 +13,12 @@ if __name__=="__main__":
     #except Exception as e:
     #    print e.traceback
 
+
     #try:
     #CC = Context()
     #s = CC.sync
-    #print CC.sync.kasatest_a.aa.bb("A")#test_empty("A")
-
+    print sync.kasatest_a.aa.bb("A")#test_empty("A")
+'''
     cc = Context()
     cc['test'] = "jajeczko"
     with cc as C:
@@ -51,6 +52,6 @@ if __name__=="__main__":
     #    except Exception as e:
     #        print e.traceback
     #        break
-
+'''
 #import socket
 #print socket.socket

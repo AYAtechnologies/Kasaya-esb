@@ -9,7 +9,7 @@ from kasaya import sync, async, trans, control, Context
 
 from kasaya.core.client.proxies import SyncProxy, AsyncProxy, ControlProxy, TransactionProxy
 from kasaya.core.client.proxies import SyncExec, AsyncExec, TransactionExec, ControlExec
-from kasaya.core.lib.syncclient import KasayaLocalClient
+from kasaya.core.protocol.kasayad_client import KasayaLocalClient
 
 
 class TestExecutionCalls(TestCase):
