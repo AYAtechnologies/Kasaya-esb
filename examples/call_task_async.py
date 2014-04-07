@@ -10,14 +10,18 @@ from time import sleep
 
 if __name__=="__main__":
     import sys
-    #print ">>>", async.fikumiku.do_work("parameter", 1, foo=123, baz=True )
-    for a in range(2):
-        res = async.locka.burak()
-        print res.result
-        sleep(1)
-        print res.result
-        sleep(1)
-        print res.result
+    print ">>>", async.fikumiku.do_work("parameter", 1, foo=123, baz=True )
+
+
+
+    #for a in range(2):
+    #    res = async.locka.burak()
+    #    print res
+    #    print type(res)
+    #    sleep(1)
+    #    print res.result
+    #    sleep(1)
+    #    print res.result
     #sleep(1)
     #print res.result
         #async.locka.task_a("!")
