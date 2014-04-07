@@ -13,7 +13,7 @@ from kasaya.conf import settings
 from kasaya.core.protocol import Serializer
 from kasaya.core.client.proxies import RawProxy
 from kasaya.core import exceptions
-from kasaya.core.client.worker_finder import WorkerFinder
+from kasaya.core.protocol.kasayad_client import WorkerFinder
 
 from kasaya.core.lib.logger import LOG
 LOG.stetupLogger("async")
