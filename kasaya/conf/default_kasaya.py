@@ -90,7 +90,7 @@ LOG_FILE_NAME = "/tmp/syncd.log"
 # poziom logowania
 # DEBUG - 10, INFO - 20, WARNING - 30, ERROR - 40, CRITICAL - 50
 # im niższy tym więcej informacji w logu
-LOG_LEVEL = "DEBUG"
+LOG_LEVEL = "INFO"
 
 # jeśli True to standardowe wyjście zostanie również przekierowane do logu
 # LOG_STDOUT = True

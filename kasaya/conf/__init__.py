@@ -99,4 +99,3 @@ load_settings_from_config_file(SYSTEM_KASAYA_CONFIG, "config", True, set_value, 
 if settings.USE_ASYNC_SERVICE:
     load_defaults("async")
     #load_settings_from_config_file(SYSTEM_SERVICES_CONFIG, "async", True, set_value, add_prefix="ASYNC_")
-

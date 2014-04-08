@@ -19,6 +19,12 @@ class WorkerBase(object):
         self.servicename = servicename
         self.stats = {}
 
+        if LOG.level<=10:
+            from kasaya.conf import settings
+            for k,v in settings.items():
+                LOG.debug("settings %s = %r" % (k,v))
+
+
     def verbose_name(self):
         """
         Return verbose name of worker for exceptions

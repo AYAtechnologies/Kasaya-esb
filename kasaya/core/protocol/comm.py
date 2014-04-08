@@ -260,7 +260,7 @@ class Sender(object):
         timeout is not supported yet.
         """
         if not self.__working:
-            raise ConnectionClosed
+            raise exceptions.ConnectionClosed
         try:
             serialize_and_send(self.SOCK, self.serializer, message, resreq=False)
         except exceptions.NetworkError:
@@ -276,7 +276,7 @@ class Sender(object):
         """
         # send message
         if not self.__working:
-            raise ConnectionClosed
+            raise exceptions.ConnectionClosed
         try:
             serialize_and_send(self.SOCK, self.serializer, message, resreq=True)
         except exceptions.NetworkError:
@@ -444,7 +444,7 @@ class MessageLoop(object):
         while True:
             try:
                 msgdata, resreq = receive_and_deserialize(SOCK, self.serializer)
-            except (NoData, ConnectionClosed):
+            except (exceptions.NoData, exceptions.ConnectionClosed):
                 return
             except NotOurMessage:
                 continue
@@ -520,7 +520,7 @@ class MessageLoop(object):
                         messages.result2message(result),
                         resreq = False
                     )
-            except ConnectionClosed:
+            except exceptions.ConnectionClosed:
                 return
 
     def _send_noop(self, SOCK):
