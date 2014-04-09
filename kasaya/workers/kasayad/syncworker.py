@@ -144,14 +144,6 @@ class SyncWorker(object):
         Receive worker's ping singnal.
         This function is triggered only by local worker.
         """
-        {
-            u'status': 1,
-            u'addr': u'tcp://0.0.0.0:5000',
-            u'service': u'locka',
-            u'pid': 6222,
-            u'id': u'WLUKJGE5AOKF4E'
-        }
-
         wrkr = self.DB.worker_get(msg['id'])
 
         if wrkr is None:

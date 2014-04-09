@@ -97,7 +97,7 @@ class SimpleSender(object):
                 # connection is broken
                 self._on_conn_closed()
                 continue
-        raise exceptions.ConnectionClosed("Broken connection")
+        raise ConnectionClosed("Broken connection")
 
 
     def send_and_receive(self, message, timeout=None):
@@ -128,7 +128,7 @@ class SimpleSender(object):
                 # connection is broken
                 self._on_conn_closed()
                 continue
-        raise exceptions.ConnectionClosed("Broken connection")
+        raise ConnectionClosed("Broken connection")
 
 
 
@@ -260,7 +260,7 @@ class Sender(object):
         timeout is not supported yet.
         """
         if not self.__working:
-            raise exceptions.ConnectionClosed
+            raise ConnectionClosed
         try:
             serialize_and_send(self.SOCK, self.serializer, message, resreq=False)
         except exceptions.NetworkError:
@@ -276,7 +276,7 @@ class Sender(object):
         """
         # send message
         if not self.__working:
-            raise exceptions.ConnectionClosed
+            raise ConnectionClosed
         try:
             serialize_and_send(self.SOCK, self.serializer, message, resreq=True)
         except exceptions.NetworkError:
@@ -306,8 +306,9 @@ class MessageLoop(object):
 
     def __init__(self, address, maxport=None, backlog=50):
         global emit
-        from gevent.server import StreamServer
         from kasaya.core.events import emit
+        from gevent.server import StreamServer
+        from gevent import socket
 
         # session id is received from connecting side for each connection
         # by default it's unset and unused. When set it will be sended after
@@ -318,6 +319,7 @@ class MessageLoop(object):
         # bind to socket
         self.socket_type, addr, so1, so2 = decode_addr(address)
         sock = socket.socket(so1, so2)
+
         if self.socket_type=="ipc":
             os.unlink(addr)
         else:
@@ -348,6 +350,9 @@ class MessageLoop(object):
 
         sock.listen(backlog)
 
+        # serialization
+        self.serializer = Serializer()
+
         # stream server from gevent
         self.SERVER = StreamServer(sock, self.connection_handler)
 
@@ -360,8 +365,7 @@ class MessageLoop(object):
         elif self.socket_type=="ipc":
             self.address = "ipc://%s" % addr
 
-        # serialization
-        self.serializer = Serializer()
+
 
     def __ip_translate(self, ip):
         """
@@ -444,7 +448,7 @@ class MessageLoop(object):
         while True:
             try:
                 msgdata, resreq = receive_and_deserialize(SOCK, self.serializer)
-            except (exceptions.NoData, exceptions.ConnectionClosed):
+            except (NoData, ConnectionClosed):
                 return
             except NotOurMessage:
                 continue
@@ -520,7 +524,7 @@ class MessageLoop(object):
                         messages.result2message(result),
                         resreq = False
                     )
-            except exceptions.ConnectionClosed:
+            except ConnectionClosed:
                 return
 
     def _send_noop(self, SOCK):
