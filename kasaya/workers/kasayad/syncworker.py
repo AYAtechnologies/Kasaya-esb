@@ -61,7 +61,7 @@ class SyncWorker(object):
         self.ctl.register_task("svbus.status",  self.CTL_global_services)
         self.ctl.register_task("worker.stop",   self.CTL_worker_stop)
         self.ctl.register_task("worker.stats",  self.CTL_worker_stats)
-        self.ctl.register_task("worker.exists",  self.CTL_worker_exists)
+        self.ctl.register_task("worker.exists", self.CTL_worker_exists)
         self.ctl.register_task("service.start", self.CTL_service_start)
         self.ctl.register_task("service.stop",  self.CTL_service_stop)
         self.ctl.register_task("host.rescan",   self.CTL_host_rescan)
