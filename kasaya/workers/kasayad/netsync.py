@@ -4,41 +4,62 @@ from __future__ import unicode_literals
 
 
 
-class HostDB(object):
-
-    def __init__(self):
-        self.db = {}
-
-    def host_get_counters(self, hostid):
-        passZres
-
-    def host_set_full_sync_flag(self, state):
-        """
-        Sets flag for host indicating that host is currently in "full sync required" state.
-        This means that host is currently out of sync and complede data set is required to make it sync.
-          state=True - sync required
-          state=False - data synced
-        """
-        assert type(stat) is bool
-        pass
-
-
-
 class KasayaNetworkSync(object):
 
     def __init__(self, dbinstance, ID):
+        #print "BORN",ID
         self.ID = ID
-        self.major = 0  # main state counter
+        self.major = 1  # main state counter
         self.minor = 0  # state counter for nonauthoritative messages
         self.DB = dbinstance
-        self.broadcast(self.ID, self.major)
+        self.broadcast(self.ID, self.major, self.minor)
+        self.counters = {}
 
 
-    def host_join(self, hostid, addr):
+    def is_local_state_actual(self, hostid, major, minor):
+        """
+        Check counters for given host.
+        Result:
+            True  - local stored counters are equal or higher
+            False - local stored counters are outdated
+        """
+        try:
+            lmajor, lminor = self.counters[hostid]
+        except KeyError: # unknown host
+            return False
+        if major<lmajor:
+            return True
+        elif major>lmajor:
+            return False
+        return minor<=lminor
+
+
+    def set_counters(self, hostid, major,  minor):
+        """
+        Set new value for counters.
+        """
+        self.counters[hostid] = (major, minor)
+
+
+    def host_join(self, hostid, addr, cmajor, cminor):
         """
         Detected new host in network (from broadcast or first connection)
         """
-        pass
+        #print "incoming broadcast from %s (%s)" % (hostid, addr)
+        if self.ID==hostid:
+            # ignore own broadcasts
+            return
+        #print "my id", self.ID, " incoming",hostid, " known",self.counters.keys()
+        if self.is_local_state_actual(hostid, cmajor, cminor):
+            # we have newer data than sender, ignore
+            #print "KNOWN HOST"
+            return
+
+        self.set_counters(hostid, cmajor, cminor)
+        self.DB.host_register(hostid, addr)
+        self.request_full_sync(hostid)
+        #print "host %s joined network" % hostid, "known", self.counters.keys()
+
 
     def host_leave(self, hostid):
         """
@@ -67,7 +88,7 @@ class KasayaNetworkSync(object):
         """
         pass
 
-    def broadcast(self, hostid, cmajor):
+    def broadcast(self, hostid, cmajor, cminor):
         """
         Send broadcast to all hosts in network about self.
           hostid - own host id
