@@ -32,6 +32,13 @@ class KasayaFakeSync(KasayaNetworkSync):
         g = gevent.Greenlet( self.TP.broadcast, hostid, cmajor, cminor)
         g.start()
 
+    def request_remote_host_state(self, hostid, addr):
+        return self.TP.request_remote_host_state( hostid, addr )
+
+    def local_state_report(self):
+        return {}
+
+
 
 class KasayaTestPool(object):
 
@@ -72,12 +79,23 @@ class KasayaTestPool(object):
             g = gevent.Greenlet( host.host_join, hostid, ip, cmajor, cminor )
             g.start()
 
+    def request_remote_host_state(self, hostid, addr):
+        """
+        full host state request to remote host
+        """
+        h = self[hostid]
+        r = h.report_own_state(hostid)
+        return r
+
+
+
     def __len__(self):
         return len(self.hosts)
     def __getitem__(self,k):
         return self.hosts[k]
     def items(self):
         return self.hosts.items()
+
 
 
 class NetSyncTest(unittest.TestCase):
@@ -117,6 +135,7 @@ class NetSyncTest(unittest.TestCase):
                 )
 
         print ("after wait")
+
 
 
 
