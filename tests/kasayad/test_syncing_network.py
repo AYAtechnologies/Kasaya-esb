@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasatest/bin/python
+#!/home/moozg/venvs/kasa/bin/python
 #coding: utf-8
-#!/home/moozg/venvs/kasa33/bin/python
+#!/home/moozg/venvs/kasatest/bin/python
 from __future__ import division, absolute_import, print_function, unicode_literals
 import unittest, os, random
 
@@ -16,7 +16,7 @@ class KasayaNullSync(KasayaNetworkSync):
     """
     disabled broadcast on setup, for testing single methods
     """
-    def broadcast(self, hostid, cmajor, cminor):
+    def broadcast(self, hostid, counter):
         pass
 
 
@@ -26,11 +26,21 @@ class KasayaFakeSync(KasayaNetworkSync):
         self.TP = testpool
         super(KasayaFakeSync, self).__init__( dbinstance, ID)
 
+    def __repr__(self):
+        return "<KS:%s>" % (self.ID[1:])
+
     # redirect network operation to test pool which simulate network operations
 
-    def broadcast(self, hostid, cmajor, cminor):
-        g = gevent.Greenlet( self.TP.broadcast, hostid, cmajor, cminor)
+    def broadcast(self, hostid, counter):
+        g = gevent.Greenlet( self.TP.broadcast, hostid, counter)
         g.start()
+
+    def request_full_sync(self, hostid, addr):
+        g = gevent.Greenlet( self.TP.request_full_sync, hostid, addr, self.ID)
+        g.start()
+
+    def create_full_state_report(self):
+        return {}
 
 
 class KasayaTestPool(object):
@@ -39,8 +49,16 @@ class KasayaTestPool(object):
         self.hosts = {}
         self.__ips = {}  # ip address map
 
+    # be like dict
     def keys(self):
         return self.hosts.keys()
+    def __len__(self):
+        return len(self.hosts)
+    def __getitem__(self,k):
+        return self.hosts[k]
+    def items(self):
+        return self.hosts.items()
+
 
     def new_host(self, hid=None):
         if hid is None:
@@ -50,7 +68,7 @@ class KasayaTestPool(object):
         self.hosts[hid] = h
         return hid
 
-    def get_host_ip(self, hid):
+    def _get_ip_for_host(self, hid):
         """
         Return fake IP address for host
         """
@@ -62,22 +80,35 @@ class KasayaTestPool(object):
         self.__ips[hid] = ip
         return ip
 
+    def _get_host_for_ip(self, ip):
+        for h, i in self.__ips.items():
+            if i==ip:
+                return self[h]
+        raise KeyError("Host with ip %s not found" % ip)
+
     # fake network operations
-    def broadcast(self, hostid, cmajor, cminor):
+    def broadcast(self, hostid, counter):
         """
         Simulate broadcasting to all hosts
         """
-        ip = self.get_host_ip(hostid)
+        ip = self._get_ip_for_host(hostid)
         for hid, host in self.hosts.iteritems():
-            g = gevent.Greenlet( host.host_join, hostid, ip, cmajor, cminor )
+            g = gevent.Greenlet( host.host_join, hostid, ip, counter )
             g.start()
 
-    def __len__(self):
-        return len(self.hosts)
-    def __getitem__(self,k):
-        return self.hosts[k]
-    def items(self):
-        return self.hosts.items()
+    def request_full_sync(self, hostid, addr, sender_id):
+        """
+        Simulate sending request to remote host
+        for complete staus report
+        """
+        host = self._get_host_for_ip(addr)
+        sender_addr = self._get_ip_for_host(sender_id)
+        msg = {}
+        g = gevent.Greenlet( host.on_full_sync_request, msg)
+        g.start()
+
+
+
 
 
 class NetSyncTest(unittest.TestCase):
@@ -88,13 +119,10 @@ class NetSyncTest(unittest.TestCase):
 
     def _test_countes(self):
         ns = KasayaNetworkSync(None, "ownid")
-        self.assertEqual( ns.is_local_state_actual("h",  0, 0), False ) # unknown host, alwasy not actual
-        ns.set_counters("h", 10, 5 )
-        self.assertEqual( ns.is_local_state_actual("h",  9, 0), True  )
-        self.assertEqual( ns.is_local_state_actual("h", 11, 0), False )
-        self.assertEqual( ns.is_local_state_actual("h", 10, 4), True  )
-        self.assertEqual( ns.is_local_state_actual("h", 10, 5), True  )
-        self.assertEqual( ns.is_local_state_actual("h", 10, 6), False )
+        self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
+        ns.set_counter("h", 10 )
+        self.assertEqual( ns.is_local_state_actual("h",  9), True  )
+        self.assertEqual( ns.is_local_state_actual("h", 11), False )
 
     def test_network_syncer(self):
         pool = KasayaTestPool()
@@ -109,12 +137,19 @@ class NetSyncTest(unittest.TestCase):
         hosts = pool.keys()
         for hid,host in pool.items():
             for h in hosts:
-                status = host.is_local_state_actual(h, pool[h].major, pool[h].minor)
+                # we can't use is_local_state_actual method, because after broadcast
+                # new host still have "out of sync" state!
+                # we check if host is registered in each host local database
+                status = h in host.counters.keys()
+                #status = host.is_local_state_actual(h, pool[h].counter)
                 shouldbe = hid!=pool[h].ID
                 self.assertEqual(
                     status, shouldbe,
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
+
+
+
 
         print ("after wait")
 
