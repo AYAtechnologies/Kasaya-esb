@@ -104,8 +104,8 @@ class NetSyncTest(unittest.TestCase):
     #def setUpClass(cls):
     #    set_value("KASAYAD_DB_BACKEND", "memory")
 
-    def _test_countes(self):
-        ns = KasayaNetworkSync(None, "ownid")
+    def test_countes(self):
+        ns = KasayaNullSync(None, "ownid")
         self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
         ns.set_counter("h", 10 )
         self.assertEqual( ns.is_local_state_actual("h",  9), True  )

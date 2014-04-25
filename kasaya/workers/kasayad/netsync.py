@@ -146,11 +146,15 @@ class KasayaNetworkSync(object):
 
 
     def on_broadcast(self, addr, msg):
+        """
+        Noe host send broadcast on start
+        """
         self.host_join(
             addr,
             msg['senderid'],
             msg['counter']
         )
+
 
 
     def on_host_join(self, addr, msg):
@@ -277,7 +281,7 @@ class KasayaNetworkSync(object):
         #    'counter': self.counter,
         #    'state'  : self.create_full_state_report()
         #}
-        print ("INCOMING FULL SYNC", addr, msg)
+        #print ("INCOMING FULL SYNC", addr, msg)
 
     def send_full_sync_request(self, addr, hostid):
         """
@@ -338,7 +342,6 @@ class KasayaNetworkSync(object):
         Send message
         """
         raise NotImplementedError
-
 
     def create_full_state_report(self):
         """
