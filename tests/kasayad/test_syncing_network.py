@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasa/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasatest/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasa/bin/python
 from __future__ import division, absolute_import, print_function, unicode_literals
 import unittest, os, random
 
@@ -14,9 +14,11 @@ import gevent
 
 class KasayaNullSync(KasayaNetworkSync):
     """
-    disabled broadcast on setup, for testing single methods
+    Disabled network communication.
     """
-    def broadcast(self, hostid, counter):
+    def send_broadcast(self, msg):
+        pass
+    def send_message(self, addr, msg):
         pass
 
 
@@ -31,27 +33,14 @@ class KasayaFakeSync(KasayaNetworkSync):
 
     # redirect network operation to test pool which simulate network operations
 
-    def broadcast(self, hostid, counter):
-        g = gevent.Greenlet( self.TP.broadcast, hostid, counter)
+    def send_broadcast(self, msg):
+        g = gevent.Greenlet( self.TP.send_broadcast, msg)
         g.start()
 
-    def request_full_sync(self, hostid, addr):
-        g = gevent.Greenlet( self.TP.request_full_sync, hostid, addr, self.ID)
+    def send_message(self, addr, msg):
+        g = gevent.Greenlet( self.TP.send_message, addr, msg)
         g.start()
 
-<<<<<<< HEAD
-    def request_remote_host_state(self, hostid, addr):
-        return self.TP.request_remote_host_state( hostid, addr )
-
-    def local_state_report(self):
-        return {}
-
-
-=======
-    def create_full_state_report(self):
-        return {}
-
->>>>>>> origin/feature/KAS-5-kasaya-network-sync
 
 class KasayaTestPool(object):
 
@@ -97,48 +86,16 @@ class KasayaTestPool(object):
         raise KeyError("Host with ip %s not found" % ip)
 
     # fake network operations
-    def broadcast(self, hostid, counter):
-        """
-        Simulate broadcasting to all hosts
-        """
-        ip = self._get_ip_for_host(hostid)
-        for hid, host in self.hosts.iteritems():
-            g = gevent.Greenlet( host.host_join, hostid, ip, counter )
+    def send_broadcast(self, msg):
+        senderaddr = self._get_ip_for_host( msg['senderid'] )
+        for host in self.hosts.values():
+            g = gevent.Greenlet( host.receive_message, senderaddr, msg )
             g.start()
 
-<<<<<<< HEAD
-    def request_remote_host_state(self, hostid, addr):
-        """
-        full host state request to remote host
-        """
-        h = self[hostid]
-        r = h.report_own_state(hostid)
-        return r
-
-
-
-    def __len__(self):
-        return len(self.hosts)
-    def __getitem__(self,k):
-        return self.hosts[k]
-    def items(self):
-        return self.hosts.items()
-=======
-    def request_full_sync(self, hostid, addr, sender_id):
-        """
-        Simulate sending request to remote host
-        for complete staus report
-        """
+    def send_message(self, addr, msg):
+        senderaddr = self._get_ip_for_host( msg['senderid'] )
         host = self._get_host_for_ip(addr)
-        sender_addr = self._get_ip_for_host(sender_id)
-        msg = {}
-        g = gevent.Greenlet( host.on_full_sync_request, msg)
-        g.start()
-
-
-
->>>>>>> origin/feature/KAS-5-kasaya-network-sync
-
+        host.receive_message(senderaddr, msg)
 
 
 class NetSyncTest(unittest.TestCase):

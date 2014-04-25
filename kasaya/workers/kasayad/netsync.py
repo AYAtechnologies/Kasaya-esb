@@ -3,6 +3,14 @@
 from __future__ import unicode_literals
 from time import time
 
+__all__ = ("KasayaNetworkSync",)
+
+
+_MSG_BROADCAST  = "bc"
+_MSG_HOST_JOIN  = "hj"
+_MSG_HOST_LEAVE = "hl"
+_MSG_FULL_SYNC_REQUEST = "sr"
+
 
 class KasayaNetworkSync(object):
 
@@ -11,20 +19,56 @@ class KasayaNetworkSync(object):
         self.ID = ID
         self.counter = 1  # main state counter
         self.DB = dbinstance
-        self.send_broadcast(self.ID, 0) # counter=0 means out of sync state
+        self._broadcast(0) # counter=0 means out of sync state
         self.counters = {}
 
         self._methodmap = {
-            "hj" : self.host_join,
-            "hl" : self.host_leave,
-            "hc" : self.on_host_change,
-            "hd" : self.send_host_died,
-            "wd" : self.send_worker_died,
-            "sr" : self.send_full_sync_request,
-            "hs" : self.send_host_full_state,
-            "bc" : self.send_broadcast,
+            _MSG_BROADCAST  : self.on_broadcast,
+            _MSG_HOST_JOIN  : self.on_host_join,
+            _MSG_HOST_LEAVE : self.on_host_leave,
+            _MSG_FULL_SYNC_REQUEST : self.on_full_sync_request,
+            #"hl" : self.on_leave,
+            #"hc" : self.on_host_change,
+            #"hd" : self.on_host_died,
+            #"wd" : self.on_worker_died,
+            #"sr" : self.on_full_sync_request,
+            #"hs" : self.on_host_full_state,
         }
 
+
+    # send and receive network messages
+
+    def receive_message(self, sender_addr, msg):
+        """
+        Incoming messages dispatcher
+        """
+        try:
+            fnc = self._methodmap[ msg['SMSG'] ]
+        except KeyError:
+            # invalid message
+            return
+
+        if msg['senderid']==self.ID:
+            # ignore own messages
+            return
+
+        print ("received message from", sender_addr, msg)
+        fnc(sender_addr, msg)
+
+    def _broadcast(self, counter):
+        msg = {
+            'SMSG' : _MSG_BROADCAST,
+            'senderid': self.ID,
+            'counter' : counter,
+        }
+        self.send_broadcast(msg)
+
+    def _send(self, addr, msg):
+        """
+        Add sender ID and send message
+        """
+        msg['senderid'] = self.ID
+        self.send_message(addr, msg)
 
 
     # top level logic methods
@@ -35,13 +79,13 @@ class KasayaNetworkSync(object):
         Check counters for given host.
         Result:
             True  - local stored counters are equal or higher
-            False - local stored counters are outdated
+            False - local stored counters are outdated or 0
         """
         try:
             counter, tstamp = self.counters[hostid]
         except KeyError: # unknown host
             return False
-        return counter>=rc
+        return (counter>=rc) and (counter>0)
 
 
     def set_counter(self, hostid, counter):
@@ -51,7 +95,7 @@ class KasayaNetworkSync(object):
         self.counters[hostid] = (counter, time() )
 
 
-    def host_join(self, hostid, addr, counter):
+    def host_join(self, addr, hostid, counter):
         """
         Detected new host in network (from broadcast or first connection)
         """
@@ -68,7 +112,7 @@ class KasayaNetworkSync(object):
         # new host is joined
         self.set_counter(hostid, counter)
         self.DB.host_register(hostid, addr)
-        self.host_full_sync(hostid, addr)
+        self.host_full_sync_required(hostid)
         #print "host %s joined network" % hostid, "known", self.counters.keys()
 
 
@@ -89,29 +133,24 @@ class KasayaNetworkSync(object):
         print ("STATE CHANGE", host, counter, ">>>", key, data)
 
 
-    def host_full_state(self, hostid, counter, payload):
+    def host_full_sync_required(self, hostid):
         """
-        Remote host sends full state and new counters.
-        payload is dict treated as many key,data values in host_state_change method.
+        Host require full sync, start sync procedure.
         """
-        pass
+        addr = self.DB.host_addr_by_id(hostid)
+        self.send_full_sync_request(addr, hostid)
+
 
 
     # network input / output methods
-    # methods executed by network connectivity component
-    # each on_... method has send_... eqiuvalent wchih
-    # should be overwritten in child class
 
-    def on_incoming_message(self, msg):
-        """
-        Redirect incoming sync messages to appropriate methods
-        """
-        try:
-            fnc = self._methodmap[ msg['SMSG'] ]
-        except KeyError:
-            # invalid message
-            return
-        fnc(msg)
+
+    def on_broadcast(self, addr, msg):
+        self.host_join(
+            addr,
+            msg['senderid'],
+            msg['counter']
+        )
 
 
     def on_host_join(self, addr, msg):
@@ -224,7 +263,7 @@ class KasayaNetworkSync(object):
             "hostid"   : hostid,
             "workerid" : workerid,
         }
-        return msg
+        self._send(addr, msg)
 
 
 
@@ -243,11 +282,12 @@ class KasayaNetworkSync(object):
     def send_full_sync_request(self, addr, hostid):
         """
         Create local state report and send to specified host
+           hostid - id of host which message is targeting
         """
-        res = {
-            'host'   : hostid,
+        msg = { 'SMSG' : _MSG_FULL_SYNC_REQUEST,
+            'hostid' : hostid,
         }
-        return res
+        self._send(addr, msg)
 
 
 
@@ -285,12 +325,17 @@ class KasayaNetworkSync(object):
 
     # abstract methods, need to be overwritten in child classess
 
-
-    def send_broadcast(self, hostid, counter):
+    def send_broadcast(self, msg):
         """
         Send broadcast to all hosts in network about self.
           hostid - own host id
           counter - status counter
+        """
+        raise NotImplementedError
+
+    def send_message(self, addr, msg):
+        """
+        Send message
         """
         raise NotImplementedError
 
@@ -300,3 +345,4 @@ class KasayaNetworkSync(object):
         Create host full status report
         """
         raise NotImplementedError
+
