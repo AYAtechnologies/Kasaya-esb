@@ -9,7 +9,8 @@ __all__ = ("KasayaNetworkSync",)
 _MSG_BROADCAST  = "bc"
 _MSG_HOST_JOIN  = "hj"
 _MSG_HOST_LEAVE = "hl"
-_MSG_FULL_SYNC_REQUEST = "sr"
+_MSG_FULL_STATE_REQUEST = "sr"
+_MSG_FULL_STATE = "fs"
 
 
 class KasayaNetworkSync(object):
@@ -18,6 +19,7 @@ class KasayaNetworkSync(object):
         #print "BORN",ID
         self.ID = ID
         self.counter = 1  # main state counter
+        self.online = True # always True until close is called
         self.DB = dbinstance
         self._broadcast(0) # counter=0 means out of sync state
         self.counters = {}
@@ -26,7 +28,8 @@ class KasayaNetworkSync(object):
             _MSG_BROADCAST  : self.on_broadcast,
             _MSG_HOST_JOIN  : self.on_host_join,
             _MSG_HOST_LEAVE : self.on_host_leave,
-            _MSG_FULL_SYNC_REQUEST : self.on_full_sync_request,
+            _MSG_FULL_STATE_REQUEST : self.on_full_sync_request,
+            _MSG_FULL_STATE : self.on_host_full_state,
             #"hl" : self.on_leave,
             #"hc" : self.on_host_change,
             #"hd" : self.on_host_died,
@@ -34,6 +37,15 @@ class KasayaNetworkSync(object):
             #"sr" : self.on_full_sync_request,
             #"hs" : self.on_host_full_state,
         }
+
+
+    def close(self):
+        """
+        Unregister self from network.
+        """
+        self.online = False
+        self.counter += 1
+        #self.send_host_leave()
 
 
     # send and receive network messages
@@ -52,7 +64,7 @@ class KasayaNetworkSync(object):
             # ignore own messages
             return
 
-        print ("received message from", sender_addr, msg)
+        #print "received message from", sender_addr, msg
         fnc(sender_addr, msg)
 
     def _broadcast(self, counter):
@@ -61,14 +73,23 @@ class KasayaNetworkSync(object):
             'senderid': self.ID,
             'counter' : counter,
         }
-        self.send_broadcast(msg)
+        if self.online:
+            self.send_broadcast(msg)
 
     def _send(self, addr, msg):
         """
-        Add sender ID and send message
+        Add sender ID and send message to specified address or list of addresses
         """
         msg['senderid'] = self.ID
-        self.send_message(addr, msg)
+        if type(addr) in (list, tuple):
+            for a in addr:
+                self.send_message(addr, msg)
+        else:
+            self.send_message(addr, msg)
+
+
+
+
 
 
     # top level logic methods
@@ -133,13 +154,21 @@ class KasayaNetworkSync(object):
         print ("STATE CHANGE", host, counter, ">>>", key, data)
 
 
+    def host_state_complete(self, hostid, counter, items):
+        """
+        Received complete state of remote host.
+        items - list of key/value pairs with host properties/workers
+        """
+        self.set_counter(hostid, counter)
+        print "NEW STATE", items
+
+
     def host_full_sync_required(self, hostid):
         """
-        Host require full sync, start sync procedure.
+        Remote host require full host status. Send report.
         """
         addr = self.DB.host_addr_by_id(hostid)
-        self.send_full_sync_request(addr, hostid)
-
+        self.send_host_full_state(addr)
 
 
     # network input / output methods
@@ -276,19 +305,19 @@ class KasayaNetworkSync(object):
         Incoming request for full host report.
         Result will be transmitted back asynchronously.
         """
-        #res = {
-        #    'host'   : self.ID,
-        #    'counter': self.counter,
-        #    'state'  : self.create_full_state_report()
-        #}
-        #print ("INCOMING FULL SYNC", addr, msg)
+        if not msg['hostid']==self.ID:
+            # invalid host id,
+            # remote host has outdated host list
+            # TODO: notify sender about invalid hostid/address information
+            return
+        self.host_full_sync_required( msg['senderid'] )
 
     def send_full_sync_request(self, addr, hostid):
         """
         Create local state report and send to specified host
            hostid - id of host which message is targeting
         """
-        msg = { 'SMSG' : _MSG_FULL_SYNC_REQUEST,
+        msg = { 'SMSG' : _MSG_FULL_STATE_REQUEST,
             'hostid' : hostid,
         }
         self._send(addr, msg)
@@ -296,35 +325,47 @@ class KasayaNetworkSync(object):
 
 
 
-    def on_host_full_state(self, hostid, addr):
+    def on_host_full_state(self, addr, msg):
         """
         Remote host data is out of sync, send full sync request and process response
           - hostid - remote host id
           - addr - remote addess
         """
-        result = self.request_remote_host_state(hostid, addr)
-        print result
-        return
-        if "id" in result:
-            # wrong response
-            print ("wrong full sync response")
-            pass
-        else:
-            # full status response
-            #self.set_full_host_state()
-            pass
+        knownaddr = self.DB.host_addr_by_id( msg['senderid'] )
+        if addr!=knownaddr:
+            # our host database is outdated.
+            # under given hostid we have different host registered
+            # TODO!
+            #   update/repair current db
+            return
+
+        if self.is_local_state_actual( msg['senderid'], msg['counter'] ):
+            # we doesn't need any updates
+            return
+
+        if 'offline' in msg:
+            # host is currently leaving network
+            if msg['offline']:
+                self.host_leave(msg['senderid'])
+                return
+
+        self.host_state_complete( msg['senderid'], msg['counter'], msg['state'] )
+
 
 
     def send_host_full_state(self, addr):
         """
         Send full state to specified host
         """
-        msg = {
+        msg = { 'SMSG' : _MSG_FULL_STATE,
             "hostid"  : self.ID,
             "counter" : self.counter,
-            "state"   : self.create_full_state_report(),
         }
-        return msg
+        if self.online:
+            msg["state"] = self.create_full_state_report()
+        else:
+            msg["offline"] = None
+        self._send(addr, msg)
 
 
     # abstract methods, need to be overwritten in child classess

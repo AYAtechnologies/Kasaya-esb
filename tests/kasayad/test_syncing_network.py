@@ -41,6 +41,9 @@ class KasayaFakeSync(KasayaNetworkSync):
         g = gevent.Greenlet( self.TP.send_message, addr, msg)
         g.start()
 
+    def create_full_state_report(self):
+        return []
+
 
 class KasayaTestPool(object):
 
@@ -115,9 +118,9 @@ class NetSyncTest(unittest.TestCase):
         pool = KasayaTestPool()
         pool.new_host()
         pool.new_host()
-        pool.new_host()
-        pool.new_host()
-        pool.new_host()
+        #pool.new_host()
+        #pool.new_host()
+        #pool.new_host()
         gevent.wait() # alow all hosts to synchronize
 
         # check all hosts know all others, but not self
