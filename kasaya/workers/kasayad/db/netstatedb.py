@@ -28,7 +28,7 @@ class NetworkStateDB(object):
 
     # hosts
 
-    def host_register(self, host_id, address):# hostname, ip, services=None):
+    def host_register(self, host_id, address, hostname=None):# hostname, ip, services=None):
         """
         Register new host (kasayad instance).
         host_id - id of kasayad
@@ -48,7 +48,7 @@ class NetworkStateDB(object):
             #else:
             return False
         # register host
-        self.LLDB.host_add(host_id, address)
+        self.LLDB.host_add(host_id, address, hostname)
         # register services
         #if services is not None:
         #    self.service_update_list(host_id, services)

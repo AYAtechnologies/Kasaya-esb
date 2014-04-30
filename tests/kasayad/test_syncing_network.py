@@ -1,7 +1,7 @@
-#!/home/moozg/venvs/kasatest/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasa/bin/python
-from __future__ import division, absolute_import, print_function, unicode_literals
+#coding: utf-8
+#!/home/moozg/venvs/kasatest/bin/python
+from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 
 from kasaya.conf import set_value, settings
@@ -24,9 +24,9 @@ class KasayaNullSync(KasayaNetworkSync):
 
 class KasayaFakeSync(KasayaNetworkSync):
 
-    def __init__(self, testpool, dbinstance, ID):
+    def __init__(self, testpool, dbinstance, ID, hostname):
         self.TP = testpool
-        super(KasayaFakeSync, self).__init__( dbinstance, ID)
+        super(KasayaFakeSync, self).__init__( dbinstance, ID, hostname)
 
     def __repr__(self):
         return "<KS:%s>" % (self.ID[1:])
@@ -34,6 +34,8 @@ class KasayaFakeSync(KasayaNetworkSync):
     # redirect network operation to test pool which simulate network operations
 
     def send_broadcast(self, msg):
+        if self.TP.disable_bc:
+            return
         g = gevent.Greenlet( self.TP.send_broadcast, msg)
         g.start()
 
@@ -41,15 +43,16 @@ class KasayaFakeSync(KasayaNetworkSync):
         g = gevent.Greenlet( self.TP.send_message, addr, msg)
         g.start()
 
-    def create_full_state_report(self):
-        return []
-
 
 class KasayaTestPool(object):
 
     def __init__(self):
         self.hosts = {}
         self.__ips = {}  # ip address map
+        self.__cnt = 0
+        # disable broadcast
+        self.disable_bc = False
+        self.__hl = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
     # be like dict
     def keys(self):
@@ -64,9 +67,13 @@ class KasayaTestPool(object):
 
     def new_host(self, hid=None):
         if hid is None:
-            hid = make_kasaya_id(True)
+        #    hid = make_kasaya_id(True)
+            hid = self.__hl[0]
+            self.__hl = self.__hl[1:]
         db = NetworkStateDB()
-        h = KasayaFakeSync(self, db, hid)
+        self.__cnt += 1
+        hn = "host_%i" % self.__cnt
+        h = KasayaFakeSync(self, db, hid, hn)
         self.hosts[hid] = h
         return hid
 
@@ -114,13 +121,13 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( ns.is_local_state_actual("h",  9), True  )
         self.assertEqual( ns.is_local_state_actual("h", 11), False )
 
-    def test_network_syncer(self):
+    def test_broadcast(self):
         pool = KasayaTestPool()
         pool.new_host()
         pool.new_host()
-        #pool.new_host()
-        #pool.new_host()
-        #pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
         gevent.wait() # alow all hosts to synchronize
 
         # check all hosts know all others, but not self
@@ -139,12 +146,47 @@ class NetSyncTest(unittest.TestCase):
                 )
 
 
+    def test_inter_host_sync(self):
+        pool = KasayaTestPool()
+        # silent host creation
+        pool.disable_bc = True
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        #pool.new_host()
+        #pool.new_host()
+        gevent.wait() # alow all hosts to synchronize
 
+        # before broadcast hosts doesn't know about others
+        for hid, host in pool.items():
+            self.assertEqual( len( host.known_hosts() ), 0 )
 
-        print ("after wait")
+        # send broadcast from one host
+        pool.disable_bc = False
+        bchost = pool.keys()[0]
+        bchost = pool[bchost]
+        print "Broadcasting",bchost.ID
+        print "-"*27
+        bchost._broadcast(0)
+        gevent.wait()
 
+        # each host should know broadcasting host
+        # and broadcasting host should know all others
+        for hid, host in pool.items():
+            kh = host.known_hosts()
 
-
+            if (hid!=bchost.ID):
+                kh = host.known_hosts()
+                self.assertEqual( len(kh), 1 ) # one known host
+                self.assertIn( bchost.ID, kh ) # broadcasting one
+            else:
+                # broadcasting host should know all others
+                kh = host.known_hosts()
+                self.assertEqual( len(kh), len(pool)-1, "Broadcasting host should know %i other hosts" % (len(pool)-1) )
+                for p in pool.keys():
+                    if p==bchost.ID:
+                        continue
+                    self.assertIn( p, kh, "Broadcasting host should know %s host" % p)
 
 
 

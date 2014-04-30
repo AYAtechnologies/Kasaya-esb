@@ -24,12 +24,12 @@ class MemoryDB(BaseDB):
     # -------------------------
 
 
-    def host_add(self, ID, address):#, hostname):
+    def host_add(self, ID, address, hostname):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "INSERT INTO hosts ('id','addr') VALUES (?,?)",
-                (ID, address))
+                "INSERT INTO hosts ('id','addr','hostname') VALUES (?,?,?)",
+                (ID, address, hostname))
             self.__db.commit()
         finally:
             self.SEMA.release()

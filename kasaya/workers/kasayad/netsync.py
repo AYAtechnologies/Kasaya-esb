@@ -15,9 +15,10 @@ _MSG_FULL_STATE = "fs"
 
 class KasayaNetworkSync(object):
 
-    def __init__(self, dbinstance, ID):
+    def __init__(self, dbinstance, ID, hostname=None):
         #print "BORN",ID
         self.ID = ID
+        self.hostname = hostname
         self.counter = 1  # main state counter
         self.online = True # always True until close is called
         self.DB = dbinstance
@@ -48,6 +49,9 @@ class KasayaNetworkSync(object):
         #self.send_host_leave()
 
 
+    def known_hosts(self):
+        return self.counters.keys()
+
     # send and receive network messages
 
     def receive_message(self, sender_addr, msg):
@@ -72,6 +76,7 @@ class KasayaNetworkSync(object):
             'SMSG' : _MSG_BROADCAST,
             'senderid': self.ID,
             'counter' : counter,
+            'hostname' : self.hostname,
         }
         if self.online:
             self.send_broadcast(msg)
@@ -94,6 +99,13 @@ class KasayaNetworkSync(object):
 
     # top level logic methods
 
+    def peer_chooser(self):
+        """
+        Choose hosts from local database to distribute messages
+        """
+        hosts = list( self.DB.host_list() )
+        #print hosts
+
 
     def is_local_state_actual(self, hostid, rc):
         """
@@ -109,63 +121,109 @@ class KasayaNetworkSync(object):
         return (counter>=rc) and (counter>0)
 
 
-    def set_counter(self, hostid, counter):
+    def set_counter(self, senderid, counter):
         """
         Set new value for counters.
         """
-        self.counters[hostid] = (counter, time() )
+        self.counters[senderid] = (counter, time() )
 
 
-    def host_join(self, addr, hostid, counter):
+    def check_sender(self, addr, senderid):
+        """
+        When receiving message from remote host, we need to check
+        sender address and sender id to detect new hosts.
+        Result:
+            True - sender is known
+            False - sender was unknown or invalid, new host was registered
+        """
+        knownaddr = self.DB.host_addr_by_id( senderid )
+        if knownaddr is None:
+            # new host!
+            self.host_join(addr, senderid, 0)
+            return False
+
+        # everything is OK
+        if senderid==knownaddr:
+            return True
+
+        # known host address is different!
+        # something strange is happening.... :(
+        # TODO:
+        #   detected IP changes of remote host
+        #   do something in such case
+        return False
+
+
+    def host_join(self, addr, senderid, counter, hostname=None):
         """
         Detected new host in network (from broadcast or first connection)
         """
-        if hostid==self.ID:
+        if senderid==self.ID:
             # message about self
             if self.counter>counter:
                 # someone sends obsolete data
                 # TODO: send back new status
                 pass
             return
-        if self.is_local_state_actual(hostid, counter):
+        if self.is_local_state_actual(senderid, counter):
             # we have same data or newer, ignore message
             return
         # new host is joined
-        self.set_counter(hostid, counter)
-        self.DB.host_register(hostid, addr)
-        self.host_full_sync_required(hostid)
+        self.set_counter(senderid, counter)
+        self.DB.host_register(senderid, addr, hostname )
+        self.host_full_sync_required( senderid )
+
+        peers = self.peer_chooser()
         #print "host %s joined network" % hostid, "known", self.counters.keys()
 
 
-    def host_leave(self, hostid):
+    def host_leave(self, senderid):
         """
         Remote host is shutting down or died unexpectly.
         """
-        self.DB.host_unregister(hostid)
-        del self.counters[hostid]
+        self.DB.host_unregister(senderid)
+        del self.counters[senderid]
 
 
-    def host_state_change(self, hostid, counter, key, data):
+    def host_state_change(self, senderid, counter, key, data):
         """
         Remote host changed state of own component and sends new state.
         """
-        if self.is_local_state_actual(hostid, counter):
+        if self.is_local_state_actual(senderid, counter):
             return
         print ("STATE CHANGE", host, counter, ">>>", key, data)
 
 
-    def host_state_complete(self, hostid, counter, items):
+    def host_state_complete(self, senderid, counter, items):
         """
         Received complete state of remote host.
         items - list of key/value pairs with host properties/workers
         """
-        self.set_counter(hostid, counter)
-        print "NEW STATE", items
+        self.set_counter(senderid, counter)
+        #print "NEW STATE"
+        #for i in items:
+        #    print i
+
+
+    def create_full_state_report(self):
+        """
+        Create status report with all workers and services on host
+        """
+        #workers = self.DB.worker_list(self.ID, only_online=True)
+        #services = self.DB.service_list(self.ID)
+        res = {
+            "hostname":self.hostname,
+            "workers":[],
+            "services":[]
+            }
+        return res
 
 
     def host_full_sync_required(self, hostid):
         """
         Remote host require full host status. Send report.
+          addr - sender address
+          hostid - sender is asking for host with host id = hostid
         """
         addr = self.DB.host_addr_by_id(hostid)
         self.send_host_full_state(addr)
@@ -181,9 +239,9 @@ class KasayaNetworkSync(object):
         self.host_join(
             addr,
             msg['senderid'],
-            msg['counter']
+            msg['counter'],
+            msg['hostname']
         )
-
 
 
     def on_host_join(self, addr, msg):
@@ -198,9 +256,6 @@ class KasayaNetworkSync(object):
             host_id - id of host which joined network
             counter - host status counter
         """
-        if msg['sender_id']==self.ID:
-            # own message, ignoring
-            return
         self.host_join(msg['host_id'], addr, msg['counter'])
 
     def send_host_join(self, addr, hostid, counter):
@@ -242,6 +297,7 @@ class KasayaNetworkSync(object):
         Host changed property
         message type: authoritative
         """
+        self.check_sender(addr, msg['senderid'])
         pass
 
     def send_host_change(self, addr, hostid, counter, name, value):
@@ -269,6 +325,7 @@ class KasayaNetworkSync(object):
             counter - last known host counter
         if local stored counter is lower or
         """
+        self.check_sender(addr, msg['senderid'])
         pass
 
     def send_host_died(self, addr, hostid):
@@ -286,6 +343,7 @@ class KasayaNetworkSync(object):
             sender_id - who detected worker death and send this message
             worker_id - wchich worker died
         """
+        self.check_sender(addr, msg['senderid'])
         pass
 
     def send_worker_died(self, addr, hostid, workerid):
@@ -310,7 +368,8 @@ class KasayaNetworkSync(object):
             # remote host has outdated host list
             # TODO: notify sender about invalid hostid/address information
             return
-        self.host_full_sync_required( msg['senderid'] )
+        self.check_sender(addr, msg['senderid'])
+        self.host_full_sync_required( msg['senderid'], addr )
 
     def send_full_sync_request(self, addr, hostid):
         """
@@ -331,14 +390,7 @@ class KasayaNetworkSync(object):
           - hostid - remote host id
           - addr - remote addess
         """
-        knownaddr = self.DB.host_addr_by_id( msg['senderid'] )
-        if addr!=knownaddr:
-            # our host database is outdated.
-            # under given hostid we have different host registered
-            # TODO!
-            #   update/repair current db
-            return
-
+        self.check_sender(addr, msg['senderid'])
         if self.is_local_state_actual( msg['senderid'], msg['counter'] ):
             # we doesn't need any updates
             return
@@ -383,10 +435,3 @@ class KasayaNetworkSync(object):
         Send message
         """
         raise NotImplementedError
-
-    def create_full_state_report(self):
-        """
-        Create host full status report
-        """
-        raise NotImplementedError
-
