@@ -153,8 +153,8 @@ class NetSyncTest(unittest.TestCase):
         pool.new_host()
         pool.new_host()
         pool.new_host()
-        #pool.new_host()
-        #pool.new_host()
+        pool.new_host()
+        pool.new_host()
         gevent.wait() # alow all hosts to synchronize
 
         # before broadcast hosts doesn't know about others
@@ -163,10 +163,8 @@ class NetSyncTest(unittest.TestCase):
 
         # send broadcast from one host
         pool.disable_bc = False
-        bchost = pool.keys()[0]
+        bchost = pool.keys()[3]
         bchost = pool[bchost]
-        print "Broadcasting",bchost.ID
-        print "-"*27
         bchost._broadcast(0)
         gevent.wait()
 
@@ -187,6 +185,7 @@ class NetSyncTest(unittest.TestCase):
                     if p==bchost.ID:
                         continue
                     self.assertIn( p, kh, "Broadcasting host should know %s host" % p)
+
 
 
 

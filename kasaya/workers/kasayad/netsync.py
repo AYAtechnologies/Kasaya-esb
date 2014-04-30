@@ -101,10 +101,29 @@ class KasayaNetworkSync(object):
 
     def peer_chooser(self):
         """
-        Choose hosts from local database to distribute messages
+        Choose nearest hosts from local database to distribute messages
         """
-        hosts = list( self.DB.host_list() )
-        #print hosts
+        result = set()
+        hlst = [self.ID]
+        for h in self.DB.host_list():
+            hlst.append( h['id'] )
+        if len(hlst)<2:
+            # there is no one more in this network
+            return result
+        # check my own position
+        hlst.sort()
+        myidx = hlst.index(self.ID)
+        # select two sibling hosts in network
+        if myidx>0:
+            result.add ( hlst[myidx-1] )
+        else:
+            result.add ( hlst[-1] )
+        if myidx<(len(hlst)-1):
+            result.add ( hlst[myidx+1] )
+        else:
+            result.add ( hlst[0] )
+        return result
+
 
 
     def is_local_state_actual(self, hostid, rc):
