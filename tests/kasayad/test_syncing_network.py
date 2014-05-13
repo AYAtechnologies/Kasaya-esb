@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasa/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasatest/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasa/bin/python
 from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 
@@ -73,7 +73,11 @@ class KasayaTestPool(object):
         db = NetworkStateDB()
         self.__cnt += 1
         hn = "host_%i" % self.__cnt
+        # new host
+        ip = "192.168.%i.%i" % (random.randint(1,254), random.randint(1,254))
+        self.__ips[hid] = ip
         h = KasayaFakeSync(self, db, hid, hn)
+        #h._my_pub_ip = ip
         self.hosts[hid] = h
         return hid
 
@@ -81,13 +85,7 @@ class KasayaTestPool(object):
         """
         Return fake IP address for host
         """
-        try:
-            return self.__ips[hid]
-        except KeyError:
-            pass
-        ip = "192.168.%i.%i" % (random.randint(1,254), random.randint(1,254))
-        self.__ips[hid] = ip
-        return ip
+        return self.__ips[hid]
 
     def _get_host_for_ip(self, ip):
         for h, i in self.__ips.items():
@@ -97,15 +95,16 @@ class KasayaTestPool(object):
 
     # fake network operations
     def send_broadcast(self, msg):
-        senderaddr = self._get_ip_for_host( msg['senderid'] )
+        senderaddr = self._get_ip_for_host( msg['sender_id'] )
         for host in self.hosts.values():
             g = gevent.Greenlet( host.receive_message, senderaddr, msg )
             g.start()
 
     def send_message(self, addr, msg):
-        senderaddr = self._get_ip_for_host( msg['senderid'] )
+        senderaddr = self._get_ip_for_host( msg['sender_id'] )
         host = self._get_host_for_ip(addr)
         host.receive_message(senderaddr, msg)
+
 
 
 class NetSyncTest(unittest.TestCase):
@@ -114,14 +113,14 @@ class NetSyncTest(unittest.TestCase):
     #def setUpClass(cls):
     #    set_value("KASAYAD_DB_BACKEND", "memory")
 
-    def test_countes(self):
+    def _test_counters(self):
         ns = KasayaNullSync(None, "ownid")
         self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
         ns.set_counter("h", 10 )
         self.assertEqual( ns.is_local_state_actual("h",  9), True  )
         self.assertEqual( ns.is_local_state_actual("h", 11), False )
 
-    def test_broadcast(self):
+    def _test_broadcast(self):
         pool = KasayaTestPool()
         pool.new_host()
         pool.new_host()
@@ -148,7 +147,7 @@ class NetSyncTest(unittest.TestCase):
 
     def test_inter_host_sync(self):
         pool = KasayaTestPool()
-        # silent host creation
+        # silent host creation (without broadcast)
         pool.disable_bc = True
         pool.new_host()
         pool.new_host()
@@ -163,9 +162,12 @@ class NetSyncTest(unittest.TestCase):
 
         # send broadcast from one host
         pool.disable_bc = False
-        bchost = pool.keys()[3]
+        bchost = random.choice(pool.keys())
         bchost = pool[bchost]
         bchost._broadcast(0)
+        # broadcast should result in requests from hosts about new host state
+        # after this all hosts should know new host, and new host should know
+        # all other hosts.
         gevent.wait()
 
         # each host should know broadcasting host
@@ -176,7 +178,7 @@ class NetSyncTest(unittest.TestCase):
             if (hid!=bchost.ID):
                 kh = host.known_hosts()
                 self.assertEqual( len(kh), 1 ) # one known host
-                self.assertIn( bchost.ID, kh ) # broadcasting one
+                self.assertIn( bchost.ID, kh ) # broadca`sting one
             else:
                 # broadcasting host should know all others
                 kh = host.known_hosts()
@@ -186,6 +188,19 @@ class NetSyncTest(unittest.TestCase):
                         continue
                     self.assertIn( p, kh, "Broadcasting host should know %s host" % p)
 
+        # Now we create new host without broadcasting
+        pool.disable_bc = True
+        nh = pool.new_host()
+        gevent.wait()
+        self.assertEqual( len(pool[nh].known_hosts()), 0 )
+        # now, we send from new host single message to one random host
+        # this should result in cascading host registering by passing
+        # information about new host to all hosts in network
+        target = random.choice( list( set(pool.keys())-set(nh) ) )
+        target = pool[target]
+        msg = {"SMSG":"p", "sender_id":nh}
+        target.receive_message(pool._get_ip_for_host(nh), msg)
+        gevent.wait()
 
 
 

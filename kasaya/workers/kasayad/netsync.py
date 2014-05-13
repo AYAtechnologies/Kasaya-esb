@@ -6,6 +6,18 @@ from time import time
 __all__ = ("KasayaNetworkSync",)
 
 
+"""
+Message format:
+  SMSG - message type
+  sender_id - ID of host which sends message
+optional fields (filled by receiving side if not exists)
+  host_id - ID of host about which is message
+  host_addr - ID of host about which is message
+other fields
+  hostname - remote host hostname
+  counter - last known counter for _MSG_BROADCAST
+"""
+_MSG_PING       = "p"
 _MSG_BROADCAST  = "bc"
 _MSG_HOST_JOIN  = "hj"
 _MSG_HOST_LEAVE = "hl"
@@ -26,12 +38,12 @@ class KasayaNetworkSync(object):
         self.counters = {}
 
         self._methodmap = {
+            _MSG_PING       : self.on_ping,
             _MSG_BROADCAST  : self.on_broadcast,
             _MSG_HOST_JOIN  : self.on_host_join,
             _MSG_HOST_LEAVE : self.on_host_leave,
             _MSG_FULL_STATE_REQUEST : self.on_full_sync_request,
             _MSG_FULL_STATE : self.on_host_full_state,
-            #"hl" : self.on_leave,
             #"hc" : self.on_host_change,
             #"hd" : self.on_host_died,
             #"wd" : self.on_worker_died,
@@ -56,25 +68,41 @@ class KasayaNetworkSync(object):
 
     def receive_message(self, sender_addr, msg):
         """
-        Incoming messages dispatcher
+        Incoming messages dispatcher.
+        - sender_addr - adderss of host which sends us message
+        - msg - body of message
         """
         try:
             fnc = self._methodmap[ msg['SMSG'] ]
+            sid = msg['sender_id']
         except KeyError:
             # invalid message
             return
 
-        if msg['senderid']==self.ID:
-            # ignore own messages
+        if sid==self.ID:
+            # ignoring own messages
             return
+
+        # optional fields are completed by sender data
+        if not 'host_id' in msg:
+            msg['host_id'] = sid
+        else:
+            # this is message from other host, about ourself
+            # we ignore such messages
+            if msg['host_id']==self.ID:
+                #print "remote info about us, ignoring"
+                return
+        if not 'host_addr' in msg:
+            msg['host_addr'] = sender_addr
 
         #print "received message from", sender_addr, msg
         fnc(sender_addr, msg)
+        self.check_sender(sender_addr, sid)
 
     def _broadcast(self, counter):
         msg = {
             'SMSG' : _MSG_BROADCAST,
-            'senderid': self.ID,
+            'sender_id': self.ID,
             'counter' : counter,
             'hostname' : self.hostname,
         }
@@ -85,7 +113,7 @@ class KasayaNetworkSync(object):
         """
         Add sender ID and send message to specified address or list of addresses
         """
-        msg['senderid'] = self.ID
+        msg['sender_id'] = self.ID
         if type(addr) in (list, tuple):
             for a in addr:
                 self.send_message(addr, msg)
@@ -99,7 +127,7 @@ class KasayaNetworkSync(object):
 
     # top level logic methods
 
-    def peer_chooser(self):
+    def peer_chooser(self, exclude=()):
         """
         Choose nearest hosts from local database to distribute messages
         """
@@ -109,6 +137,10 @@ class KasayaNetworkSync(object):
             hlst.append( h['id'] )
         if len(hlst)<2:
             # there is no one more in this network
+            # remove excluded host from result
+            for ex in exclude:
+                try: result.remove(exclude)
+                except KeyError: pass
             return result
         # check my own position
         hlst.sort()
@@ -122,11 +154,15 @@ class KasayaNetworkSync(object):
             result.add ( hlst[myidx+1] )
         else:
             result.add ( hlst[0] )
+        # remove excluded host from result
+        for ex in exclude:
+            try: result.remove(exclude)
+            except KeyError: pass
         return result
 
 
 
-    def is_local_state_actual(self, hostid, rc):
+    def is_local_state_actual(self, host_id, rc):
         """
         Check counters for given host.
         Result:
@@ -134,35 +170,42 @@ class KasayaNetworkSync(object):
             False - local stored counters are outdated or 0
         """
         try:
-            counter, tstamp = self.counters[hostid]
+            counter, tstamp = self.counters[host_id]
         except KeyError: # unknown host
             return False
         return (counter>=rc) and (counter>0)
 
 
-    def set_counter(self, senderid, counter):
+    def set_counter(self, sender_id, counter):
         """
         Set new value for counters.
         """
-        self.counters[senderid] = (counter, time() )
+        self.counters[sender_id] = (counter, time() )
 
 
-    def check_sender(self, addr, senderid):
+    def check_sender(self, addr, sender_id):
         """
         When receiving message from remote host, we need to check
         sender address and sender id to detect new hosts.
-        Result:
+        Newly detected host will be added to database with counter=0
+        which result in request of full sync new host.
+
+        parameters:
+          - addr - address of remote host
+          - sender_id - ID of remote host
+        result:
             True - sender is known
             False - sender was unknown or invalid, new host was registered
         """
-        knownaddr = self.DB.host_addr_by_id( senderid )
+        knownaddr = self.DB.host_addr_by_id( sender_id )
         if knownaddr is None:
             # new host!
-            self.host_join(addr, senderid, 0)
+            print "  >> id", sender_id,"addr",addr
+            self.host_join(addr, sender_id, 0)
             return False
 
         # everything is OK
-        if senderid==knownaddr:
+        if sender_id==knownaddr:
             return True
 
         # known host address is different!
@@ -173,52 +216,64 @@ class KasayaNetworkSync(object):
         return False
 
 
-    def host_join(self, addr, senderid, counter, hostname=None):
+    def host_join(self, host_addr, host_id, counter, hostname=None, sender_id=None):
         """
         Detected new host in network (from broadcast or first connection)
+            host_addr - new host address
+            host_id - new host id
+            counter - new host counter
+            hostname - new host name
+            sender_id - who is sending message (sender host id)
         """
-        if senderid==self.ID:
-            # message about self
-            if self.counter>counter:
-                # someone sends obsolete data
-                # TODO: send back new status
-                pass
-            return
-        if self.is_local_state_actual(senderid, counter):
+        if self.is_local_state_actual(host_id, counter):
             # we have same data or newer, ignore message
             return
+        #print "host_join",
+        #print "host_addr:", host_addr, "host_id:", host_id, "counter:", counter, "hostname:", hostname, "sender_id:", sender_id
         # new host is joined
-        self.set_counter(senderid, counter)
-        self.DB.host_register(senderid, addr, hostname )
-        self.host_full_sync_required( senderid )
+        # Because we doesn't know current state of new host, we can't just set
+        # counter, we need to do full sync first.
+        self.set_counter(host_id, 0)
+        self.DB.host_register(host_id, host_addr, hostname )
+        self.host_full_sync_required( host_id )
 
-        peers = self.peer_chooser()
-        #print "host %s joined network" % hostid, "known", self.counters.keys()
+        # send notification to neighboors
+        peers = self.peer_chooser( (host_id, sender_id) )
+        for p in peers:
+            destination = self.DB.host_addr_by_id( p )   # destination host address
+            print "send info to host:",p, "addr:",destination
+            self.send_host_join(
+                destination,
+                host_id,
+                host_addr,
+                counter,
+                hostname
+            )
 
 
-    def host_leave(self, senderid):
+    def host_leave(self, sender_id):
         """
         Remote host is shutting down or died unexpectly.
         """
-        self.DB.host_unregister(senderid)
-        del self.counters[senderid]
+        self.DB.host_unregister(sender_id)
+        del self.counters[sender_id]
 
 
-    def host_state_change(self, senderid, counter, key, data):
+    def host_state_change(self, sender_id, counter, key, data):
         """
         Remote host changed state of own component and sends new state.
         """
-        if self.is_local_state_actual(senderid, counter):
+        if self.is_local_state_actual(sender_id, counter):
             return
         print ("STATE CHANGE", host, counter, ">>>", key, data)
 
 
-    def host_state_complete(self, senderid, counter, items):
+    def host_state_complete(self, sender_id, counter, items):
         """
         Received complete state of remote host.
         items - list of key/value pairs with host properties/workers
         """
-        self.set_counter(senderid, counter)
+        self.set_counter(sender_id, counter)
         #print "NEW STATE"
         #for i in items:
         #    print i
@@ -251,15 +306,22 @@ class KasayaNetworkSync(object):
     # network input / output methods
 
 
+    def on_ping(self, addr, msg):
+        """
+        Does nothing.
+        """
+        pass
+
     def on_broadcast(self, addr, msg):
         """
         Noe host send broadcast on start
         """
         self.host_join(
-            addr,
-            msg['senderid'],
+            msg['host_addr'],
+            msg['host_id'],
             msg['counter'],
-            msg['hostname']
+            msg['hostname'],
+            msg['sender_id']
         )
 
 
@@ -275,21 +337,23 @@ class KasayaNetworkSync(object):
             host_id - id of host which joined network
             counter - host status counter
         """
-        self.host_join(msg['host_id'], addr, msg['counter'])
+        self.host_join(msg['host_id'], msg['host_addr'], msg['counter'], msg['hostname'])
 
-    def send_host_join(self, addr, hostid, counter):
+    def send_host_join(self, addr, host_id, host_addr, counter, hostname):
         """
         New host joined network.
-            addr - address of ne host
-            hostid - new host id
-            counter - remote host current counter
+            host_id - joining host id
+            host_addr - joining host address
+            counter - joining host current counter
+            hostname - joining host name
         """
-        msg = { 'SMSG' : "hj",
-            'hostid' : hostid,
-            'sender_id' : self.ID,
-            'counter' : counter,
+        msg = { 'SMSG'  : _MSG_HOST_JOIN,
+            'host_id'   : host_id,
+            'host_addr' : host_addr,
+            'hostname'  : hostname,
+            'counter'   : counter,
         }
-        return msg
+        self._send(addr, msg)
 
 
 
@@ -316,7 +380,6 @@ class KasayaNetworkSync(object):
         Host changed property
         message type: authoritative
         """
-        self.check_sender(addr, msg['senderid'])
         pass
 
     def send_host_change(self, addr, hostid, counter, name, value):
@@ -344,7 +407,6 @@ class KasayaNetworkSync(object):
             counter - last known host counter
         if local stored counter is lower or
         """
-        self.check_sender(addr, msg['senderid'])
         pass
 
     def send_host_died(self, addr, hostid):
@@ -362,7 +424,6 @@ class KasayaNetworkSync(object):
             sender_id - who detected worker death and send this message
             worker_id - wchich worker died
         """
-        self.check_sender(addr, msg['senderid'])
         pass
 
     def send_worker_died(self, addr, hostid, workerid):
@@ -387,8 +448,7 @@ class KasayaNetworkSync(object):
             # remote host has outdated host list
             # TODO: notify sender about invalid hostid/address information
             return
-        self.check_sender(addr, msg['senderid'])
-        self.host_full_sync_required( msg['senderid'], addr )
+        self.host_full_sync_required( msg['sender_id'] )
 
     def send_full_sync_request(self, addr, hostid):
         """
@@ -409,18 +469,17 @@ class KasayaNetworkSync(object):
           - hostid - remote host id
           - addr - remote addess
         """
-        self.check_sender(addr, msg['senderid'])
-        if self.is_local_state_actual( msg['senderid'], msg['counter'] ):
+        if self.is_local_state_actual( msg['sender_id'], msg['counter'] ):
             # we doesn't need any updates
             return
 
         if 'offline' in msg:
             # host is currently leaving network
             if msg['offline']:
-                self.host_leave(msg['senderid'])
+                self.host_leave(msg['sender_id'])
                 return
 
-        self.host_state_complete( msg['senderid'], msg['counter'], msg['state'] )
+        self.host_state_complete( msg['sender_id'], msg['counter'], msg['state'] )
 
 
 
