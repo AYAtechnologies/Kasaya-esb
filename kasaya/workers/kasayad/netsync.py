@@ -2,6 +2,7 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from time import time
+import gevent
 
 __all__ = ("KasayaNetworkSync",)
 
@@ -37,6 +38,8 @@ class KasayaNetworkSync(object):
         self._broadcast(0) # counter=0 means out of sync state
         self.counters = {}
 
+        self.FULL_SYNC_DELAY = 0.1  # for test purposes use short delays
+
         self._methodmap = {
             _MSG_PING       : self.on_ping,
             _MSG_BROADCAST  : self.on_broadcast,
@@ -50,6 +53,9 @@ class KasayaNetworkSync(object):
             #"sr" : self.on_full_sync_request,
             #"hs" : self.on_host_full_state,
         }
+
+        # internal switches
+        self._disable_forwarding = False    # disable forwarding of messages to other hosts
 
 
     def close(self):
@@ -97,7 +103,10 @@ class KasayaNetworkSync(object):
 
         #print "received message from", sender_addr, msg
         fnc(sender_addr, msg)
-        self.check_sender(sender_addr, sid)
+
+        # check sender in delay
+        self.delay( None, self.check_sender, sender_addr, sid )
+
 
     def _broadcast(self, counter):
         msg = {
@@ -131,20 +140,25 @@ class KasayaNetworkSync(object):
         """
         Choose nearest hosts from local database to distribute messages
         """
-        result = set()
-        hlst = [self.ID]
+        #print "IM",self.ID," I KNOW", self.known_hosts()
+        # list of known hosts without excluded
+        hlst = []
         for h in self.DB.host_list():
-            hlst.append( h['id'] )
-        if len(hlst)<2:
-            # there is no one more in this network
-            # remove excluded host from result
-            for ex in exclude:
-                try: result.remove(exclude)
-                except KeyError: pass
-            return result
+            h = h['id']
+            if h in exclude:
+                continue
+            hlst.append( h )
+
+        if len(hlst)<=1:
+            #print "   ",hlst
+            return set(hlst)
+
+        result = set()
         # check my own position
+        hlst.append( self.ID )
         hlst.sort()
         myidx = hlst.index(self.ID)
+
         # select two sibling hosts in network
         if myidx>0:
             result.add ( hlst[myidx-1] )
@@ -155,9 +169,6 @@ class KasayaNetworkSync(object):
         else:
             result.add ( hlst[0] )
         # remove excluded host from result
-        for ex in exclude:
-            try: result.remove(exclude)
-            except KeyError: pass
         return result
 
 
@@ -200,7 +211,7 @@ class KasayaNetworkSync(object):
         knownaddr = self.DB.host_addr_by_id( sender_id )
         if knownaddr is None:
             # new host!
-            print "  >> id", sender_id,"addr",addr
+            print self.ID,"incoming message from unknown host",sender_id, "registering..."
             self.host_join(addr, sender_id, 0)
             return False
 
@@ -218,7 +229,7 @@ class KasayaNetworkSync(object):
 
     def host_join(self, host_addr, host_id, counter, hostname=None, sender_id=None):
         """
-        Detected new host in network (from broadcast or first connection)
+        Detected new host in network (from broadcast, first connection or passef from other host)
             host_addr - new host address
             host_id - new host id
             counter - new host counter
@@ -227,21 +238,27 @@ class KasayaNetworkSync(object):
         """
         if self.is_local_state_actual(host_id, counter):
             # we have same data or newer, ignore message
+            print self.ID, "already know", host_id, "skipping"
             return
-        #print "host_join",
-        #print "host_addr:", host_addr, "host_id:", host_id, "counter:", counter, "hostname:", hostname, "sender_id:", sender_id
         # new host is joined
         # Because we doesn't know current state of new host, we can't just set
         # counter, we need to do full sync first.
         self.set_counter(host_id, 0)
         self.DB.host_register(host_id, host_addr, hostname )
-        self.host_full_sync_required( host_id )
+        self.delay(
+            self.FULL_SYNC_DELAY,
+            self.host_full_sync_required, host_id
+        )
+        #self.host_full_sync_required( host_id )
+        #print self.ID,"registered new host",host_id
 
         # send notification to neighboors
+        if self._disable_forwarding:
+            return
         peers = self.peer_chooser( (host_id, sender_id) )
         for p in peers:
             destination = self.DB.host_addr_by_id( p )   # destination host address
-            print "send info to host:",p, "addr:",destination
+            print "from ",self.ID, "to",p," there is new host: ", host_id
             self.send_host_join(
                 destination,
                 host_id,
@@ -268,12 +285,17 @@ class KasayaNetworkSync(object):
         print ("STATE CHANGE", host, counter, ">>>", key, data)
 
 
-    def host_state_complete(self, sender_id, counter, items):
+    def host_state_complete(self, host_id, counter, items):
         """
         Received complete state of remote host.
         items - list of key/value pairs with host properties/workers
         """
-        self.set_counter(sender_id, counter)
+        addr = self.DB.host_addr_by_id(host_id)
+        if addr is None:
+            # this host is unknown, skip registering
+            return
+        self.set_counter(host_id, counter)
+        #self.DB.host_register(host_id, host_addr, hostname )
         #print "NEW STATE"
         #for i in items:
         #    print i
@@ -337,7 +359,7 @@ class KasayaNetworkSync(object):
             host_id - id of host which joined network
             counter - host status counter
         """
-        self.host_join(msg['host_id'], msg['host_addr'], msg['counter'], msg['hostname'])
+        self.host_join(msg['host_addr'], msg['host_id'], msg['counter'], msg['hostname'])
 
     def send_host_join(self, addr, host_id, host_addr, counter, hostname):
         """
@@ -469,17 +491,17 @@ class KasayaNetworkSync(object):
           - hostid - remote host id
           - addr - remote addess
         """
-        if self.is_local_state_actual( msg['sender_id'], msg['counter'] ):
+        if self.is_local_state_actual( msg['host_id'], msg['counter'] ):
             # we doesn't need any updates
             return
 
         if 'offline' in msg:
             # host is currently leaving network
             if msg['offline']:
-                self.host_leave(msg['sender_id'])
+                self.host_leave(msg['host_id'])
                 return
 
-        self.host_state_complete( msg['sender_id'], msg['counter'], msg['state'] )
+        self.host_state_complete( msg['host_id'], msg['counter'], msg['state'] )
 
 
 
@@ -513,3 +535,6 @@ class KasayaNetworkSync(object):
         Send message
         """
         raise NotImplementedError
+
+    def delay(self, seconds, func, *args, **kwargs):
+        func(*args, **kwargs)

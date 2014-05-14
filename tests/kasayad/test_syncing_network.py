@@ -31,10 +31,16 @@ class KasayaFakeSync(KasayaNetworkSync):
     def __repr__(self):
         return "<KS:%s>" % (self.ID[1:])
 
+    def _get_disable_forwarding(self):
+        return self.TP.disable_forwarding
+    def _set_disable_forwarding(self, value):
+        pass
+    _disable_forwarding = property(_get_disable_forwarding,_set_disable_forwarding)
+
     # redirect network operation to test pool which simulate network operations
 
     def send_broadcast(self, msg):
-        if self.TP.disable_bc:
+        if self.TP.disable_broadcast:
             return
         g = gevent.Greenlet( self.TP.send_broadcast, msg)
         g.start()
@@ -43,15 +49,24 @@ class KasayaFakeSync(KasayaNetworkSync):
         g = gevent.Greenlet( self.TP.send_message, addr, msg)
         g.start()
 
+    def delay(self, seconds, func, *args, **kwargs):
+        g = gevent.Greenlet(func, *args, **kwargs)
+        if not seconds:
+            g.start()
+        else:
+            g.start_later(seconds)
+
+
 
 class KasayaTestPool(object):
 
     def __init__(self):
+        self.disable_forwarding = False
         self.hosts = {}
         self.__ips = {}  # ip address map
         self.__cnt = 0
         # disable broadcast
-        self.disable_bc = False
+        self.disable_broadcast = False
         self.__hl = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
     # be like dict
@@ -120,8 +135,9 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( ns.is_local_state_actual("h",  9), True  )
         self.assertEqual( ns.is_local_state_actual("h", 11), False )
 
-    def _test_broadcast(self):
+    def test_broadcast(self):
         pool = KasayaTestPool()
+        pool.disable_forwarding = True # don't use forwarding
         pool.new_host()
         pool.new_host()
         pool.new_host()
@@ -144,11 +160,72 @@ class NetSyncTest(unittest.TestCase):
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
 
+    def _test_peer_chooser(self):
+        pool = KasayaTestPool()
+        pool.disable_broadcast = False
+        pool.disable_forwarding = True
+        # no other hosts
+        A = pool.new_host()
+        A = pool[A]
+        gevent.wait()
+        self.assertEqual( len(A.peer_chooser()), 0 )
+
+        # one neighbour
+        B = pool.new_host()
+        B = pool[B]
+        gevent.wait()
+        peers = B.peer_chooser()
+        self.assertEqual( len(peers), 1 )
+        self.assertIn( A.ID, peers )
+
+        # two neighbours
+        C = pool.new_host()
+        C = pool[C]
+        gevent.wait()
+        peers = B.peer_chooser()
+        self.assertEqual( len(peers), 2 )
+        self.assertIn( A.ID, peers )
+        self.assertIn( C.ID, peers )
+
+        # many neighbours
+        D = pool.new_host()
+        D = pool[D]
+        E = pool.new_host()
+        E = pool[E]
+        F = pool.new_host()
+        F = pool[F]
+        gevent.wait()
+
+        # simple choices
+        peers = A.peer_chooser()
+        self.assertEqual( len(peers), 2 )
+        self.assertItemsEqual( ["F","B"], peers )
+
+        peers = F.peer_chooser()
+        self.assertEqual( len(peers), 2 )
+        self.assertItemsEqual( ["A","E"], peers )
+
+        peers = D.peer_chooser()
+        self.assertEqual( len(peers), 2 )
+        self.assertItemsEqual( ["C","E"], peers )
+
+        # choices with exclusions
+        peers = A.peer_chooser( ["B"] )
+        self.assertEqual( len(peers), 2 )
+        self.assertItemsEqual( ["C","F"], peers )
+
+        peers = A.peer_chooser( ["B","F"] )
+        self.assertEqual( len(peers), 2 )
+        self.assertItemsEqual( ["C","E"], peers )
+
+
+
 
     def test_inter_host_sync(self):
         pool = KasayaTestPool()
-        # silent host creation (without broadcast)
-        pool.disable_bc = True
+        # silent host creation (without broadcast and forwarding info)
+        pool.disable_forwarding = True
+        pool.disable_broadcast = True
         pool.new_host()
         pool.new_host()
         pool.new_host()
@@ -161,7 +238,7 @@ class NetSyncTest(unittest.TestCase):
             self.assertEqual( len( host.known_hosts() ), 0 )
 
         # send broadcast from one host
-        pool.disable_bc = False
+        pool.disable_broadcast = False
         bchost = random.choice(pool.keys())
         bchost = pool[bchost]
         bchost._broadcast(0)
@@ -189,18 +266,34 @@ class NetSyncTest(unittest.TestCase):
                     self.assertIn( p, kh, "Broadcasting host should know %s host" % p)
 
         # Now we create new host without broadcasting
-        pool.disable_bc = True
+        pool.disable_broadcast = True
+        pool.disable_forwarding = True
         nh = pool.new_host()
+        print "-"*30
+        print "CREATED:",nh
         gevent.wait()
         self.assertEqual( len(pool[nh].known_hosts()), 0 )
         # now, we send from new host single message to one random host
         # this should result in cascading host registering by passing
         # information about new host to all hosts in network
-        target = random.choice( list( set(pool.keys())-set(nh) ) )
+        pool.disable_forwarding = False
+        peers = list( set(pool.keys())-set(nh) )
+        peers.sort()
+        target = "D"#random.choice( peers )
+
+        _pk = pool.keys()
+        _pk.sort()
+        print "All peers", _pk
+
         target = pool[target]
         msg = {"SMSG":"p", "sender_id":nh}
+        print "Sending single message to", target.ID
         target.receive_message(pool._get_ip_for_host(nh), msg)
         gevent.wait()
+        print
+
+        for p in peers:
+            self.assertIn(nh, pool[p].known_hosts(), "Host %s should know %s" % (p, nh) )
 
 
 
