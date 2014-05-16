@@ -27,6 +27,7 @@ class KasayaFakeSync(KasayaNetworkSync):
     def __init__(self, testpool, dbinstance, ID, hostname):
         self.TP = testpool
         super(KasayaFakeSync, self).__init__( dbinstance, ID, hostname)
+        self.FULL_SYNC_DELAY = 0.1
 
     def __repr__(self):
         return "<KS:%s>" % (self.ID[1:])
@@ -290,20 +291,15 @@ class NetSyncTest(unittest.TestCase):
         peers.sort()
         target = "D"#random.choice( peers )
 
-        _pk = pool.keys()
-        _pk.sort()
-        print "All peers", _pk
-
-        target = pool[target]
-        msg = {"SMSG":"p", "sender_id":nh}
-        print "Sending single message to", target.ID
-        target.receive_message(pool._get_ip_for_host(nh), msg)
+        print "Sending single message from", nh, "to", target
+        pool[nh].send_ping( pool._get_ip_for_host(target) )
         gevent.wait()
+
         print
         #print "BROADCAST_COUNTER", pool.broadcast_counter
         #print "SEND_COUNTER", pool.send_counter
-        #for p in peers:
-        #    self.assertIn(nh, pool[p].known_hosts(), "Host %s should know %s" % (p, nh) )
+        for p in peers:
+            self.assertIn(nh, pool[p].known_hosts(), "Host %s should know %s" % (p, nh) )
 
 
 

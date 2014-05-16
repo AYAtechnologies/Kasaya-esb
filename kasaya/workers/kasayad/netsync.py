@@ -38,7 +38,7 @@ class KasayaNetworkSync(object):
         self._broadcast(0) # counter=0 means out of sync state
         self.counters = {}
 
-        self.FULL_SYNC_DELAY = 0.1  # for test purposes use short delays
+        self.FULL_SYNC_DELAY = 3  # for test purposes use short delays
 
         self._methodmap = {
             _MSG_PING       : self.on_ping,
@@ -66,8 +66,10 @@ class KasayaNetworkSync(object):
         self.counter += 1
         #self.send_host_leave()
 
-
     def known_hosts(self):
+        """
+        List of locally known hosts
+        """
         return self.counters.keys()
 
     # send and receive network messages
@@ -106,7 +108,6 @@ class KasayaNetworkSync(object):
 
         # check sender in delay
         self.delay( None, self.check_sender, sender_addr, sid )
-
 
     def _broadcast(self, counter):
         msg = {
@@ -246,8 +247,8 @@ class KasayaNetworkSync(object):
             sender_id - who is sending message (sender host id)
         """
         if self.is_host_known(host_id):
-            # we have same data or newer, ignore message
-            print self.ID, "already know", host_id, "skipping"
+            # we already know that host, exit
+            #print self.ID, "already know", host_id, "skipping"
             return
         # new host is joined
         # Because we doesn't know current state of new host, we can't just set
@@ -255,11 +256,9 @@ class KasayaNetworkSync(object):
         self.set_counter(host_id, 0)
         self.DB.host_register(host_id, host_addr, hostname )
         self.delay(
-            self.FULL_SYNC_DELAY,
-            self.host_full_sync_required, host_id
+            self.FULL_SYNC_DELAY, # delay in seconds
+            self._host_check_is_sync_required, host_id, counter
         )
-        #self.host_full_sync_required( host_id )
-        #print self.ID,"registered new host",host_id
 
         # send notification to neighboors
         if self._disable_forwarding:
@@ -267,7 +266,7 @@ class KasayaNetworkSync(object):
         peers = self.peer_chooser( (host_id, sender_id) )
         for p in peers:
             destination = self.DB.host_addr_by_id( p )   # destination host address
-            print "from",self.ID, "to",p," there is new host: ", host_id
+            #print "from",self.ID, "to",p," there is new host: ", host_id
             self.send_host_join(
                 destination,
                 host_id,
@@ -295,9 +294,9 @@ class KasayaNetworkSync(object):
         print ("STATE CHANGE", host, counter, ">>>", key, data)
 
 
-    def host_complete_state(self, host_id, counter, items):
+    def host_process_complete_state(self, host_id, hostname, counter, items):
         """
-        Received complete state of remote host.
+        Process incoming full state report
         items - list of key/value pairs with host properties/workers
         """
         addr = self.DB.host_addr_by_id(host_id)
@@ -325,24 +324,32 @@ class KasayaNetworkSync(object):
         return res
 
 
-    def host_full_sync_required(self, hostid):
+    def _host_check_is_sync_required(self, host_id, counter):
         """
-        Remote host require full host status. Send report.
-          addr - sender address
-          hostid - sender is asking for host with host id = hostid
+        Check if we need syncing with remote host, if yes, send request for sync
+          host_id - sender is asking for host with host id = hostid
+          counter - known counter state
         """
-        addr = self.DB.host_addr_by_id(hostid)
-        self.send_host_full_state(addr)
+        if self.is_local_state_actual(host_id, counter):
+            return
+        addr = self.DB.host_addr_by_id(host_id)
+        self.send_full_sync_request(addr)
 
 
     # network input / output methods
-
+    def send_ping(self, addr):
+        """
+        Send ping to host
+        """
+        msg = { "SMSG":_MSG_PING }
+        self._send(addr, msg)
 
     def on_ping(self, addr, msg):
         """
-        Does nothing.
+        Ping does nothing.
         """
         pass
+
 
     def on_broadcast(self, addr, msg):
         """
@@ -475,16 +482,14 @@ class KasayaNetworkSync(object):
         Incoming request for full host report.
         Result will be transmitted back asynchronously.
         """
-        self.host_full_sync_required( msg['host_id'] )
+        #self.host_full_sync_is_required( msg['host_id'] )
+        print "RECEIVED FULL SYNC REQUEST",msg
 
-    def send_full_sync_request(self, addr, hostid):
+    def send_full_sync_request(self, addr):
         """
-        Create local state report and send to specified host
-           hostid - id of host which message is targeting
+        Send request for full state report from remote host
         """
-        msg = { 'SMSG' : _MSG_FULL_STATE_REQUEST,
-            "host_id" : hostid,
-        }
+        msg = { 'SMSG' : _MSG_FULL_STATE_REQUEST }
         self._send(addr, msg)
 
 
