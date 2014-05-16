@@ -123,11 +123,11 @@ class KasayaNetworkSync(object):
         Add sender ID and send message to specified address or list of addresses
         """
         msg['sender_id'] = self.ID
-        if type(addr) in (list, tuple):
-            for a in addr:
-                self.send_message(addr, msg)
-        else:
-            self.send_message(addr, msg)
+        #if type(addr) in (list, tuple):
+        #    for a in addr:
+        #        self.send_message(addr, msg)
+        #else:
+        self.send_message(addr, msg)
 
 
 
@@ -172,6 +172,12 @@ class KasayaNetworkSync(object):
         return result
 
 
+    def is_host_known(self, host_id):
+        """
+        Is host known already?
+        """
+        return host_id in self.counters
+
 
     def is_local_state_actual(self, host_id, rc):
         """
@@ -204,20 +210,23 @@ class KasayaNetworkSync(object):
         parameters:
           - addr - address of remote host
           - sender_id - ID of remote host
-        result:
+        result:`
             True - sender is known
             False - sender was unknown or invalid, new host was registered
         """
-        knownaddr = self.DB.host_addr_by_id( sender_id )
-        if knownaddr is None:
+        if self.is_host_known(sender_id):
+            return True
+
+        #knownaddr = self.DB.host_addr_by_id( sender_id )
+        #if knownaddr is None:
             # new host!
-            print self.ID,"incoming message from unknown host",sender_id, "registering..."
-            self.host_join(addr, sender_id, 0)
-            return False
+        print self.ID,"incoming message from unknown host",sender_id, "registering..."
+        self.host_join(addr, sender_id, 0)
+        #return False
 
         # everything is OK
-        if sender_id==knownaddr:
-            return True
+        #if sender_id==knownaddr:
+        #    return True
 
         # known host address is different!
         # something strange is happening.... :(
@@ -236,7 +245,7 @@ class KasayaNetworkSync(object):
             hostname - new host name
             sender_id - who is sending message (sender host id)
         """
-        if self.is_local_state_actual(host_id, counter):
+        if self.is_host_known(host_id):
             # we have same data or newer, ignore message
             print self.ID, "already know", host_id, "skipping"
             return
@@ -258,7 +267,7 @@ class KasayaNetworkSync(object):
         peers = self.peer_chooser( (host_id, sender_id) )
         for p in peers:
             destination = self.DB.host_addr_by_id( p )   # destination host address
-            print "from ",self.ID, "to",p," there is new host: ", host_id
+            print "from",self.ID, "to",p," there is new host: ", host_id
             self.send_host_join(
                 destination,
                 host_id,
@@ -266,6 +275,7 @@ class KasayaNetworkSync(object):
                 counter,
                 hostname
             )
+
 
 
     def host_leave(self, sender_id):
@@ -285,7 +295,7 @@ class KasayaNetworkSync(object):
         print ("STATE CHANGE", host, counter, ">>>", key, data)
 
 
-    def host_state_complete(self, host_id, counter, items):
+    def host_complete_state(self, host_id, counter, items):
         """
         Received complete state of remote host.
         items - list of key/value pairs with host properties/workers
@@ -390,8 +400,8 @@ class KasayaNetworkSync(object):
         """
         Notify about own shutting down
         """
-        msg = { 'SMSG' : "hl",
-            'hostid':self.ID,
+        msg = { "SMSG" : "hl",
+            "host_id" : self.ID,
         }
         return msg
 
@@ -409,7 +419,7 @@ class KasayaNetworkSync(object):
         Send host property change
         """
         msg = {
-            "hostid"  : hostid,
+            "host_id"  : hostid,
             "counter" : counter,
             "name"    : name,
             "value"   : value,
@@ -433,7 +443,7 @@ class KasayaNetworkSync(object):
 
     def send_host_died(self, addr, hostid):
         msg = {
-            'hostid' : hostid,
+            "host_id" : hostid,
         }
 
 
@@ -453,7 +463,7 @@ class KasayaNetworkSync(object):
         Send information about worker death
         """
         msg = {
-            "hostid"   : hostid,
+            "host_id"   : hostid,
             "workerid" : workerid,
         }
         self._send(addr, msg)
@@ -465,12 +475,7 @@ class KasayaNetworkSync(object):
         Incoming request for full host report.
         Result will be transmitted back asynchronously.
         """
-        if not msg['hostid']==self.ID:
-            # invalid host id,
-            # remote host has outdated host list
-            # TODO: notify sender about invalid hostid/address information
-            return
-        self.host_full_sync_required( msg['sender_id'] )
+        self.host_full_sync_required( msg['host_id'] )
 
     def send_full_sync_request(self, addr, hostid):
         """
@@ -478,7 +483,7 @@ class KasayaNetworkSync(object):
            hostid - id of host which message is targeting
         """
         msg = { 'SMSG' : _MSG_FULL_STATE_REQUEST,
-            'hostid' : hostid,
+            "host_id" : hostid,
         }
         self._send(addr, msg)
 
@@ -501,7 +506,7 @@ class KasayaNetworkSync(object):
                 self.host_leave(msg['host_id'])
                 return
 
-        self.host_state_complete( msg['host_id'], msg['counter'], msg['state'] )
+        self.host_complete_state( msg['host_id'], msg['counter'], msg['state'] )
 
 
 
@@ -510,7 +515,7 @@ class KasayaNetworkSync(object):
         Send full state to specified host
         """
         msg = { 'SMSG' : _MSG_FULL_STATE,
-            "hostid"  : self.ID,
+            "host_id"  : self.ID,
             "counter" : self.counter,
         }
         if self.online:
