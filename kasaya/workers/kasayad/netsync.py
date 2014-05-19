@@ -2,7 +2,6 @@
 #coding: utf-8
 from __future__ import unicode_literals
 from time import time
-import gevent
 
 __all__ = ("KasayaNetworkSync",)
 
@@ -151,7 +150,6 @@ class KasayaNetworkSync(object):
             hlst.append( h )
 
         if len(hlst)<=1:
-            #print "   ",hlst
             return set(hlst)
 
         result = set()
@@ -221,7 +219,7 @@ class KasayaNetworkSync(object):
         #knownaddr = self.DB.host_addr_by_id( sender_id )
         #if knownaddr is None:
             # new host!
-        print self.ID,"incoming message from unknown host",sender_id, "registering..."
+        #print self.ID,"incoming message from unknown host",sender_id, "registering..."
         self.host_join(addr, sender_id, 0)
         #return False
 
@@ -250,6 +248,7 @@ class KasayaNetworkSync(object):
             # we already know that host, exit
             #print self.ID, "already know", host_id, "skipping"
             return
+        #print "  ",self.ID,"register new host",host_id
         # new host is joined
         # Because we doesn't know current state of new host, we can't just set
         # counter, we need to do full sync first.
@@ -264,9 +263,10 @@ class KasayaNetworkSync(object):
         if self._disable_forwarding:
             return
         peers = self.peer_chooser( (host_id, sender_id) )
+        #print "  exclude", host_id, sender_id, "       ",peers
         for p in peers:
             destination = self.DB.host_addr_by_id( p )   # destination host address
-            #print "from",self.ID, "to",p," there is new host: ", host_id
+            #print "  forward",self.ID, "to",p," there is new host: ", host_id
             self.send_host_join(
                 destination,
                 host_id,
@@ -291,10 +291,19 @@ class KasayaNetworkSync(object):
         """
         if self.is_local_state_actual(sender_id, counter):
             return
-        print ("STATE CHANGE", host, counter, ">>>", key, data)
+        #print ("STATE CHANGE", host, counter, ">>>", key, data)
 
 
-    def host_process_complete_state(self, host_id, hostname, counter, items):
+    def host_update_hostname(self, host_id, hostname):
+        """
+        Update hostname of remote host if needed
+        """
+        ki = self.DB.host_info( host_id )
+        if ki['hostname'] is None:
+            self.DB.host_set_hostname( host_id, hostname )
+
+
+    def host_process_complete_state(self, host_id, counter, items):
         """
         Process incoming full state report
         items - list of key/value pairs with host properties/workers
@@ -317,7 +326,6 @@ class KasayaNetworkSync(object):
         #workers = self.DB.worker_list(self.ID, only_online=True)
         #services = self.DB.service_list(self.ID)
         res = {
-            "hostname":self.hostname,
             "workers":[],
             "services":[]
             }
@@ -329,6 +337,7 @@ class KasayaNetworkSync(object):
         Check if we need syncing with remote host, if yes, send request for sync
           host_id - sender is asking for host with host id = hostid
           counter - known counter state
+          hostname - incoming hostname (not known in accidental incoming message)
         """
         if self.is_local_state_actual(host_id, counter):
             return
@@ -376,7 +385,7 @@ class KasayaNetworkSync(object):
             host_id - id of host which joined network
             counter - host status counter
         """
-        self.host_join(msg['host_addr'], msg['host_id'], msg['counter'], msg['hostname'])
+        self.host_join(msg['host_addr'], msg['host_id'], msg['counter'], msg['hostname'], msg['sender_id'])
 
     def send_host_join(self, addr, host_id, host_addr, counter, hostname):
         """
@@ -483,7 +492,8 @@ class KasayaNetworkSync(object):
         Result will be transmitted back asynchronously.
         """
         #self.host_full_sync_is_required( msg['host_id'] )
-        print "RECEIVED FULL SYNC REQUEST",msg
+        #print self.ID , "RECEIVED FULL SYNC REQUEST",msg
+        self.send_host_full_state( addr )
 
     def send_full_sync_request(self, addr):
         """
@@ -501,17 +511,34 @@ class KasayaNetworkSync(object):
           - hostid - remote host id
           - addr - remote addess
         """
-        if self.is_local_state_actual( msg['host_id'], msg['counter'] ):
-            # we doesn't need any updates
+        hid = msg['host_id']
+
+        # update hostname of host
+        self.host_update_hostname(hid, msg['hostname'] )
+
+        # register new hosts known by remote host
+        for host in msg['known_hosts']:
+            if host['id']==self.ID:
+                continue
+            self.host_join(
+                host['addr'],
+                host['id'],
+                0,
+                host['hostname']
+            )
+
+        # check if host state is up to date?
+        if self.is_local_state_actual( hid, msg['counter'] ):
             return
 
-        if 'offline' in msg:
-            # host is currently leaving network
-            if msg['offline']:
-                self.host_leave(msg['host_id'])
-                return
+        # check if host is currently leaving network
+        if msg.get("offline",False):
+            self.host_leave(hid)
+            return
 
-        self.host_complete_state( msg['host_id'], msg['counter'], msg['state'] )
+        # process current state of host
+        self.host_process_complete_state( hid, msg['counter'], msg['state'] )
+
 
 
 
@@ -521,12 +548,21 @@ class KasayaNetworkSync(object):
         """
         msg = { 'SMSG' : _MSG_FULL_STATE,
             "host_id"  : self.ID,
-            "counter" : self.counter,
+            "counter"  : self.counter,
+            "hostname" : self.hostname,
         }
+        # local workers
         if self.online:
             msg["state"] = self.create_full_state_report()
         else:
-            msg["offline"] = None
+            msg["offline"] = True
+        # all known hosts
+        kh = []
+        for h in self.DB.host_list():
+            if h["id"]==self.ID:
+                continue
+            kh.append(h)
+        msg['known_hosts'] = kh
         self._send(addr, msg)
 
 

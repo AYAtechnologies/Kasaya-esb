@@ -72,6 +72,22 @@ class MemoryDB(BaseDB):
             yield { 'id':u, 'addr':a, 'hostname':h }
 
 
+    def host_update(self, ID, hostname=None):
+        """
+        Update host record in database
+        """
+        self.SEMA.acquire()
+        try:
+            if not hostname is None:
+                self.cur.execute(
+                    "UPDATE hosts SET hostname=? WHERE id=?;",
+                    (hostname, ID)
+                )
+            self.__db.commit()
+        finally:
+            self.SEMA.release()
+
+
 
     def service_add(self, host_id, name):
         """

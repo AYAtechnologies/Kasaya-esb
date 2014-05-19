@@ -28,7 +28,7 @@ class NetworkStateDB(object):
 
     # hosts
 
-    def host_register(self, host_id, address, hostname=None):# hostname, ip, services=None):
+    def host_register(self, host_id, address, hostname=None):
         """
         Register new host (kasayad instance).
         host_id - id of kasayad
@@ -69,12 +69,26 @@ class NetworkStateDB(object):
         #return {"addr":res[2],"hostname":res[1]}
 
 
+    def host_set_hostname(self, host_id, hostname):
+        """
+        Update hostname field for host.
+        """
+        self.LLDB.host_update(host_id, hostname=hostname)
+
+
     def host_list(self):
         """
         Return list of all hosts in network
         """
         for h in self.LLDB.host_list():
             yield h
+
+
+    def host_info(self, host_id):
+        """
+        Known info about host
+        """
+        return self.LLDB.host_get(host_id)
 
 
     def host_addr_by_id(self, host_id):
