@@ -37,7 +37,7 @@ class KasayaNetworkSync(object):
         self._broadcast(0) # counter=0 means out of sync state
         self.counters = {}
 
-        self.FULL_SYNC_DELAY = 3  # for test purposes use short delays
+        self.FULL_SYNC_DELAY = 3
 
         self._methodmap = {
             _MSG_PING       : self.on_ping,
@@ -106,7 +106,13 @@ class KasayaNetworkSync(object):
         fnc(sender_addr, msg)
 
         # check sender in delay
+        # skip checking for messages about joining and leaving network
+        # if message is coming from host wchih is joining/leaving
+        if msg['SMSG'] in (_MSG_HOST_JOIN, _MSG_HOST_LEAVE):
+            if sid==msg['host_id']:
+                return
         self.delay( None, self.check_sender, sender_addr, sid )
+
 
     def _broadcast(self, counter):
         msg = {
@@ -340,6 +346,7 @@ class KasayaNetworkSync(object):
           hostname - incoming hostname (not known in accidental incoming message)
         """
         if self.is_local_state_actual(host_id, counter):
+            print self.ID, "not require syncing"
             return
         addr = self.DB.host_addr_by_id(host_id)
         self.send_full_sync_request(addr)

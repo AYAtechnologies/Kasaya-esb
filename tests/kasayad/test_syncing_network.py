@@ -228,10 +228,7 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["C","E"], peers )
 
-
-
-
-    def test_inter_host_sync(self):
+    def _test_inter_host_sync(self):
         pool = KasayaTestPool()
         # silent host creation (without broadcast and forwarding info)
         pool.disable_forwarding = True
@@ -289,21 +286,29 @@ class NetSyncTest(unittest.TestCase):
         pool.disable_forwarding = False
         peers = list( set(pool.keys())-set(nh) )
         peers.sort()
-        target = "D"#random.choice( peers )
-
-        #print "Sending single message from", nh, "to", target
+        target = random.choice( peers )
+        # send ping to initiate host registering and p2p messages
         pool[nh].send_ping( pool._get_ip_for_host(target) )
-        #gevent.sleep(1) # wait for execution of delayed calls
         gevent.wait()
-
-        #for p in pool[nh].DB.host_list():
-        #    print p
-        #print "BROADCAST_COUNTER", pool.broadcast_counter
-        #print "SEND_COUNTER", pool.send_counter
-        #return
+        # after full sync each host should know all other hosts
         for p in peers:
-            self.assertIn(nh, pool[p].known_hosts(), "Host %s should know %s" % (p, nh) )
+            kh = set(pool.keys())
+            myid = pool[p].ID
+            kh-=set( (myid,) )
+            self.assertEqual( kh, set(pool[p].known_hosts()) )
 
+    def test_host_leave(self):
+        pool = KasayaTestPool()
+        # silent host creation (without broadcast and forwarding info)
+        #pool.disable_forwarding = True
+        #pool.disable_broadcast = True
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        gevent.wait() # alow all hosts to synchronize
+        print pool.send_counter
 
 
 if __name__ == '__main__':
