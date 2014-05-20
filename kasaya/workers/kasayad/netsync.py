@@ -61,8 +61,12 @@ class KasayaNetworkSync(object):
         """
         Unregister self from network.
         """
+        if not self.online:
+            # already off
+            return
         self.online = False
         self.counter += 1
+        self._host_leave_forwarder(self.ID, self.counter)
         #self.send_host_leave()
 
     def known_hosts(self):
@@ -113,6 +117,7 @@ class KasayaNetworkSync(object):
                 return
         self.delay( None, self.check_sender, sender_addr, sid )
 
+    # internal send and broadcast functions
 
     def _broadcast(self, counter):
         msg = {
@@ -184,7 +189,7 @@ class KasayaNetworkSync(object):
         return host_id in self.counters
 
 
-    def is_local_state_actual(self, host_id, rc):
+    def is_local_state_actual(self, host_id, remote_counter):
         """
         Check counters for given host.
         Result:
@@ -195,14 +200,14 @@ class KasayaNetworkSync(object):
             counter, tstamp = self.counters[host_id]
         except KeyError: # unknown host
             return False
-        return (counter>=rc) and (counter>0)
+        return (counter>=remote_counter) and (counter>0)
 
 
-    def set_counter(self, sender_id, counter):
+    def set_counter(self, host_if, counter):
         """
         Set new value for counters.
         """
-        self.counters[sender_id] = (counter, time() )
+        self.counters[host_if] = (counter, time() )
 
 
     def check_sender(self, addr, sender_id):
@@ -252,9 +257,7 @@ class KasayaNetworkSync(object):
         """
         if self.is_host_known(host_id):
             # we already know that host, exit
-            #print self.ID, "already know", host_id, "skipping"
             return
-        #print "  ",self.ID,"register new host",host_id
         # new host is joined
         # Because we doesn't know current state of new host, we can't just set
         # counter, we need to do full sync first.
@@ -283,12 +286,33 @@ class KasayaNetworkSync(object):
 
 
 
-    def host_leave(self, sender_id):
+    def host_leave(self, host_id, counter, sender_id=None):
         """
         Remote host is shutting down or died unexpectly.
         """
-        self.DB.host_unregister(sender_id)
-        del self.counters[sender_id]
+        # if host is already unknown, exit
+        if not self.is_host_known(host_id):
+            return
+        # if curernt counter state is higher, then
+        # unregistering is not valid now.
+        if self.is_local_state_actual(host_id, counter):
+            return
+        # unregister and delete host data
+        #self.set_counter(host_id, counter)
+        self.DB.host_unregister(host_id)
+        del self.counters[host_id]
+        # notify neighbours
+        self._host_leave_forwarder( host_id, counter, sender_id )
+
+    def _host_leave_forwarder(self, host_id, counter, sender_id=None ):
+        if self._disable_forwarding: return
+        # forward message to neighbours
+        for hid in self.peer_chooser( (host_id, sender_id) ):
+            self.send_host_leave(
+                self.DB.host_addr_by_id( hid ),   # host address
+                host_id,
+                counter
+            )
 
 
     def host_state_change(self, sender_id, counter, key, data):
@@ -417,16 +441,21 @@ class KasayaNetworkSync(object):
         Host leaves network
         message type: authoritative
         """
-        pass
+        self.host_leave( msg['host_id'], msg['counter'], msg['sender_id'] )
 
-    def send_host_leave(self, addr):
+    def send_host_leave(self, addr, host_id, counter):
         """
-        Notify about own shutting down
+        Notify about leaving network.
+        addr - target address
+        host_id - leaving host id
+        counter - leaving host counter
         """
-        msg = { "SMSG" : "hl",
-            "host_id" : self.ID,
+        msg = {
+            "SMSG" : _MSG_HOST_LEAVE,
+            "host_id" : host_id,
+            "counter" : counter
         }
-        return msg
+        self._send(addr, msg)
 
 
 
@@ -498,7 +527,6 @@ class KasayaNetworkSync(object):
         Incoming request for full host report.
         Result will be transmitted back asynchronously.
         """
-        #self.host_full_sync_is_required( msg['host_id'] )
         #print self.ID , "RECEIVED FULL SYNC REQUEST",msg
         self.send_host_full_state( addr )
 
@@ -508,7 +536,6 @@ class KasayaNetworkSync(object):
         """
         msg = { 'SMSG' : _MSG_FULL_STATE_REQUEST }
         self._send(addr, msg)
-
 
 
 
@@ -546,9 +573,6 @@ class KasayaNetworkSync(object):
         # process current state of host
         self.host_process_complete_state( hid, msg['counter'], msg['state'] )
 
-
-
-
     def send_host_full_state(self, addr):
         """
         Send full state to specified host
@@ -575,6 +599,7 @@ class KasayaNetworkSync(object):
 
     # abstract methods, need to be overwritten in child classess
 
+
     def send_broadcast(self, msg):
         """
         Send broadcast to all hosts in network about self.
@@ -590,4 +615,8 @@ class KasayaNetworkSync(object):
         raise NotImplementedError
 
     def delay(self, seconds, func, *args, **kwargs):
+        """
+        Delay execution of function in bacground
+        like gevent.start_later(...)
+        """
         func(*args, **kwargs)
