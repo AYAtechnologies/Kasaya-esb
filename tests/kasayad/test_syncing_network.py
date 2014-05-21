@@ -30,7 +30,7 @@ class KasayaFakeSync(KasayaNetworkSync):
         self.FULL_SYNC_DELAY = 0.1
 
     def __repr__(self):
-        return "<KS:%s>" % (self.ID[1:])
+        return "<KS:%s>" % (self.ID)
 
     def _get_disable_forwarding(self):
         return self.TP.disable_forwarding
@@ -57,6 +57,11 @@ class KasayaFakeSync(KasayaNetworkSync):
         else:
             g.start_later(seconds)
 
+    def remote_property_set(self, host_id, key, data):
+        print self.ID, "remote set", host_id, key, data
+
+    def remote_property_delete(self, host_id, key, data):
+        print self.ID, "remote delete", host_id, key
 
 
 class KasayaTestPool(object):
@@ -131,14 +136,14 @@ class KasayaTestPool(object):
 
 class NetSyncTest(unittest.TestCase):
 
-    def test_counters(self):
+    def _test_counters(self):
         ns = KasayaNullSync(None, "ownid")
         self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
         ns.set_counter("h", 10 )
         self.assertEqual( ns.is_local_state_actual("h",  9), True  )
         self.assertEqual( ns.is_local_state_actual("h", 11), False )
 
-    def test_broadcast(self):
+    def _test_broadcast(self):
         pool = KasayaTestPool()
         pool.disable_forwarding = True # don't use forwarding
         pool.new_host()
@@ -166,7 +171,7 @@ class NetSyncTest(unittest.TestCase):
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
 
-    def test_peer_chooser(self):
+    def _test_peer_chooser(self):
         pool = KasayaTestPool()
         pool.disable_broadcast = False
         pool.disable_forwarding = True
@@ -174,13 +179,13 @@ class NetSyncTest(unittest.TestCase):
         A = pool.new_host()
         A = pool[A]
         gevent.wait()
-        self.assertEqual( len(A.peer_chooser()), 0 )
+        self.assertEqual( len(A._peer_chooser()), 0 )
 
         # one neighbour
         B = pool.new_host()
         B = pool[B]
         gevent.wait()
-        peers = B.peer_chooser()
+        peers = B._peer_chooser()
         self.assertEqual( len(peers), 1 )
         self.assertIn( A.ID, peers )
 
@@ -188,7 +193,7 @@ class NetSyncTest(unittest.TestCase):
         C = pool.new_host()
         C = pool[C]
         gevent.wait()
-        peers = B.peer_chooser()
+        peers = B._peer_chooser()
         self.assertEqual( len(peers), 2 )
         self.assertIn( A.ID, peers )
         self.assertIn( C.ID, peers )
@@ -203,28 +208,28 @@ class NetSyncTest(unittest.TestCase):
         gevent.wait()
 
         # simple choices
-        peers = A.peer_chooser()
+        peers = A._peer_chooser()
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["F","B"], peers )
 
-        peers = F.peer_chooser()
+        peers = F._peer_chooser()
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["A","E"], peers )
 
-        peers = D.peer_chooser()
+        peers = D._peer_chooser()
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["C","E"], peers )
 
         # choices with exclusions
-        peers = A.peer_chooser( ["B"] )
+        peers = A._peer_chooser( ["B"] )
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["C","F"], peers )
 
-        peers = A.peer_chooser( ["B","F"] )
+        peers = A._peer_chooser( ["B","F"] )
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["C","E"], peers )
 
-    def test_inter_host_sync(self):
+    def _test_inter_host_sync(self):
         pool = KasayaTestPool()
         # silent host creation (without broadcast and forwarding info)
         pool.disable_forwarding = True
@@ -293,7 +298,7 @@ class NetSyncTest(unittest.TestCase):
             kh-=set( (myid,) )
             self.assertEqual( kh, set(pool[p].known_hosts()) )
 
-    def test_host_leave(self):
+    def _test_host_leave(self):
         pool = KasayaTestPool()
         #pool.disable_forwarding = True
         #pool.disable_broadcast = True
@@ -316,6 +321,36 @@ class NetSyncTest(unittest.TestCase):
             kh = set(pool[p].known_hosts())
             self.assertEqual( kh, should_know - set([p]) )
 
+    def test_host_change(self):
+        pool = KasayaTestPool()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        gevent.wait()
+        pool.send_counter = 0
+
+        # one host is closing...
+        host = pool[  random.choice(pool.keys())  ]
+        print host
+        host.set_local_property("myval", {'fululu':'umcykcyk','color':4} )
+        gevent.wait()
+
+        print "sends", pool.send_counter
+        #print changing_host
+
+
+        #should_know = set(pool.keys()) - set( (exiting_host,) )
+        #pool[exiting_host].close()
+        #gevent.wait()
+
+        # check all other hosts are deregistered exiting host
+        #for p in pool.keys():
+        #    if p==exiting_host:
+        #        continue
+        #    kh = set(pool[p].known_hosts())
+        #    self.assertEqual( kh, should_know - set([p]) )
 
 
 if __name__ == '__main__':

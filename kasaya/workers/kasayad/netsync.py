@@ -23,30 +23,30 @@ _MSG_HOST_JOIN  = "hj"
 _MSG_HOST_LEAVE = "hl"
 _MSG_FULL_STATE_REQUEST = "sr"
 _MSG_FULL_STATE = "fs"
+_MSG_HOST_CHANGE = "hc"
 
 
-class KasayaNetworkSync(object):
+class NetworkSync(object):
 
-    def __init__(self, dbinstance, ID, hostname=None):
+    def __init__(self, ID, hostname=None):
         #print "BORN",ID
         self.ID = ID
         self.hostname = hostname
         self.counter = 1  # main state counter
         self.online = True # always True until close is called
-        self.DB = dbinstance
         self._broadcast(0) # counter=0 means out of sync state
         self.counters = {}
 
         self.FULL_SYNC_DELAY = 3
 
         self._methodmap = {
-            _MSG_PING       : self.on_ping,
-            _MSG_BROADCAST  : self.on_broadcast,
-            _MSG_HOST_JOIN  : self.on_host_join,
-            _MSG_HOST_LEAVE : self.on_host_leave,
+            _MSG_PING        : self.on_ping,
+            _MSG_BROADCAST   : self.on_broadcast,
+            _MSG_HOST_JOIN   : self.on_host_join,
+            _MSG_HOST_LEAVE  : self.on_host_leave,
             _MSG_FULL_STATE_REQUEST : self.on_full_sync_request,
-            _MSG_FULL_STATE : self.on_host_full_state,
-            #"hc" : self.on_host_change,
+            _MSG_FULL_STATE  : self.on_host_full_state,
+            _MSG_HOST_CHANGE : self.on_host_change,
             #"hd" : self.on_host_died,
             #"wd" : self.on_worker_died,
             #"sr" : self.on_full_sync_request,
@@ -67,7 +67,6 @@ class KasayaNetworkSync(object):
         self.online = False
         self.counter += 1
         self._host_leave_forwarder(self.ID, self.counter)
-        #self.send_host_leave()
 
     def known_hosts(self):
         """
@@ -140,14 +139,9 @@ class KasayaNetworkSync(object):
         #else:
         self.send_message(addr, msg)
 
-
-
-
-
-
     # top level logic methods
 
-    def peer_chooser(self, exclude=()):
+    def _peer_chooser(self, exclude=()):
         """
         Choose nearest hosts from local database to distribute messages
         """
@@ -181,13 +175,11 @@ class KasayaNetworkSync(object):
         # remove excluded host from result
         return result
 
-
     def is_host_known(self, host_id):
         """
         Is host known already?
         """
         return host_id in self.counters
-
 
     def is_local_state_actual(self, host_id, remote_counter):
         """
@@ -202,13 +194,20 @@ class KasayaNetworkSync(object):
             return False
         return (counter>=remote_counter) and (counter>0)
 
+    def can_bump_local_state(self, host_id, remote_counter):
+        """
+        Return true if local counter is only 1 steb behind remote state
+        """
+        try:
+            return (remote_counter - self.counters[host_id][0])==1
+        except KeyError:
+            return False
 
     def set_counter(self, host_if, counter):
         """
         Set new value for counters.
         """
         self.counters[host_if] = (counter, time() )
-
 
     def check_sender(self, addr, sender_id):
         """
@@ -245,7 +244,6 @@ class KasayaNetworkSync(object):
         #   do something in such case
         return False
 
-
     def host_join(self, host_addr, host_id, counter, hostname=None, sender_id=None):
         """
         Detected new host in network (from broadcast, first connection or passef from other host)
@@ -271,7 +269,7 @@ class KasayaNetworkSync(object):
         # send notification to neighboors
         if self._disable_forwarding:
             return
-        peers = self.peer_chooser( (host_id, sender_id) )
+        peers = self._peer_chooser( (host_id, sender_id) )
         #print "  exclude", host_id, sender_id, "       ",peers
         for p in peers:
             destination = self.DB.host_addr_by_id( p )   # destination host address
@@ -283,8 +281,6 @@ class KasayaNetworkSync(object):
                 counter,
                 hostname
             )
-
-
 
     def host_leave(self, host_id, counter, sender_id=None):
         """
@@ -303,35 +299,23 @@ class KasayaNetworkSync(object):
         del self.counters[host_id]
         # notify neighbours
         self._host_leave_forwarder( host_id, counter, sender_id )
-
     def _host_leave_forwarder(self, host_id, counter, sender_id=None ):
         if self._disable_forwarding: return
         # forward message to neighbours
-        for hid in self.peer_chooser( (host_id, sender_id) ):
+        for hid in self._peer_chooser( (host_id, sender_id) ):
             self.send_host_leave(
                 self.DB.host_addr_by_id( hid ),   # host address
                 host_id,
                 counter
             )
 
-
-    def host_state_change(self, sender_id, counter, key, data):
-        """
-        Remote host changed state of own component and sends new state.
-        """
-        if self.is_local_state_actual(sender_id, counter):
-            return
-        #print ("STATE CHANGE", host, counter, ">>>", key, data)
-
-
-    def host_update_hostname(self, host_id, hostname):
+    def _host_update_hostname(self, host_id, hostname):
         """
         Update hostname of remote host if needed
         """
         ki = self.DB.host_info( host_id )
         if ki['hostname'] is None:
             self.DB.host_set_hostname( host_id, hostname )
-
 
     def host_process_complete_state(self, host_id, counter, items):
         """
@@ -348,7 +332,6 @@ class KasayaNetworkSync(object):
         #for i in items:
         #    print i
 
-
     def create_full_state_report(self):
         """
         Create status report with all workers and services on host
@@ -361,7 +344,6 @@ class KasayaNetworkSync(object):
             }
         return res
 
-
     def _host_check_is_sync_required(self, host_id, counter):
         """
         Check if we need syncing with remote host, if yes, send request for sync
@@ -370,10 +352,67 @@ class KasayaNetworkSync(object):
           hostname - incoming hostname (not known in accidental incoming message)
         """
         if self.is_local_state_actual(host_id, counter):
-            print self.ID, "not require syncing"
+            #print self.ID, "not require syncing"
             return
         addr = self.DB.host_addr_by_id(host_id)
         self.send_full_sync_request(addr)
+
+    # sending local properties to all hosts
+    def set_local_property(self, key, data):
+        """
+        Add or update local property,
+        send changes to all peers in network
+        """
+        self.counter += 1
+        self._host_change_forwarder(self.ID, self.counter, key, data)
+        #self.remote_property_set(self.ID, key, data)
+
+    def delete_local_property(self, key):
+        self.counter += 1
+        self._host_change_forwarder(self.ID, self.counter, key, None)
+        #self.remote_property_delete(self.ID, key)
+        pass
+
+    # remote host changed state
+    def host_state_change(self, host_id, counter, key, data, sender_id=None):
+        """
+        Remote host changed state of own component and sends new state.
+        """
+        if self.is_local_state_actual(host_id, counter):
+            return
+        # remote state looks tobe more than 1 step forward.
+        # this means that we need sull sync!
+        if not self.can_bump_local_state(host_id, counter):
+            # send request to remote host for full sync
+            addr = self.DB.host_addr_by_id(host_id)
+            self.send_full_sync_request(addr)
+        else:
+            # yes, we can bump local state by 1 and update database
+            self.set_counter(host_id, counter)
+            # if key is given, we can update state
+            if not key is None:
+                if data is None:
+                    # deleting data
+                    self.remote_property_delete(host_id, key)
+                else:
+                    self.remote_property_set(host_id, key, data)
+        # forward new state
+        self._host_change_forwarder(host_id, counter, key, data, sender_id)
+
+    def _host_change_forwarder(self, host_id, counter, key, data, sender_id=None):
+        """
+        Send host changes to neighbours
+        """
+        if self._disable_forwarding: return
+        # forward message to neighbours
+        for hid in self._peer_chooser( (host_id, sender_id) ):
+            self.send_host_change(
+                self.DB.host_addr_by_id( hid ),   # host address
+                host_id,
+                counter,
+                key,
+                data
+            )
 
 
     # network input / output methods
@@ -390,6 +429,7 @@ class KasayaNetworkSync(object):
         """
         pass
 
+    # joining network
 
     def on_broadcast(self, addr, msg):
         """
@@ -402,7 +442,6 @@ class KasayaNetworkSync(object):
             msg['hostname'],
             msg['sender_id']
         )
-
 
     def on_host_join(self, addr, msg):
         """
@@ -434,7 +473,7 @@ class KasayaNetworkSync(object):
         }
         self._send(addr, msg)
 
-
+    # leaving network
 
     def on_host_leave(self, addr, msg):
         """
@@ -457,29 +496,6 @@ class KasayaNetworkSync(object):
         }
         self._send(addr, msg)
 
-
-
-    def on_host_change(self, addr, msg):
-        """
-        Host changed property
-        message type: authoritative
-        """
-        pass
-
-    def send_host_change(self, addr, hostid, counter, name, value):
-        """
-        Send host property change
-        """
-        msg = {
-            "host_id"  : hostid,
-            "counter" : counter,
-            "name"    : name,
-            "value"   : value,
-        }
-        return msg
-
-
-
     def on_host_died(self, addr, msg):
         """
         Host died without leaving network.
@@ -498,7 +514,33 @@ class KasayaNetworkSync(object):
             "host_id" : hostid,
         }
 
+    # host change state
 
+    def on_host_change(self, addr, msg):
+        """
+        Host changed property
+        message type: authoritative
+        """
+        self.host_state_change(
+            msg['host_id'],
+            msg['counter'],
+            msg['key'],
+            msg['data'],
+            msg['sender_id']
+        )
+
+    def send_host_change(self, addr, hostid, counter, key, data):
+        """
+        Send host property change
+        """
+        msg = {
+            "SMSG"    : _MSG_HOST_CHANGE,
+            "host_id" : hostid,
+            "counter" : counter,
+            "key"     : key,
+            "data"    : data,
+        }
+        self._send( addr, msg )
 
     def on_worker_died(self, addr, msg):
         """
@@ -520,7 +562,7 @@ class KasayaNetworkSync(object):
         }
         self._send(addr, msg)
 
-
+    # full sync request and report
 
     def on_full_sync_request(self, addr, msg):
         """
@@ -537,8 +579,6 @@ class KasayaNetworkSync(object):
         msg = { 'SMSG' : _MSG_FULL_STATE_REQUEST }
         self._send(addr, msg)
 
-
-
     def on_host_full_state(self, addr, msg):
         """
         Remote host data is out of sync, send full sync request and process response
@@ -548,7 +588,7 @@ class KasayaNetworkSync(object):
         hid = msg['host_id']
 
         # update hostname of host
-        self.host_update_hostname(hid, msg['hostname'] )
+        self._host_update_hostname(hid, msg['hostname'] )
 
         # register new hosts known by remote host
         for host in msg['known_hosts']:
@@ -596,9 +636,7 @@ class KasayaNetworkSync(object):
         msg['known_hosts'] = kh
         self._send(addr, msg)
 
-
     # abstract methods, need to be overwritten in child classess
-
 
     def send_broadcast(self, msg):
         """
@@ -620,3 +658,18 @@ class KasayaNetworkSync(object):
         like gevent.start_later(...)
         """
         func(*args, **kwargs)
+
+    def remote_property_set(self, host_id, key, data):
+        raise NotImplementedError
+
+    def remote_property_delete(self, host_id, key):
+        raise NotImplementedError
+
+
+
+class KasayaNetworkSync(NetworkSync):
+
+    def __init__(self, dbinstance, *args, **kwargs):
+        self.DB = dbinstance
+        super(KasayaNetworkSync, self).__init__( *args, **kwargs )
+
