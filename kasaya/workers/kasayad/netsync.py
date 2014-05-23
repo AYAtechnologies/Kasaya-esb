@@ -23,7 +23,7 @@ _MSG_HOST_JOIN  = "hj"
 _MSG_HOST_LEAVE = "hl"
 _MSG_FULL_STATE_REQUEST = "sr"
 _MSG_FULL_STATE = "fs"
-_MSG_HOST_CHANGE = "hc"
+_MSG_PAYLOAD    = "hp"
 
 
 class NetworkSync(object):
@@ -46,7 +46,7 @@ class NetworkSync(object):
             _MSG_HOST_LEAVE  : self.on_host_leave,
             _MSG_FULL_STATE_REQUEST : self.on_full_sync_request,
             _MSG_FULL_STATE  : self.on_host_full_state,
-            _MSG_HOST_CHANGE : self.on_host_change,
+            _MSG_PAYLOAD     : self.on_incoming_payload,
             #"hd" : self.on_host_died,
             #"wd" : self.on_worker_died,
             #"sr" : self.on_full_sync_request,
@@ -55,7 +55,6 @@ class NetworkSync(object):
 
         # internal switches
         self._disable_forwarding = False    # disable forwarding of messages to other hosts
-
 
     def close(self):
         """
@@ -226,7 +225,7 @@ class NetworkSync(object):
         if self.is_host_known(sender_id):
             return True
 
-        #knownaddr = self.DB.host_addr_by_id( sender_id )
+        #knownaddr = self.hostid2addr( sender_id )
         #if knownaddr is None:
             # new host!
         #print self.ID,"incoming message from unknown host",sender_id, "registering..."
@@ -260,7 +259,8 @@ class NetworkSync(object):
         # Because we doesn't know current state of new host, we can't just set
         # counter, we need to do full sync first.
         self.set_counter(host_id, 0)
-        self.DB.host_register(host_id, host_addr, hostname )
+
+        self.remote_host_join(host_id, host_addr, hostname )
         self.delay(
             self.FULL_SYNC_DELAY, # delay in seconds
             self._host_check_is_sync_required, host_id, counter
@@ -272,7 +272,7 @@ class NetworkSync(object):
         peers = self._peer_chooser( (host_id, sender_id) )
         #print "  exclude", host_id, sender_id, "       ",peers
         for p in peers:
-            destination = self.DB.host_addr_by_id( p )   # destination host address
+            destination = self.hostid2addr(p) # destination host addres
             #print "  forward",self.ID, "to",p," there is new host: ", host_id
             self.send_host_join(
                 destination,
@@ -295,7 +295,7 @@ class NetworkSync(object):
             return
         # unregister and delete host data
         #self.set_counter(host_id, counter)
-        self.DB.host_unregister(host_id)
+        self.remote_host_exit(host_id)
         del self.counters[host_id]
         # notify neighbours
         self._host_leave_forwarder( host_id, counter, sender_id )
@@ -304,45 +304,25 @@ class NetworkSync(object):
         # forward message to neighbours
         for hid in self._peer_chooser( (host_id, sender_id) ):
             self.send_host_leave(
-                self.DB.host_addr_by_id( hid ),   # host address
+                self.hostid2addr( hid ),   # host address
                 host_id,
                 counter
             )
-
-    def _host_update_hostname(self, host_id, hostname):
-        """
-        Update hostname of remote host if needed
-        """
-        ki = self.DB.host_info( host_id )
-        if ki['hostname'] is None:
-            self.DB.host_set_hostname( host_id, hostname )
 
     def host_process_complete_state(self, host_id, counter, items):
         """
         Process incoming full state report
         items - list of key/value pairs with host properties/workers
         """
-        addr = self.DB.host_addr_by_id(host_id)
+        self.remote_host_reset_state(host_id)
+        addr = self.hostid2addr(host_id)
         if addr is None:
             # this host is unknown, skip registering
             return
         self.set_counter(host_id, counter)
-        #self.DB.host_register(host_id, host_addr, hostname )
-        #print "NEW STATE"
-        #for i in items:
-        #    print i
-
-    def create_full_state_report(self):
-        """
-        Create status report with all workers and services on host
-        """
-        #workers = self.DB.worker_list(self.ID, only_online=True)
-        #services = self.DB.service_list(self.ID)
-        res = {
-            "workers":[],
-            "services":[]
-            }
-        return res
+        # process all payload items
+        for itm in items:
+            self.remote_payload_process(host_id, itm)
 
     def _host_check_is_sync_required(self, host_id, counter):
         """
@@ -354,29 +334,24 @@ class NetworkSync(object):
         if self.is_local_state_actual(host_id, counter):
             #print self.ID, "not require syncing"
             return
-        addr = self.DB.host_addr_by_id(host_id)
+        addr = self.hostid2addr(host_id)
         self.send_full_sync_request(addr)
 
     # sending local properties to all hosts
-    def set_local_property(self, key, data):
+    def distribute_payload(self, data):
         """
         Add or update local property,
         send changes to all peers in network
         """
         self.counter += 1
-        self._host_change_forwarder(self.ID, self.counter, key, data)
+        self._host_payload_forwarder(self.ID, self.counter, data)
         #self.remote_property_set(self.ID, key, data)
 
-    def delete_local_property(self, key):
-        self.counter += 1
-        self._host_change_forwarder(self.ID, self.counter, key, None)
-        #self.remote_property_delete(self.ID, key)
-        pass
 
     # remote host changed state
-    def host_state_change(self, host_id, counter, key, data, sender_id=None):
+    def host_remote_payload(self, host_id, counter, data, sender_id=None):
         """
-        Remote host changed state of own component and sends new state.
+        Remote host changed state of own component and sends new payload.
         """
         if self.is_local_state_actual(host_id, counter):
             return
@@ -384,36 +359,29 @@ class NetworkSync(object):
         # this means that we need sull sync!
         if not self.can_bump_local_state(host_id, counter):
             # send request to remote host for full sync
-            addr = self.DB.host_addr_by_id(host_id)
+            addr = self.hostid2addr(host_id)
             self.send_full_sync_request(addr)
         else:
             # yes, we can bump local state by 1 and update database
             self.set_counter(host_id, counter)
             # if key is given, we can update state
-            if not key is None:
-                if data is None:
-                    # deleting data
-                    self.remote_property_delete(host_id, key)
-                else:
-                    self.remote_property_set(host_id, key, data)
-        # forward new state
-        self._host_change_forwarder(host_id, counter, key, data, sender_id)
+            self.remote_payload_process(host_id, data)
+        # forward payload
+        self._host_payload_forwarder(host_id, counter, data, sender_id)
 
-    def _host_change_forwarder(self, host_id, counter, key, data, sender_id=None):
+    def _host_payload_forwarder(self, host_id, counter, data, sender_id=None):
         """
         Send host changes to neighbours
         """
         if self._disable_forwarding: return
         # forward message to neighbours
         for hid in self._peer_chooser( (host_id, sender_id) ):
-            self.send_host_change(
-                self.DB.host_addr_by_id( hid ),   # host address
+            self.send_host_payload(
+                self.hostid2addr( hid ),   # host address
                 host_id,
                 counter,
-                key,
                 data
             )
-
 
     # network input / output methods
     def send_ping(self, addr):
@@ -516,31 +484,35 @@ class NetworkSync(object):
 
     # host change state
 
-    def on_host_change(self, addr, msg):
+    def on_incoming_payload(self, addr, msg):
         """
         Host changed property
         message type: authoritative
         """
-        self.host_state_change(
+        self.host_remote_payload(
             msg['host_id'],
             msg['counter'],
-            msg['key'],
             msg['data'],
             msg['sender_id']
         )
 
-    def send_host_change(self, addr, hostid, counter, key, data):
+    def send_host_payload(self, addr, hostid, counter, data):
         """
         Send host property change
         """
         msg = {
-            "SMSG"    : _MSG_HOST_CHANGE,
+            "SMSG"    : _MSG_PAYLOAD,
             "host_id" : hostid,
             "counter" : counter,
-            "key"     : key,
             "data"    : data,
         }
         self._send( addr, msg )
+
+    def send_host_counter(self, addr, hostid, counter):
+        """
+        Sends only known counter of host. Used when detected that remote host holds obsolete state.
+        """
+        self.send_host_proprty_set(addr, hostid, counter, None)
 
     def on_worker_died(self, addr, msg):
         """
@@ -588,7 +560,7 @@ class NetworkSync(object):
         hid = msg['host_id']
 
         # update hostname of host
-        self._host_update_hostname(hid, msg['hostname'] )
+        self.remote_host_set_hostname(hid, msg['hostname'] )
 
         # register new hosts known by remote host
         for host in msg['known_hosts']:
@@ -624,7 +596,7 @@ class NetworkSync(object):
         }
         # local workers
         if self.online:
-            msg["state"] = self.create_full_state_report()
+            msg["state"] = self.build_local_state_report()
         else:
             msg["offline"] = True
         # all known hosts
@@ -636,7 +608,9 @@ class NetworkSync(object):
         msg['known_hosts'] = kh
         self._send(addr, msg)
 
-    # abstract methods, need to be overwritten in child classess
+    # ABSTRACT METHODS, NEED TO BE OVERWRITTEN IN CHILD CLASSESS
+
+    # network communication
 
     def send_broadcast(self, msg):
         """
@@ -657,12 +631,56 @@ class NetworkSync(object):
         Delay execution of function in bacground
         like gevent.start_later(...)
         """
-        func(*args, **kwargs)
-
-    def remote_property_set(self, host_id, key, data):
         raise NotImplementedError
 
-    def remote_property_delete(self, host_id, key):
+    # host database operations
+
+    def hostid2addr(self, host_id):
+        """
+        Get address of host
+        """
+        raise NotImplementedError
+
+    def remote_host_join(self, host_id, host_addr, hostname=None):
+        """
+        Remote host joined network. Hostname can be unknown.
+        """
+        raise NotImplementedError
+
+    def remote_host_exit(self, host_id):
+        """
+        Unregister remote host
+        """
+        raise NotImplementedError
+
+    def remote_host_set_hostname(self, host_id, host_addr, hostname):
+        """
+        Update hostname of remote host
+        """
+        raise NotImplementedError
+
+    def remote_host_reset_state(self, host_id):
+        """
+        Local state of remote host should be reseted to initial state.
+        Used before accepting full sync.
+        """
+        raise NotImplementedError
+
+    def remote_payload_process(self, host_id, data):
+        """
+        Incoming payload describing ne state of remote host.
+        Place for own implementation of data processing
+        """
+        raise NotImplementedError
+
+    def build_local_state_report(self):
+        """
+        This function should generate list of messages identical
+        to sended by distribute_payload method.
+        This list should fully describe full host status to make possible
+        rebuild full state of localhost on remote network node.
+        Result will be remotely executed as series of remote_payload function calls.
+        """
         raise NotImplementedError
 
 
@@ -670,6 +688,61 @@ class NetworkSync(object):
 class KasayaNetworkSync(NetworkSync):
 
     def __init__(self, dbinstance, *args, **kwargs):
+        global gevent
+        import gevent
         self.DB = dbinstance
         super(KasayaNetworkSync, self).__init__( *args, **kwargs )
 
+    def delay(self, seconds, func, *args, **kwargs):
+        """
+        Use gevent.start_later to delay function execution.
+        """
+        g = gevent.Greenlet(func, *args, **kwargs)
+        if not seconds:
+            g.start()
+        else:
+            g.start_later(seconds)
+
+    def hostid2addr(self, id):
+        return self.DB.host_addr_by_id( id )
+
+    # expand property set/del to registering services and workers
+    def remote_host_join(self, host_id, host_addr, hostname):
+        self.DB.host_register(host_id, host_addr, hostname )
+
+    def remote_host_exit(self, host_id):
+        self.DB.host_unregister(host_id)
+
+    def remote_host_set_hostname(self, host_id, hostname):
+        """
+        Update hostname of remote host if needed
+        """
+        hi = self.DB.host_info( host_id )
+        if hi['hostname'] is None:
+            self.DB.host_set_hostname( host_id, hostname )
+
+    def build_local_state_report(self):
+        res = []
+        # implement me here
+        return res
+
+    def remote_host_reset_state(self, host_id):
+        self.DB.host_clean(host_id)
+
+    def remote_payload_process(self, host_id, data):
+        try:
+            pt = data['ptype']
+        except KeyError:
+            return
+        if pt=="wadd":
+            # worker add
+            self.DB.worker_register( msg['host_id'], msg['worker_id'], msg['service'], msg['worker_addr'] )
+        elif pt=="wdel":
+            # worker del
+            self.DB.worker_unregister(ID=msg['worker_id'])
+        elif pt=="sadd":
+            # servce add
+            self.DB.service_add(msg['host_id'], msg['service'])
+        elif pt=="sdel":
+            # service delete
+            self.DB.service_add(msg['host_id'], msg['service'])

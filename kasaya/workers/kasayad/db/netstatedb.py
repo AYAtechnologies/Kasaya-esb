@@ -61,13 +61,17 @@ class NetworkStateDB(object):
           Zwraca True jeśli wyrejestrowano workera,
           False jeśli workera nie było w bazie
         """
-        # remove all services for host
-        for s in self.LLDB.service_list(host_id):
-            self.LLDB.service_del(host_id, s['service'])
-        # remove host
+        # remove all services
+        self.host_clean(host_id)
         self.LLDB.host_del(host_id)
-        #return {"addr":res[2],"hostname":res[1]}
+        # TODO: unregister all workers!
 
+    def host_clean(self, host_id):
+        """
+        Cleanup all workers and services for host.
+        """
+        self.worker_clear(host_id)
+        self.service_clear(host_id)
 
     def host_set_hostname(self, host_id, hostname):
         """
@@ -120,7 +124,7 @@ class NetworkStateDB(object):
         """
         Usunięcie wszystkich serwisów z serwera
         """
-        for s in self.LLDB.service_list():
+        for s in self.LLDB.service_list(host_id):
             self.LLDB.service_del(host_id, s['service'])
 
     def service_list(self, host_id):
@@ -217,6 +221,12 @@ class NetworkStateDB(object):
         for wrk in lst:
             yield wrk
 
+    def worker_clear(self, host_id):
+        """
+        Delete all workers for host
+        """
+        for w in self.LLDB.worker_list(host_id):
+            worker_unregister(w['id'])
 
     def choose_worker_for_service(self, service):
         lst = self.LLDB.workers_for_service(service, True)
