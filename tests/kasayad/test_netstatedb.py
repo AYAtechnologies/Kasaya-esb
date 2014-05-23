@@ -1,7 +1,7 @@
 #!/home/moozg/venvs/kasatest/bin/python
 #coding: utf-8
 #!/home/moozg/venvs/kasa33/bin/python
-from __future__ import division, absolute_import, print_function, unicode_literals
+from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 # misc
 from kasaya.conf import set_value, settings
@@ -63,13 +63,11 @@ class NetstateDBTests(unittest.TestCase):
             DB.host_addr_by_id(ID)
         DB.close()
 
-
     def assertDictEequal(self, d1, d2):
         self.assertItemsEqual( d1.keys(), d2.keys(), "Keys for dicts not equal. %r != %r" % (d1.keys(), d2.keys()) )
         for k,v in d1.items():
             self.assertEqual( type(v), type(d2[k]), "Types [%r] not equal: %s != %s" % (k, type(v), type(d2[k])) )
             self.assertEqual( v, d2[k], "Value [%r] not equal: %r != %r" % (k, v, d2[k]) )
-
 
     def test_worker_registers(self):
         DB = NetworkStateDB()
@@ -121,7 +119,6 @@ class NetstateDBTests(unittest.TestCase):
         self.assertEqual( DB.choose_worker_for_service(svc2)['id'], wid2 )
         DB.worker_set_state( wid1, False )
         self.assertEqual( DB.choose_worker_for_service(svc1), None )
-
 
     def test_host_with_workers(self):
         _hosts = []
@@ -195,7 +192,20 @@ class NetstateDBTests(unittest.TestCase):
         w = DB.choose_worker_for_service("foobar")
         self.assertEqual(w, None)
 
-
+    def test_hostname_update(self):
+        DB = NetworkStateDB()
+        res = DB.host_register("Htest", "10.20.30.40:3456")
+        # check whats registered
+        hi = DB.host_info("Htest")
+        self.assertEqual( hi['hostname'], None )
+        # change hostname
+        DB.host_set_hostname("Htest","host_234")
+        hi = DB.host_info("Htest")
+        self.assertEqual( hi['hostname'], "host_234" )
+        # check host database
+        hl = list( DB.host_list() )
+        self.assertEqual(len(hl),1)
+        self.assertEqual( hl[0]['hostname'], "host_234" )
 
 
 if __name__ == '__main__':
