@@ -743,8 +743,8 @@ class KasayaNetworkSync(NetworkSync):
             }
             res.append(msg)
         for s in self.DB.service_list(self.ID):
-            w['ptype'] = _SERVICE_ADD
-            res.append(w)
+            s['ptype'] = _SERVICE_ADD
+            res.append(s)
         return res
 
     def remote_host_reset_state(self, host_id):
@@ -773,7 +773,7 @@ class KasayaNetworkSync(NetworkSync):
             self.DB.service_add(host_id, data['service'])
         elif pt==_SERVICE_DEL:
             # service delete
-            self.DB.service_add(host_id, data['service'])
+            self.DB.service_del(host_id, data['service'])
 
 
     # kasaya single changes
