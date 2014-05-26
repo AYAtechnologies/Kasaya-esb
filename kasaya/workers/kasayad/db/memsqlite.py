@@ -96,8 +96,13 @@ class MemoryDB(BaseDB):
         self.SEMA.acquire()
         try:
             self.cur.execute(
+                "SELECT name FROM services WHERE host_id=? AND name=?",
+                (host_id, name) )
+            if len( self.cur.fetchall() )>0:
+                return
+            self.cur.execute(
                 "INSERT INTO services ('host_id','name') VALUES (?,?)",
-                (host_id, name))
+                (host_id, name) )
             self.__db.commit()
         finally:
             self.SEMA.release()

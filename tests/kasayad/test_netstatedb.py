@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasatest/bin/python
+#!/home/moozg/venvs/kasa/bin/python
 #coding: utf-8
-#!/home/moozg/venvs/kasa33/bin/python
+#!/home/moozg/venvs/kasatest/bin/python
 from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 # misc
