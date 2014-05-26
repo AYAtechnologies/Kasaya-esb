@@ -130,14 +130,14 @@ class KasayaTestPool(object):
 
 class NetSyncTest(unittest.TestCase):
 
-    def test_counters(self):
+    def _test_counters(self):
         ns = KasayaNullSync(None, "ownid")
         self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
         ns.set_counter("h", 10 )
         self.assertEqual( ns.is_local_state_actual("h",  9), True  )
         self.assertEqual( ns.is_local_state_actual("h", 11), False )
 
-    def test_broadcast(self):
+    def _test_broadcast(self):
         pool = KasayaTestPool()
         pool.disable_forwarding = True # don't use forwarding
         pool.new_host()
@@ -165,7 +165,7 @@ class NetSyncTest(unittest.TestCase):
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
 
-    def test_peer_chooser(self):
+    def _test_peer_chooser(self):
         pool = KasayaTestPool()
         pool.disable_broadcast = False
         pool.disable_forwarding = True
@@ -223,7 +223,7 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["C","E"], peers )
 
-    def test_inter_host_sync(self):
+    def _test_inter_host_sync(self):
         pool = KasayaTestPool()
         # silent host creation (without broadcast and forwarding info)
         pool.disable_forwarding = True
@@ -292,7 +292,7 @@ class NetSyncTest(unittest.TestCase):
             kh-=set( (myid,) )
             self.assertEqual( kh, set(pool[p].known_hosts()) )
 
-    def test_host_leave(self):
+    def _test_host_leave(self):
         pool = KasayaTestPool()
         #pool.disable_forwarding = True
         #pool.disable_broadcast = True
@@ -327,27 +327,23 @@ class NetSyncTest(unittest.TestCase):
 
         # one host is closing...
         host = pool[  random.choice(pool.keys())  ]
-        print host
-        host.distribute_payload( {'fululu':'umcykcyk','color':4} )
+        waddr = "tcp://123.234.34.45:5001"
+        host.local_worker_add("W01","test", waddr)
         gevent.wait()
 
+        # check if worker known on each host
+        for p in pool.keys():
+            p = pool[p]
+            nfo = p.DB.worker_get("W01")
+            if p.ID==host.ID:
+                self.assertEqual(nfo, None)
+            else:
+                self.assertEqual(nfo['service'], "test")
+                self.assertEqual(nfo['addr'], waddr)
+                self.assertEqual(nfo['host_id'], host.ID)
 
-
-
-        print "sends", pool.send_counter
-        #print changing_host
-
-
-        #should_know = set(pool.keys()) - set( (exiting_host,) )
-        #pool[exiting_host].close()
-        #gevent.wait()
-
-        # check all other hosts are deregistered exiting host
-        #for p in pool.keys():
-        #    if p==exiting_host:
-        #        continue
-        #    kh = set(pool[p].known_hosts())
-        #    self.assertEqual( kh, should_know - set([p]) )
+        host.local_worker_del("W01")
+        gevent.wait()
 
 
 if __name__ == '__main__':
