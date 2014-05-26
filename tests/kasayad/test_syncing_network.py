@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasatest/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasa/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasatest/bin/python
 from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 
@@ -130,14 +130,14 @@ class KasayaTestPool(object):
 
 class NetSyncTest(unittest.TestCase):
 
-    def _test_counters(self):
+    def test_counters(self):
         ns = KasayaNullSync(None, "ownid")
         self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
         ns.set_counter("h", 10 )
         self.assertEqual( ns.is_local_state_actual("h",  9), True  )
         self.assertEqual( ns.is_local_state_actual("h", 11), False )
 
-    def _test_broadcast(self):
+    def test_broadcast(self):
         pool = KasayaTestPool()
         pool.disable_forwarding = True # don't use forwarding
         pool.new_host()
@@ -165,7 +165,7 @@ class NetSyncTest(unittest.TestCase):
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
 
-    def _test_peer_chooser(self):
+    def test_peer_chooser(self):
         pool = KasayaTestPool()
         pool.disable_broadcast = False
         pool.disable_forwarding = True
@@ -223,7 +223,7 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["C","E"], peers )
 
-    def _test_inter_host_sync(self):
+    def test_inter_host_sync(self):
         pool = KasayaTestPool()
         # silent host creation (without broadcast and forwarding info)
         pool.disable_forwarding = True
@@ -292,7 +292,7 @@ class NetSyncTest(unittest.TestCase):
             kh-=set( (myid,) )
             self.assertEqual( kh, set(pool[p].known_hosts()) )
 
-    def _test_host_leave(self):
+    def test_host_leave(self):
         pool = KasayaTestPool()
         #pool.disable_forwarding = True
         #pool.disable_broadcast = True
@@ -329,6 +329,7 @@ class NetSyncTest(unittest.TestCase):
         host = pool[  random.choice(pool.keys())  ]
         waddr = "tcp://123.234.34.45:5001"
         host.local_worker_add("W01","test", waddr)
+
         gevent.wait()
 
         # check if worker known on each host
@@ -336,14 +337,51 @@ class NetSyncTest(unittest.TestCase):
             p = pool[p]
             nfo = p.DB.worker_get("W01")
             if p.ID==host.ID:
+                # network sync doesn't register own workers/services.
+                # This should be done separately
                 self.assertEqual(nfo, None)
             else:
                 self.assertEqual(nfo['service'], "test")
                 self.assertEqual(nfo['addr'], waddr)
                 self.assertEqual(nfo['host_id'], host.ID)
 
+        # unregister worker
         host.local_worker_del("W01")
         gevent.wait()
+
+        # noone host should know worker
+        for p in pool.keys():
+            p = pool[p]
+            nfo = p.DB.worker_get("W01")
+            self.assertEqual(nfo, None)
+
+        # let's add host with some workers
+        pool.disable_forwarding = True
+        pool.disable_broadcast = True
+        F = pool.new_host()
+        F = pool[F]
+        gevent.wait()
+
+        # add worker to database and distribute
+        F.DB.worker_register(F.ID, "W02", "test", waddr )
+        F.local_worker_add("W02","test", waddr)
+        pool.disable_forwarding = False
+        pool.disable_broadcast = False
+        # send broadcast
+        F._broadcast()
+        gevent.wait()
+
+        # check if all hosts synchronised state
+        for p in pool.keys():
+            p = pool[p]
+            nfo = p.DB.worker_get("W02")
+            self.assertEqual(nfo['service'], "test")
+            self.assertEqual(nfo['addr'], waddr)
+            self.assertEqual(nfo['host_id'], F.ID)
+
+
+
+
 
 
 if __name__ == '__main__':

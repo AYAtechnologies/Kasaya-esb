@@ -115,7 +115,9 @@ class NetworkSync(object):
 
     # internal send and broadcast functions
 
-    def _broadcast(self, counter):
+    def _broadcast(self, counter=None):
+        if counter is None:
+            counter = self.counter
         msg = {
             'SMSG' : _MSG_BROADCAST,
             'sender_id': self.ID,
@@ -343,7 +345,6 @@ class NetworkSync(object):
         self.counter += 1
         self._host_payload_forwarder(self.ID, self.counter, data)
         #self.remote_payload_process(self.ID, data)
-
 
     # remote host changed state
     def host_remote_payload(self, host_id, counter, data, sender_id=None):
@@ -734,14 +735,22 @@ class KasayaNetworkSync(NetworkSync):
     def build_local_state_report(self):
         res = []
         for w in self.DB.worker_list(self.ID):
-            w['ptype'] = _WORKER_ADD
-            res.append(w)
+            msg = {
+                'ptype'      : _WORKER_ADD,
+                'worker_id'  : w['id'],
+                'service'    : w['service'],
+                'worker_addr': w['addr'],
+            }
+            res.append(msg)
         for s in self.DB.service_list(self.ID):
             w['ptype'] = _SERVICE_ADD
             res.append(w)
         return res
 
     def remote_host_reset_state(self, host_id):
+        """
+        reset database
+        """
         self.DB.host_clean(host_id)
 
     def remote_payload_process(self, host_id, data):
