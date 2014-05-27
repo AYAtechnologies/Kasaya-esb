@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasa/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasatest/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasa/bin/python
 from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 
@@ -43,10 +43,16 @@ class KasayaFakeSync(KasayaNetworkSync):
     def send_broadcast(self, msg):
         if self.TP.disable_broadcast:
             return
-        g = gevent.Greenlet( self.TP.send_broadcast, msg)
-        g.start()
+        self.TP.send_broadcast( msg )
 
     def send_message(self, addr, msg):
+        if not self.TP.link_accept is None:
+            fnc = self.TP.link_accept
+            dst = self.TP._get_host_for_ip(addr)
+            if not fnc(self.ID, dst.ID):
+                raise Exception("connection lost")
+        #gevent.sleep()
+        #self.TP.send_message( addr, msg )
         g = gevent.Greenlet( self.TP.send_message, addr, msg)
         g.start()
 
@@ -71,6 +77,7 @@ class KasayaTestPool(object):
         # stats
         self.send_counter = 0
         self.broadcast_counter = 0
+        self.link_accept = None
 
 
     # be like dict
@@ -128,16 +135,25 @@ class KasayaTestPool(object):
 
 
 
+
+
 class NetSyncTest(unittest.TestCase):
 
-    def test_counters(self):
+    def _test_counters(self):
         ns = KasayaNullSync(None, "ownid")
         self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
         ns.set_counter("h", 10 )
         self.assertEqual( ns.is_local_state_actual("h",  9), True  )
         self.assertEqual( ns.is_local_state_actual("h", 11), False )
+        # can bump version?
+        self.assertEqual( ns.can_bump_local_state("h",10) , False )
+        self.assertEqual( ns.can_bump_local_state("h",11) , True )
+        self.assertEqual( ns.can_bump_local_state("h",12) , False )
+        # is known?
+        self.assertEqual( ns.is_host_known("h"), True )
+        self.assertEqual( ns.is_host_known("e"), False )
 
-    def test_broadcast(self):
+    def _test_broadcast(self):
         pool = KasayaTestPool()
         pool.disable_forwarding = True # don't use forwarding
         pool.new_host()
@@ -165,7 +181,7 @@ class NetSyncTest(unittest.TestCase):
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
 
-    def test_peer_chooser(self):
+    def _test_peer_chooser(self):
         pool = KasayaTestPool()
         pool.disable_broadcast = False
         pool.disable_forwarding = True
@@ -223,7 +239,7 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["C","E"], peers )
 
-    def test_inter_host_sync(self):
+    def _test_inter_host_sync(self):
         pool = KasayaTestPool()
         # silent host creation (without broadcast and forwarding info)
         pool.disable_forwarding = True
@@ -292,7 +308,7 @@ class NetSyncTest(unittest.TestCase):
             kh-=set( (myid,) )
             self.assertEqual( kh, set(pool[p].known_hosts()) )
 
-    def test_host_leave(self):
+    def _test_host_leave(self):
         pool = KasayaTestPool()
         #pool.disable_forwarding = True
         #pool.disable_broadcast = True
@@ -315,7 +331,7 @@ class NetSyncTest(unittest.TestCase):
             kh = set(pool[p].known_hosts())
             self.assertEqual( kh, should_know - set([p]) )
 
-    def test_host_change(self):
+    def _test_host_change(self):
         pool = KasayaTestPool()
         pool.new_host()
         pool.new_host()
@@ -396,7 +412,38 @@ class NetSyncTest(unittest.TestCase):
             nfo = [ s['service'] for s in p.DB.service_list(F.ID) ]
             self.assertEqual( len(nfo), 0 )
 
+    def _test_node_connection_error(self):
+        # add simulation of single node connection problem
+        # host will not receive any messages and should
+        # fully synchronise after connection back
+        pass
 
+    def test_host_loose_connection(self):
+        pool = KasayaTestPool()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        gevent.wait()
+        # simulate network split
+        # hosts A,B,C and D,E,F can't send messages
+        def network_split(src, dst):
+            if (src in "ABC") and (dst in "DEF"):
+                return False
+            if (src in "DEF") and (dst in "ABC"):
+                return False
+            return True
+        pool.link_accept = network_split
+
+        # add worker to host
+        host = pool["B"]
+        waddr = "tcp://196.168.99.100:5000"
+        host.local_worker_add("W01", "test", waddr)
+        gevent.wait()
 
 
 

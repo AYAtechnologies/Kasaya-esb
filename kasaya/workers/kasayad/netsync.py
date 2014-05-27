@@ -21,6 +21,7 @@ _MSG_PING       = "p"
 _MSG_BROADCAST  = "bc"
 _MSG_HOST_JOIN  = "hj"
 _MSG_HOST_LEAVE = "hl"
+_MSG_HOST_DIED  = "hd"
 _MSG_FULL_STATE_REQUEST = "sr"
 _MSG_FULL_STATE = "fs"
 _MSG_PAYLOAD    = "hp"
@@ -36,6 +37,7 @@ class NetworkSync(object):
         self.online = True # always True until close is called
         self._broadcast(0) # counter=0 means out of sync state
         self.counters = {}
+        self.lost_hosts = {}
 
         self.FULL_SYNC_DELAY = 3
 
@@ -44,6 +46,7 @@ class NetworkSync(object):
             _MSG_BROADCAST   : self.on_broadcast,
             _MSG_HOST_JOIN   : self.on_host_join,
             _MSG_HOST_LEAVE  : self.on_host_leave,
+            _MSG_HOST_DIED   : self.on_host_died,
             _MSG_FULL_STATE_REQUEST : self.on_full_sync_request,
             _MSG_FULL_STATE  : self.on_host_full_state,
             _MSG_PAYLOAD     : self.on_incoming_payload,
@@ -127,16 +130,18 @@ class NetworkSync(object):
         if self.online:
             self.send_broadcast(msg)
 
-    def _send(self, addr, msg):
+    def _send(self, addr, msg, noreports=False):
         """
         Add sender ID and send message to specified address or list of addresses
         """
         msg['sender_id'] = self.ID
-        #if type(addr) in (list, tuple):
-        #    for a in addr:
-        #        self.send_message(addr, msg)
-        #else:
-        self.send_message(addr, msg)
+        try:
+            self.send_message(addr, msg)
+            return
+        except Exception:
+            pass
+        if not noreports:
+            self.report_connection_error(host_addr=addr)
 
     # top level logic methods
 
@@ -336,6 +341,42 @@ class NetworkSync(object):
         addr = self.hostid2addr(host_id)
         self.send_full_sync_request(addr)
 
+    def host_died(self, host_id):
+        """
+        Called when remote host died unexpectly.
+        """
+        if not self.is_host_known(host_id):
+            return
+        print "host %s is died" % host_id
+        self.remote_host_exit(host_id)
+        del self.counters[host_id]
+        #self._host_died_forwarder(host_id)
+    def _host_died_forwarder(self, host_id, sender_id=None ):
+        if self._disable_forwarding: return
+        for hid in self._peer_chooser( (host_id, sender_id) ):
+            self.send_host_died(
+                self.hostid2addr( hid ),
+                host_id,
+            )
+
+
+    def report_connection_error(self, host_addr=None):
+        """
+        Call this function if destination address is unavailable.
+        This function will try to connect to host again, if connection is also unavailable,
+        then host is reported as dead.
+        """
+        hnfo = self.addr2hostid(host_addr)
+        if hnfo is None:
+            return
+        hid = hnfo['id']
+        if hid in self.lost_hosts:
+            self.host_died(hid)
+            return
+        self.lost_hosts[hid]=time()
+        self.send_ping(hnfo['addr'])
+
+
     # sending local properties to all hosts
     def distribute_change(self, data):
         """
@@ -382,12 +423,13 @@ class NetworkSync(object):
             )
 
     # network input / output methods
-    def send_ping(self, addr):
+    def send_ping(self, addr, noreports=False):
         """
-        Send ping to host
+        Send ping to host.
+        noreports parameter is used to disable broken connection reporting.
         """
         msg = { "SMSG":_MSG_PING }
-        self._send(addr, msg)
+        self._send(addr, msg, noreports=noreports)
 
     def on_ping(self, addr, msg):
         """
@@ -412,12 +454,7 @@ class NetworkSync(object):
     def on_host_join(self, addr, msg):
         """
         New host joined network.
-        message type: authoritative
-
-        msg - message body
-        addr - sender address
         message fields:
-            sender_id - sending host
             host_id - id of host which joined network
             counter - host status counter
         """
@@ -444,7 +481,6 @@ class NetworkSync(object):
     def on_host_leave(self, addr, msg):
         """
         Host leaves network
-        message type: authoritative
         """
         self.host_leave( msg['host_id'], msg['counter'], msg['sender_id'] )
 
@@ -465,27 +501,21 @@ class NetworkSync(object):
     def on_host_died(self, addr, msg):
         """
         Host died without leaving network.
-        message type: non-authoritative
-
-        Message properties:
-            sender_id - sending host
-            host_id - id of host wchih died
-            counter - last known host counter
-        if local stored counter is lower or
         """
-        pass
+        self.host_died( msg['host_id'] )
 
     def send_host_died(self, addr, hostid):
         msg = {
+            "SMSG"    : _MSG_HOST_DIED,
             "host_id" : hostid,
         }
+        self._send( addr, msg )
 
     # host change state
 
     def on_incoming_payload(self, addr, msg):
         """
         Host changed property
-        message type: authoritative
         """
         self.host_remote_payload(
             msg['host_id'],
@@ -511,26 +541,6 @@ class NetworkSync(object):
         Sends only known counter of host. Used when detected that remote host holds obsolete state.
         """
         self.send_host_proprty_set(addr, hostid, counter, None)
-
-    def on_worker_died(self, addr, msg):
-        """
-        Detected remote worker death.
-        message type: non-authoritative
-        This message should be received by host on wchih run worker.
-            sender_id - who detected worker death and send this message
-            worker_id - wchich worker died
-        """
-        pass
-
-    def send_worker_died(self, addr, hostid, workerid):
-        """
-        Send information about worker death
-        """
-        msg = {
-            "host_id"   : hostid,
-            "workerid" : workerid,
-        }
-        self._send(addr, msg)
 
     # full sync request and report
 
@@ -638,6 +648,12 @@ class NetworkSync(object):
         """
         raise NotImplementedError
 
+    def addr2hostid(self, addr):
+        """
+        Reverse conversion: get host ID for address
+        """
+        raise NotImplementedError
+
     def remote_host_join(self, host_id, host_addr, hostname=None):
         """
         Remote host joined network. Hostname can be unknown.
@@ -713,6 +729,11 @@ class KasayaNetworkSync(NetworkSync):
 
     def hostid2addr(self, id):
         return self.DB.host_addr_by_id( id )
+
+    def addr2hostid(self, addr):
+        for h in self.DB.host_list():
+            if h['addr']==addr:
+                return h
 
     # expand property set/del to registering services and workers
     def remote_host_join(self, host_id, host_addr, hostname):
