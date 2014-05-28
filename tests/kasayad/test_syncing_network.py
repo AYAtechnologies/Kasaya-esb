@@ -43,7 +43,7 @@ class KasayaFakeSync(KasayaNetworkSync):
     def send_broadcast(self, msg):
         if self.TP.disable_broadcast:
             return
-        self.TP.send_broadcast( msg )
+        self.TP.send_broadcast( self.ID, msg )
 
     def send_message(self, addr, msg):
         if not self.TP.link_accept is None:
@@ -120,10 +120,17 @@ class KasayaTestPool(object):
         raise KeyError("Host with ip %s not found" % ip)
 
     # fake network operations
-    def send_broadcast(self, msg):
+    def send_broadcast(self, sender, msg):
+        fnc = self.link_accept
         senderaddr = self._get_ip_for_host( msg['sender_id'] )
         self.broadcast_counter += 1
         for host in self.hosts.values():
+            # broken network simulation
+            if not fnc is None:
+                dst = host.ID
+                if not fnc(sender, dst):
+                    continue
+            # send
             g = gevent.Greenlet( host.receive_message, senderaddr, msg )
             g.start()
 
@@ -139,7 +146,7 @@ class KasayaTestPool(object):
 
 class NetSyncTest(unittest.TestCase):
 
-    def _test_counters(self):
+    def test_counters(self):
         ns = KasayaNullSync(None, "ownid")
         self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
         ns.set_counter("h", 10 )
@@ -153,7 +160,7 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( ns.is_host_known("h"), True )
         self.assertEqual( ns.is_host_known("e"), False )
 
-    def _test_broadcast(self):
+    def test_broadcast(self):
         pool = KasayaTestPool()
         pool.disable_forwarding = True # don't use forwarding
         pool.new_host()
@@ -181,7 +188,7 @@ class NetSyncTest(unittest.TestCase):
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
 
-    def _test_peer_chooser(self):
+    def test_peer_chooser(self):
         pool = KasayaTestPool()
         pool.disable_broadcast = False
         pool.disable_forwarding = True
@@ -239,7 +246,7 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( len(peers), 2 )
         self.assertItemsEqual( ["C","E"], peers )
 
-    def _test_inter_host_sync(self):
+    def test_inter_host_sync(self):
         pool = KasayaTestPool()
         # silent host creation (without broadcast and forwarding info)
         pool.disable_forwarding = True
@@ -308,7 +315,7 @@ class NetSyncTest(unittest.TestCase):
             kh-=set( (myid,) )
             self.assertEqual( kh, set(pool[p].known_hosts()) )
 
-    def _test_host_leave(self):
+    def test_host_leave(self):
         pool = KasayaTestPool()
         #pool.disable_forwarding = True
         #pool.disable_broadcast = True
@@ -331,7 +338,7 @@ class NetSyncTest(unittest.TestCase):
             kh = set(pool[p].known_hosts())
             self.assertEqual( kh, should_know - set([p]) )
 
-    def _test_host_change(self):
+    def test_host_change(self):
         pool = KasayaTestPool()
         pool.new_host()
         pool.new_host()
@@ -418,23 +425,27 @@ class NetSyncTest(unittest.TestCase):
         # fully synchronise after connection back
         pass
 
-    def test_host_loose_connection(self):
+    def test_network_split(self):
         pool = KasayaTestPool()
+        # A,B,C hosts
         pool.new_host()
         pool.new_host()
         pool.new_host()
-        pool.new_host()
-        pool.new_host()
+        # D,E,F hosts
         pool.new_host()
         pool.new_host()
         pool.new_host()
         gevent.wait()
+
         # simulate network split
-        # hosts A,B,C and D,E,F can't send messages
+        # hosts A,B,C and D,E,F,G can't send messages
         def network_split(src, dst):
-            if (src in "ABC") and (dst in "DEF"):
+            """
+            drops messages between two halfs of network
+            """
+            if (src in "ABC") and (dst in "DEFG"):
                 return False
-            if (src in "DEF") and (dst in "ABC"):
+            if (src in "DEFG") and (dst in "ABC"):
                 return False
             return True
         pool.link_accept = network_split
@@ -442,8 +453,51 @@ class NetSyncTest(unittest.TestCase):
         # add worker to host
         host = pool["B"]
         waddr = "tcp://196.168.99.100:5000"
+        host.DB.worker_register(host.ID, "W01", "test", waddr )
         host.local_worker_add("W01", "test", waddr)
         gevent.wait()
+
+        # check if ABC hosts know only half of network
+        for p in "ABC":
+            p = pool[p]
+            for p2 in "ABC":
+                if p.ID==p2:
+                    continue
+                self.assertEqual( p.is_host_known(p2), True )
+
+            for p2 in "DEF":
+                self.assertEqual( p.is_host_known(p2), False )
+
+        # check if all hosts know new worker on B
+        for p in "ABC":
+            p = pool[p]
+            wrkr = p.DB.worker_get("W01")
+            self.assertEqual(wrkr['host_id'], host.ID)
+
+        # adding new host to splitted network (to DEF set)
+        pool.new_host()
+        gevent.wait()
+        for p in pool.keys():
+            kh = pool[p].known_hosts()
+            if p in "ABC":
+                self.assertItemsEqual( kh, set("ABC")-set(p) )
+            else:
+                self.assertItemsEqual( kh, set("DEFG")-set(p) )
+
+        # Joining back splitted network
+        pool.link_accept=None
+
+        # send message from host in one half to other half of network
+        # from G to A
+        pool["G"].send_ping( pool._get_ip_for_host("A") )
+        gevent.wait()
+
+        # now all hosts should know all others and should know information about worker W01
+        for p in pool.keys():
+            p = pool[p]
+            self.assertItemsEqual( p.known_hosts(), set(pool.keys()) - set([p.ID]) )
+            wrkr = p.DB.worker_get("W01")
+            self.assertEqual(wrkr['host_id'], host.ID)
 
 
 

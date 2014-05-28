@@ -91,6 +91,10 @@ class NetworkSync(object):
             # invalid message
             return
 
+        if sid in self.lost_hosts:
+            # host is not dead
+            del self.lost_hosts[sid]
+
         if sid==self.ID:
             # ignoring own messages
             return
@@ -111,7 +115,7 @@ class NetworkSync(object):
         # check sender in delay
         # skip checking for messages about joining and leaving network
         # if message is coming from host wchih is joining/leaving
-        if msg['SMSG'] in (_MSG_HOST_JOIN, _MSG_HOST_LEAVE):
+        if msg['SMSG'] in (_MSG_HOST_JOIN, _MSG_HOST_LEAVE, _MSG_HOST_DIED):
             if sid==msg['host_id']:
                 return
         self.delay( None, self.check_sender, sender_addr, sid )
@@ -130,7 +134,7 @@ class NetworkSync(object):
         if self.online:
             self.send_broadcast(msg)
 
-    def _send(self, addr, msg, noreports=False):
+    def _send(self, addr, msg):
         """
         Add sender ID and send message to specified address or list of addresses
         """
@@ -140,8 +144,7 @@ class NetworkSync(object):
             return
         except Exception:
             pass
-        if not noreports:
-            self.report_connection_error(host_addr=addr)
+        self.report_connection_error(host_addr=addr)
 
     # top level logic methods
 
@@ -263,6 +266,10 @@ class NetworkSync(object):
         # Because we doesn't know current state of new host, we can't just set
         # counter, we need to do full sync first.
         self.set_counter(host_id, 0)
+        try:
+            del self.lost_hosts[host_id]
+        except KeyError:
+            pass
 
         self.remote_host_join(host_id, host_addr, hostname )
         self.delay(
@@ -299,6 +306,10 @@ class NetworkSync(object):
             return
         # unregister and delete host data
         #self.set_counter(host_id, counter)
+        try:
+            del self.lost_hosts[host_id]
+        except KeyError:
+            pass
         self.remote_host_exit(host_id)
         del self.counters[host_id]
         # notify neighbours
@@ -347,18 +358,16 @@ class NetworkSync(object):
         """
         if not self.is_host_known(host_id):
             return
-        print "host %s is died" % host_id
         self.remote_host_exit(host_id)
         del self.counters[host_id]
-        #self._host_died_forwarder(host_id)
-    def _host_died_forwarder(self, host_id, sender_id=None ):
+        self._host_died_forwarder(host_id)
+    def _host_died_forwarder(self, host_id, sender_id=None):
         if self._disable_forwarding: return
         for hid in self._peer_chooser( (host_id, sender_id) ):
             self.send_host_died(
                 self.hostid2addr( hid ),
                 host_id,
             )
-
 
     def report_connection_error(self, host_addr=None):
         """
@@ -423,13 +432,13 @@ class NetworkSync(object):
             )
 
     # network input / output methods
-    def send_ping(self, addr, noreports=False):
+    def send_ping(self, addr):
         """
         Send ping to host.
         noreports parameter is used to disable broken connection reporting.
         """
         msg = { "SMSG":_MSG_PING }
-        self._send(addr, msg, noreports=noreports)
+        self._send(addr, msg)
 
     def on_ping(self, addr, msg):
         """
