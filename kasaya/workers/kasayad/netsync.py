@@ -53,7 +53,8 @@ class NetworkSync(object):
         }
 
         # internal switches
-        self._disable_forwarding = False    # disable forwarding of messages to other hosts
+        self._disable_forwarding = False  # disable forwarding of messages to other hosts
+        self._disable_reping = False      # disable ping with counter after registering new host
 
     def close(self):
         """
@@ -289,9 +290,14 @@ class NetworkSync(object):
         # after some time send to newly joined host ping
         # with own counter state. This is usefull after
         # reconnecting host which previously loosed connection
-        #if from_broadcast:
+        if not self._disable_reping:
+            print "reping"
+            self.delay(
+                self.FULL_SYNC_DELAY*2,
+                self.send_ping,
+                host_addr
+            )
 
-        self.send_ping( host_addr )
         # send notification to neighboors
         if self._disable_forwarding:
             return
@@ -305,6 +311,7 @@ class NetworkSync(object):
                 counter,
                 hostname
             )
+
 
     def host_leave(self, host_id, counter, sender_id=None):
         """
@@ -453,7 +460,6 @@ class NetworkSync(object):
             "SMSG"    : _MSG_PING,
             "counter" : self.counter,
         }
-        print self.ID, "send ping..."
         self._send(addr, msg)
 
     def on_ping(self, addr, msg):

@@ -38,6 +38,12 @@ class KasayaFakeSync(KasayaNetworkSync):
         pass
     _disable_forwarding = property(_get_disable_forwarding,_set_disable_forwarding)
 
+    def _get_disable_reping(self):
+        return self.TP.disable_reping
+    def _set_disable_reping(self, value):
+        pass
+    _disable_reping = property(_get_disable_reping,_set_disable_reping)
+
     # redirect network operation to test pool which simulate network operations
 
     def send_broadcast(self, msg):
@@ -64,24 +70,11 @@ class KasayaFakeSync(KasayaNetworkSync):
         print self.ID, "remote delete", host_id, key
 
 
-def PKH(host):
-    """
-    Print Known Hosts
-    """
-    hosts = host.TP.keys()
-    hosts.sort()
-    print host.ID,"-> [",
-    for h in hosts:
-        if h in host.known_hosts():
-            print h,
-        else:
-            print " ",
-    print "]"
-
 class KasayaTestPool(object):
 
     def __init__(self):
         self.disable_forwarding = False
+        self.disable_reping = False
         self.hosts = {}
         self.__ips = {}  # ip address map
         self.__cnt = 0
@@ -93,8 +86,7 @@ class KasayaTestPool(object):
         self.broadcast_counter = 0
         self.link_accept = None
 
-
-    # be like dict
+    # To be like a dict...
     def keys(self):
         return self.hosts.keys()
     def values(self):
@@ -105,7 +97,6 @@ class KasayaTestPool(object):
         return self.hosts[k]
     def items(self):
         return self.hosts.items()
-
 
     def new_host(self, hid=None):
         if hid is None:
@@ -156,11 +147,25 @@ class KasayaTestPool(object):
         self.send_counter+=1
         host.receive_message(senderaddr, msg)
 
+    def PKH(self, host):
+        """
+        Print Known Hosts
+        """
+        hosts = host.TP.keys()
+        hosts.sort()
+        print host.ID,"-> [",
+        for h in hosts:
+            if h in host.known_hosts():
+                print h,
+            else:
+                print " ",
+        print "]"
+
     def PP(self):
         hl = self.keys()
         hl.sort()
         for h in hl:
-            PKH(self[h])
+            self.PKH(self[h])
 
 
 
@@ -180,9 +185,11 @@ class NetSyncTest(unittest.TestCase):
         self.assertEqual( ns.is_host_known("h"), True )
         self.assertEqual( ns.is_host_known("e"), False )
 
-    def _test_broadcast(self):
+    def test_broadcast(self):
         pool = KasayaTestPool()
         pool.disable_forwarding = True # don't use forwarding
+        pool.disable_reping = True
+        pool.disable_reping = True
         pool.new_host()
         pool.new_host()
         pool.new_host()
@@ -207,6 +214,7 @@ class NetSyncTest(unittest.TestCase):
                     status, shouldbe,
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
+        print "sends:",pool.send_counter, "broadcasts:",pool.broadcast_counter
 
     def _test_peer_chooser(self):
         pool = KasayaTestPool()
@@ -267,7 +275,9 @@ class NetSyncTest(unittest.TestCase):
         self.assertItemsEqual( ["C","E"], peers )
 
     def test_inter_host_sync(self):
+        gevent.wait()
         pool = KasayaTestPool()
+        pool.disable_reping = True
         # silent host creation (without broadcast and forwarding info)
         pool.disable_forwarding = True
         pool.disable_broadcast = True
@@ -279,29 +289,20 @@ class NetSyncTest(unittest.TestCase):
         pool.new_host()
         pool.new_host()
         gevent.wait() # alow all hosts to synchronize
-
-        def disable_ping(src,dst,msgtype):
-            if msgtype=="p":
-                return False
-            return True
-        pool.link_accept = disable_ping
-
         # before broadcast hosts doesn't know about others
         for hid, host in pool.items():
             self.assertEqual( len( host.known_hosts() ), 0 )
-
         # send broadcast from one host
         pool.disable_broadcast = False
         bchost = random.choice(pool.keys())
         bchost = pool[bchost]
-        bchost._broadcast(0)
+        bchost._broadcast()
         # broadcast should result in requests from hosts about new host state
         # after this all hosts should know new host, and new host should know
         # all other hosts.
         gevent.wait()
-        print
-        print bchost
         pool.PP()
+        print "sends:",pool.send_counter, "broadcasts:",pool.broadcast_counter
         # each host should know broadcasting host
         # and broadcasting host should know all others
         for hid, host in pool.items():
@@ -309,7 +310,7 @@ class NetSyncTest(unittest.TestCase):
 
             if (hid!=bchost.ID):
                 kh = host.known_hosts()
-                #self.assertEqual( len(kh), 1 ) # one known host
+                self.assertEqual( len(kh), 1 ) # one known host
                 self.assertIn( bchost.ID, kh ) # broadcasting one
             else:
                 # broadcasting host should know all others
@@ -325,14 +326,7 @@ class NetSyncTest(unittest.TestCase):
         pool.disable_broadcast = True
         pool.disable_forwarding = True
         nh = pool.new_host()
-        #print "-"*30
-        #print "CREATED:",nh
-        #print "KNOWN POOLS",pool.keys()
-
         gevent.wait()
-        print
-        print bchost
-        pool.PP()
 
         self.assertEqual( len(pool[nh].known_hosts()), 0 )
         # now, we send from new host single message to one random host
@@ -343,7 +337,6 @@ class NetSyncTest(unittest.TestCase):
         peers.sort()
         target = random.choice( peers )
         # send ping to initiate host registering and p2p messages
-        pool.link_accept = None
         pool[nh].send_ping( pool._get_ip_for_host(target) )
         gevent.wait()
         # after full sync each host should know all other hosts
