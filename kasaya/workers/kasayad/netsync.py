@@ -17,14 +17,14 @@ other fields
   hostname - remote host hostname
   counter - last known counter for _MSG_BROADCAST
 """
-_MSG_PING       = "p"
-_MSG_BROADCAST  = "bc"
-_MSG_HOST_JOIN  = "hj"
-_MSG_HOST_LEAVE = "hl"
-_MSG_HOST_DIED  = "hd"
-_MSG_FULL_STATE_REQUEST = "sr"
-_MSG_FULL_STATE = "fs"
-_MSG_PAYLOAD    = "hp"
+_MSG_PING           = "p"
+_MSG_BROADCAST      = "bc"
+_MSG_HOST_JOIN      = "hj"
+_MSG_HOST_LEAVE     = "hl"
+_MSG_HOST_DIED      = "hd"
+_MSG_FULL_STATE_REQ = "sr"
+_MSG_FULL_STATE     = "fs"
+_MSG_PAYLOAD        = "hp"
 
 
 class NetworkSync(object):
@@ -42,18 +42,14 @@ class NetworkSync(object):
         self.FULL_SYNC_DELAY = 3
 
         self._methodmap = {
-            _MSG_PING        : self.on_ping,
-            _MSG_BROADCAST   : self.on_broadcast,
-            _MSG_HOST_JOIN   : self.on_host_join,
-            _MSG_HOST_LEAVE  : self.on_host_leave,
-            _MSG_HOST_DIED   : self.on_host_died,
-            _MSG_FULL_STATE_REQUEST : self.on_full_sync_request,
-            _MSG_FULL_STATE  : self.on_host_full_state,
-            _MSG_PAYLOAD     : self.on_incoming_payload,
-            #"hd" : self.on_host_died,
-            #"wd" : self.on_worker_died,
-            #"sr" : self.on_full_sync_request,
-            #"hs" : self.on_host_full_state,
+            _MSG_PING           : self.on_ping,
+            _MSG_BROADCAST      : self.on_broadcast,
+            _MSG_HOST_JOIN      : self.on_host_join,
+            _MSG_HOST_LEAVE     : self.on_host_leave,
+            _MSG_HOST_DIED      : self.on_host_died,
+            _MSG_FULL_STATE_REQ : self.on_full_sync_request,
+            _MSG_FULL_STATE     : self.on_host_full_state,
+            _MSG_PAYLOAD        : self.on_incoming_payload,
         }
 
         # internal switches
@@ -250,7 +246,7 @@ class NetworkSync(object):
         #   do something in such case
         return False
 
-    def host_join(self, host_addr, host_id, counter, hostname=None, sender_id=None):
+    def host_join(self, host_addr, host_id, counter, hostname=None, sender_id=None, from_broadcast=False):
         """
         Detected new host in network (from broadcast, first connection or passef from other host)
             host_addr - new host address
@@ -260,8 +256,21 @@ class NetworkSync(object):
             sender_id - who is sending message (sender host id)
         """
         if self.is_host_known(host_id):
-            # we already know that host, exit
+            # host is known
+            if from_broadcast:
+                # incoming broadcast can notify about new state of host
+                # if we have old state (but not initial=0, then in near future
+                # we can check remote host for new state, and update it
+                hc = self.counters[host_id][0]
+                if hc==0: return
+                if hc<counter:
+                    # remote host has newer state than we already know
+                    # check new state in near future
+                    self.delay(self.FULL_SYNC_DELAY,
+                        self._host_check_is_sync_required, host_id, counter
+                    )
             return
+
         # new host is joined
         # Because we doesn't know current state of new host, we can't just set
         # counter, we need to do full sync first.
@@ -277,14 +286,18 @@ class NetworkSync(object):
             self._host_check_is_sync_required, host_id, counter
         )
 
+        # after some time send to newly joined host ping
+        # with own counter state. This is usefull after
+        # reconnecting host which previously loosed connection
+        #if from_broadcast:
+
+        self.send_ping( host_addr )
         # send notification to neighboors
         if self._disable_forwarding:
             return
         peers = self._peer_chooser( (host_id, sender_id) )
-        #print "  exclude", host_id, sender_id, "       ",peers
         for p in peers:
             destination = self.hostid2addr(p) # destination host addres
-            #print "  forward",self.ID, "to",p," there is new host: ", host_id
             self.send_host_join(
                 destination,
                 host_id,
@@ -347,7 +360,6 @@ class NetworkSync(object):
           hostname - incoming hostname (not known in accidental incoming message)
         """
         if self.is_local_state_actual(host_id, counter):
-            #print self.ID, "not require syncing"
             return
         addr = self.hostid2addr(host_id)
         self.send_full_sync_request(addr)
@@ -437,14 +449,27 @@ class NetworkSync(object):
         Send ping to host.
         noreports parameter is used to disable broken connection reporting.
         """
-        msg = { "SMSG":_MSG_PING }
+        msg = {
+            "SMSG"    : _MSG_PING,
+            "counter" : self.counter,
+        }
+        print self.ID, "send ping..."
         self._send(addr, msg)
 
     def on_ping(self, addr, msg):
         """
-        Ping does nothing.
+        When received ping, check incoming coutner.
+        Maybye sending host has newer state than we know.
         """
-        pass
+        try:
+            counter = msg['counter']
+        except KeyError:
+            return
+        # schedule remote host counter check
+        self.delay( self.FULL_SYNC_DELAY,
+            self._host_check_is_sync_required,
+            msg['sender_id'], counter
+        )
 
     # joining network
 
@@ -457,7 +482,8 @@ class NetworkSync(object):
             msg['host_id'],
             msg['counter'],
             msg['hostname'],
-            msg['sender_id']
+            msg['sender_id'],
+            from_broadcast=True
         )
 
     def on_host_join(self, addr, msg):
@@ -565,7 +591,7 @@ class NetworkSync(object):
         """
         Send request for full state report from remote host
         """
-        msg = { 'SMSG' : _MSG_FULL_STATE_REQUEST }
+        msg = { 'SMSG' : _MSG_FULL_STATE_REQ }
         self._send(addr, msg)
 
     def on_host_full_state(self, addr, msg):
