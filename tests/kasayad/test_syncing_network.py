@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasa/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasatest/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasa/bin/python
 from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 
@@ -85,6 +85,13 @@ class KasayaTestPool(object):
         self.send_counter = 0
         self.broadcast_counter = 0
         self.link_accept = None
+
+    def status(self):
+        print "DISABLED: ",
+        print "forwarding", self.disable_forwarding,
+        print " reping", self.disable_reping,
+        print " broadcast", self.disable_broadcast
+        print "COUNTERS:  send", self.send_counter, " broadcast", self.broadcast_counter
 
     # To be like a dict...
     def keys(self):
@@ -171,7 +178,7 @@ class KasayaTestPool(object):
 
 class NetSyncTest(unittest.TestCase):
 
-    def _test_counters(self):
+    def test_counters(self):
         ns = KasayaNullSync(None, "ownid")
         self.assertEqual( ns.is_local_state_actual("h",  0), False ) # unknown host, alwasy not actual
         ns.set_counter("h", 10 )
@@ -187,8 +194,8 @@ class NetSyncTest(unittest.TestCase):
 
     def test_broadcast(self):
         pool = KasayaTestPool()
-        pool.disable_forwarding = True # don't use forwarding
-        pool.disable_reping = True
+        pool.disable_forwarding = True
+        pool.disable_broadcast = False
         pool.disable_reping = True
         pool.new_host()
         pool.new_host()
@@ -214,9 +221,8 @@ class NetSyncTest(unittest.TestCase):
                     status, shouldbe,
                     "Host %s, checking status of %s, should be %s" % (host.ID, h, str(shouldbe))
                 )
-        print "sends:",pool.send_counter, "broadcasts:",pool.broadcast_counter
 
-    def _test_peer_chooser(self):
+    def test_peer_chooser(self):
         pool = KasayaTestPool()
         pool.disable_broadcast = False
         pool.disable_forwarding = True
@@ -277,10 +283,10 @@ class NetSyncTest(unittest.TestCase):
     def test_inter_host_sync(self):
         gevent.wait()
         pool = KasayaTestPool()
-        pool.disable_reping = True
-        # silent host creation (without broadcast and forwarding info)
-        pool.disable_forwarding = True
         pool.disable_broadcast = True
+        pool.disable_forwarding = True
+        pool.disable_reping = True
+
         pool.new_host()
         pool.new_host()
         pool.new_host()
@@ -294,16 +300,15 @@ class NetSyncTest(unittest.TestCase):
             self.assertEqual( len( host.known_hosts() ), 0 )
         # send broadcast from one host
         pool.disable_broadcast = False
-        bchost = random.choice(pool.keys())
+        bchost = "E"# random.choice(pool.keys())
         bchost = pool[bchost]
         bchost._broadcast()
         # broadcast should result in requests from hosts about new host state
         # after this all hosts should know new host, and new host should know
         # all other hosts.
         gevent.wait()
-        pool.PP()
-        print "sends:",pool.send_counter, "broadcasts:",pool.broadcast_counter
-        # each host should know broadcasting host
+
+       # each host should know broadcasting host
         # and broadcasting host should know all others
         for hid, host in pool.items():
             kh = host.known_hosts()
@@ -325,6 +330,7 @@ class NetSyncTest(unittest.TestCase):
         # Now we create new host without broadcasting
         pool.disable_broadcast = True
         pool.disable_forwarding = True
+        pool.disable_reping = True
         nh = pool.new_host()
         gevent.wait()
 
@@ -346,7 +352,7 @@ class NetSyncTest(unittest.TestCase):
             kh-=set( (myid,) )
             self.assertEqual( kh, set(pool[p].known_hosts()) )
 
-    def _test_host_leave(self):
+    def test_host_leave(self):
         pool = KasayaTestPool()
         #pool.disable_forwarding = True
         #pool.disable_broadcast = True
@@ -369,7 +375,7 @@ class NetSyncTest(unittest.TestCase):
             kh = set(pool[p].known_hosts())
             self.assertEqual( kh, should_know - set([p]) )
 
-    def _test_host_change(self):
+    def test_host_change(self):
         pool = KasayaTestPool()
         pool.new_host()
         pool.new_host()
@@ -450,7 +456,7 @@ class NetSyncTest(unittest.TestCase):
             nfo = [ s['service'] for s in p.DB.service_list(F.ID) ]
             self.assertEqual( len(nfo), 0 )
 
-    def _test_single_host_connection_error(self):
+    def test_single_host_connection_error(self):
         pool = KasayaTestPool()
         pool.new_host()
         pool.new_host()
@@ -525,7 +531,7 @@ class NetSyncTest(unittest.TestCase):
             wnfo = p.DB.worker_get("W03")
             self.assertEqual(wnfo["id"], "W03" )
 
-    def _test_network_split(self):
+    def test_network_split(self):
         pool = KasayaTestPool()
         # A,B,C hosts
         pool.new_host()

@@ -115,7 +115,7 @@ class NetworkSync(object):
         if msg['SMSG'] in (_MSG_HOST_JOIN, _MSG_HOST_LEAVE, _MSG_HOST_DIED):
             if sid==msg['host_id']:
                 return
-        self.delay( None, self.check_sender, sender_addr, sid )
+        self.delay( self.FULL_SYNC_DELAY/2, self.check_sender, sender_addr, sid )
 
     # internal send and broadcast functions
 
@@ -291,7 +291,6 @@ class NetworkSync(object):
         # with own counter state. This is usefull after
         # reconnecting host which previously loosed connection
         if not self._disable_reping:
-            print "reping"
             self.delay(
                 self.FULL_SYNC_DELAY*2,
                 self.send_ping,
