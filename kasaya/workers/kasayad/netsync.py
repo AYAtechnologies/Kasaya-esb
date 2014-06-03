@@ -267,7 +267,7 @@ class NetworkSync(object):
                 if hc<counter:
                     # remote host has newer state than we already know
                     # check new state in near future
-                    self.delay(self.FULL_SYNC_DELAY,
+                    self.delay(self.FULL_SYNC_DELAY*2,
                         self._host_check_is_sync_required, host_id, counter
                     )
             return
@@ -280,6 +280,10 @@ class NetworkSync(object):
             del self.lost_hosts[host_id]
         except KeyError:
             pass
+
+        # TODO: check address of new host
+        # if it's used by another host, then probably previous host
+        # died and new started in place of previous.
 
         self.remote_host_join(host_id, host_addr, hostname )
         self.delay(

@@ -3,8 +3,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.conf import settings
 from kasaya.core.protocol import messages
 from kasaya.core import exceptions
-#from kasaya.core.lib.binder import get_bind_address
-from kasaya.core.protocol.comm import MessageLoop, send_and_receive_response
+from kasaya.core.protocol.comm import MessageLoop, send_and_receive_response, send
 from kasaya.core.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
 from kasaya.core.lib import LOG, servicesctl
 from kasaya.core.events import add_event_handler, emit
@@ -26,7 +25,6 @@ def _worker_addr( wrkr ):
 class RedirectRequiredEx(RedirectRequiredToAddr):
     def __init__(self, host_id):
         self.remote_id = host_id
-
 
 
 class SyncWorker(object):
@@ -51,6 +49,7 @@ class SyncWorker(object):
         # kasayad <--> kasayad communication
         self.intersync = MessageLoop( 'tcp://0.0.0.0:'+str(settings.KASAYAD_CONTROL_PORT) )
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
+        self.intersync.register_message(messages.NET_SYNC, self.handle_global_control_request)
         # local worker <-> kasayad dialog on public port
         self.intersync.register_message(messages.WORKER_LIVE, self.handle_worker_live)
         self.intersync.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
@@ -82,6 +81,7 @@ class SyncWorker(object):
         Own network address
         """
         return self.intersync.address
+
 
 
     # closing and quitting
@@ -321,8 +321,17 @@ class SyncWorker(object):
         return result
         #return {"message":messages.RESULT, "result":result }
 
+    def handle_kasaya_sync(self, msg):
+        """
+        Syncing network state changes and synchronisation.
+        Translation of incoming host address and passing message to
+        """
+        #result = self.
+        print msg
+        #emit("net-sync", msg['id'], msg['addr'], msg['service'], msg['pid']
 
-
+    def send_kasaya_symc_msg(self, addr, data):
+        send_without_response(addr, messages.net_sync_message(data) )
     # kasayad host tasks
 
 

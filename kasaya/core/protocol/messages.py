@@ -26,6 +26,7 @@ QUERY_MULTI = "sync/mulquery"
 WORKER_ADDR = "wrkr/addr"
 WORKER_REREG = "wrkr/rereg" # requet worker to register again
 CTL_CALL = "wrkr/ctrl" # internal service bus control request
+NET_SYNC = "sync/net" # synchronisation of hosts
 
 # normal client <--> worker messages
 SYNC_CALL = "call/sync" # synchronously call worker taks
@@ -63,6 +64,12 @@ def message_session_id(sid):
         "id" : sid,
     }
 
+
+def net_sync_message(data):
+    return {
+        "message" : NET_SYNC,
+        "data" : data,
+    }
 
 # exceptions
 

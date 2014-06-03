@@ -9,8 +9,10 @@ from kasaya.core.lib import LOG
 import socket
 
 __all__=("ConnectionClosed", "NoData", "decode_addr",
-          "serialize_and_send", "receive_and_deserialize",
-          "send_and_receive", "send_and_receive_response")
+         "send_without_response",
+         #"serialize_and_send",
+         "receive_and_deserialize",
+         "send_and_receive", "send_and_receive_response")
 
 
 # internal exceptions
@@ -138,6 +140,21 @@ def receive_and_deserialize(SOCK, serializer, timeout=None):
 
 # high level
 # ----------
+
+
+def send_without_response(address, message):
+    """
+    address - full destination address (eg: tcp://127.0.0.1:1234)
+    message - message payload (will be automatically serialized)
+    """
+    serializer = Serializer() # <-- serializer is a singleton
+
+    typ, addr, so1, so2 = decode_addr(address)
+    SOCK = socket.socket(so1,so2)
+    SOCK.connect(addr)
+    # send...
+    serialize_and_send(SOCK, serializer, message, resreq=False)
+    SOCK.close()
 
 
 def send_and_receive(address, message, timeout=None):

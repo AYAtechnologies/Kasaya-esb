@@ -16,7 +16,7 @@ class NetstateDBTests(unittest.TestCase):
     def setUpClass(cls):
         set_value("KASAYAD_DB_BACKEND", "memory")
 
-    def _test_host_up_and_down(self):
+    def test_host_up_and_down(self):
         DB = NetworkStateDB()
         ID, addr = make_kasaya_id(True), "tcp://192.168.1.2:4000"
 
@@ -69,7 +69,7 @@ class NetstateDBTests(unittest.TestCase):
             self.assertEqual( type(v), type(d2[k]), "Types [%r] not equal: %s != %s" % (k, type(v), type(d2[k])) )
             self.assertEqual( v, d2[k], "Value [%r] not equal: %r != %r" % (k, v, d2[k]) )
 
-    def _test_worker_registers(self):
+    def test_worker_registers(self):
         DB = NetworkStateDB()
         host_id, addr = make_kasaya_id(True), "tcp://127.0.0.1:4000"
         DB.host_register(host_id, addr)
@@ -120,7 +120,7 @@ class NetstateDBTests(unittest.TestCase):
         DB.worker_set_state( wid1, False )
         self.assertEqual( DB.choose_worker_for_service(svc1), None )
 
-    def _test_host_with_workers(self):
+    def test_host_with_workers(self):
         _hosts = []
 
         DB = NetworkStateDB()
@@ -192,7 +192,7 @@ class NetstateDBTests(unittest.TestCase):
         w = DB.choose_worker_for_service("foobar")
         self.assertEqual(w, None)
 
-    def _test_hostname_update(self):
+    def test_hostname_update(self):
         DB = NetworkStateDB()
         res = DB.host_register("Htest", "10.20.30.40:3456")
         # check whats registered

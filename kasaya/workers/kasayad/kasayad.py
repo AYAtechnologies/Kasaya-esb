@@ -9,8 +9,25 @@ from kasaya.core.worker.worker_base import WorkerBase
 from .syncworker import SyncWorker
 from .db.netstatedb import NetworkStateDB
 from .broadcast import UDPBroadcast
-from .dbsync import Synchronizer
+from . import netsync
 import gevent
+
+
+
+class KasayaNetworkSyncIO(netsync.KasayaNetworkSync):
+    """
+    KasayaNetworkSync instance with working send/broadcast methods
+    """
+    def __init__(self, parent, db, ID, hostname):
+        super(KasayaNetworkSyncIO, self).__init__(db, ID, hostname)
+        self.parent = parent
+
+    def send_broadcast(self, msg):
+        pass
+
+    def send_message(self, addr, msg):
+        pass
+
 
 
 class KasayaDaemon(WorkerBase):
@@ -21,14 +38,15 @@ class KasayaDaemon(WorkerBase):
         # event handlers
         add_event_handler("host-join", self.on_remote_kasayad_start)
         add_event_handler("host-leave", self.on_remote_kasayad_stop)
+        add_event_handler("net-sync", self.on_remote_kasaya_message)
 
         self.hostname = system.get_hostname()
         LOG.info("Starting local kasaya daemon with ID: [%s]" % self.ID)
 
         self.DB = NetworkStateDB()  # database
         self.BC = UDPBroadcast(self.ID) # broadcaster
-        self.SYNC = Synchronizer(self.DB, self.ID) # synchronisation
         self.WORKER = SyncWorker(server=self, database=self.DB)
+        self.SYNC = KasayaNetworkSyncIO(self, self.DB, self.ID, system.get_hostname() )
         self.BC.set_own_ip(self.WORKER.own_ip)
 
 
@@ -68,6 +86,10 @@ class KasayaDaemon(WorkerBase):
             # We send again registering information about self syncd instance.
             gevent.sleep(0.5)
             self.notify_kasayad_self_start()
+
+
+    def on_remote_kasaya_message(self, msg):
+        pass
 
 
     def on_remote_kasayad_start(self, host_id, addr):
