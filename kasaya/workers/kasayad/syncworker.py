@@ -3,7 +3,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from kasaya.conf import settings
 from kasaya.core.protocol import messages
 from kasaya.core import exceptions
-from kasaya.core.protocol.comm import MessageLoop, send_and_receive_response, send
+from kasaya.core.protocol.comm import MessageLoop, send_and_receive_response
 from kasaya.core.lib.control_tasks import ControlTasks, RedirectRequiredToAddr
 from kasaya.core.lib import LOG, servicesctl
 from kasaya.core.events import add_event_handler, emit
@@ -96,12 +96,9 @@ class SyncWorker(object):
         #self.queries.close()
         pass
 
-    # all message loops used in kasayad
-    def get_loops(self):
-        return [
-            #self.pinger.loop,
-            self.intersync.loop,
-        ]
+    @property
+    def loop(self):
+        return self.intersync.loop
 
 
     # local services management
@@ -271,32 +268,6 @@ class SyncWorker(object):
 
 
 
-    # heartbeat
-    def hearbeat_loop(self):
-        """
-        Periodically check all locally registered workers ping time. Unregister dead workers
-        """
-        maxpinglife = timedelta( seconds = settings.HEARTBEAT_TIMEOUT + settings.WORKER_HEARTBEAT )
-        unreglist = []
-        while True:
-
-            now = datetime.now()
-            for ID, nfo in self.__pingdb.iteritems():
-                # find outdated timeouts
-                to = nfo['t'] + maxpinglife
-                if to<now:
-                    LOG.warning("Worker [%s] with id [%s] died. Unregistering." % (nfo['s'], ID) )
-                    unreglist.append(ID)
-
-            # unregister all dead workers
-            while len(unreglist)>0:
-                ID = unreglist.pop()
-                self.worker_stop( ID )
-
-            gevent.sleep(settings.WORKER_HEARTBEAT)
-
-
-
     # inter sync communication and global management
     # -------------------------------------------------
 
@@ -321,19 +292,6 @@ class SyncWorker(object):
         return result
         #return {"message":messages.RESULT, "result":result }
 
-    def handle_kasaya_sync(self, msg):
-        """
-        Syncing network state changes and synchronisation.
-        Translation of incoming host address and passing message to
-        """
-        #result = self.
-        print msg
-        #emit("net-sync", msg['id'], msg['addr'], msg['service'], msg['pid']
-
-    def send_kasaya_symc_msg(self, addr, data):
-        send_without_response(addr, messages.net_sync_message(data) )
-    # kasayad host tasks
-
 
     def CTL_global_services(self):
         """
@@ -346,7 +304,6 @@ class SyncWorker(object):
             hst ['services'] = self.CTL_services_on_host( hst['id'] )
             lst.append( hst )
         return lst
-
 
     # this command is not currently exposed via control interface
     def CTL_services_on_host(self, host_id):
@@ -374,14 +331,12 @@ class SyncWorker(object):
                 lst.append( {'service':sv,'running':False, 'managed':True} )
         return lst
 
-
     def CTL_worker_exists(self, worker_id):
         """
         Check if worker with given id is existing
         """
         wrkr = self.DB.worker_get(worker_id)
         return not wrkr is None
-
 
     def CTL_worker_stop(self, ID, terminate=False, sigkill=False):
         """
@@ -406,7 +361,6 @@ class SyncWorker(object):
             res = send_and_receive_response(self.context, addr, msg)
             return res
 
-
     def CTL_worker_stats(self, ID):
         """
         Return full stats of worker
@@ -421,7 +375,6 @@ class SyncWorker(object):
         }
         res = send_and_receive_response(self.context, addr, msg)
         return res
-
 
     def CTL_service_start(self, name, ip=None):
         """
@@ -442,7 +395,6 @@ class SyncWorker(object):
         svc.start_service()
         return True
 
-
     def CTL_service_stop(self, name, ip=None):
         """
         Stop all workers serving given service.
@@ -460,7 +412,6 @@ class SyncWorker(object):
             raise exceptions.ServiceBusException("There is no [%s] service running" % name)
         for u in services:
             self.CTL_worker_stop(u)
-
 
     def CTL_host_rescan(self, ip=None):
         """

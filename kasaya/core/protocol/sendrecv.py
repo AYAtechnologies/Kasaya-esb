@@ -10,7 +10,7 @@ import socket
 
 __all__=("ConnectionClosed", "NoData", "decode_addr",
          "send_without_response",
-         #"serialize_and_send",
+         "serialize_and_send",  # TODO: remove this export
          "receive_and_deserialize",
          "send_and_receive", "send_and_receive_response")
 
@@ -147,8 +147,8 @@ def send_without_response(address, message):
     address - full destination address (eg: tcp://127.0.0.1:1234)
     message - message payload (will be automatically serialized)
     """
+    print ("send_without_response", address, message)
     serializer = Serializer() # <-- serializer is a singleton
-
     typ, addr, so1, so2 = decode_addr(address)
     SOCK = socket.socket(so1,so2)
     SOCK.connect(addr)
@@ -163,12 +163,11 @@ def send_and_receive(address, message, timeout=None):
     message - message payload (will be automatically serialized)
     timeout - time in seconds after which TimeoutError will be raised
     """
+    print ("send_and_receive", address, message)
     serializer = Serializer() # <-- serializer is a singleton
-
     typ, addr, so1, so2 = decode_addr(address)
     SOCK = socket.socket(so1,so2)
     SOCK.connect(addr)
-
     # send...
     serialize_and_send(SOCK, serializer, message, resreq=True)
 

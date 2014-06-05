@@ -30,12 +30,10 @@ _MSG_PAYLOAD        = "hp"
 class NetworkSync(object):
 
     def __init__(self, ID, hostname=None):
-        #print "BORN",ID
         self.ID = ID
         self.hostname = hostname
         self.counter = 1  # main state counter
         self.online = True # always True until close is called
-        self._broadcast(0) # counter=0 means out of sync state
         self.counters = {}
         self.lost_hosts = {}
 
@@ -55,6 +53,9 @@ class NetworkSync(object):
         # internal switches
         self._disable_forwarding = False  # disable forwarding of messages to other hosts
         self._disable_reping = False      # disable ping with counter after registering new host
+
+    def start(self):
+        self._broadcast()
 
     def close(self):
         """
@@ -81,6 +82,7 @@ class NetworkSync(object):
         - sender_addr - adderss of host which sends us message
         - msg - body of message
         """
+        #print "received msg from", sender_addr, msg
         try:
             fnc = self._methodmap[ msg['SMSG'] ]
             sid = msg['sender_id']
@@ -756,8 +758,9 @@ _SERVICE_DEL = '-s'
 class KasayaNetworkSync(NetworkSync):
 
     def __init__(self, dbinstance, *args, **kwargs):
-        global gevent
+        global gevent, emit
         import gevent
+        from kasaya.core.events import emit
         self.DB = dbinstance
         super(KasayaNetworkSync, self).__init__( *args, **kwargs )
 
@@ -771,8 +774,8 @@ class KasayaNetworkSync(NetworkSync):
         else:
             g.start_later(seconds)
 
-    def hostid2addr(self, id):
-        return self.DB.host_addr_by_id( id )
+    def hostid2addr(self, ID):
+        return self.DB.host_addr_by_id( ID )
 
     def addr2hostid(self, addr):
         for h in self.DB.host_list():
@@ -782,9 +785,11 @@ class KasayaNetworkSync(NetworkSync):
     # expand property set/del to registering services and workers
     def remote_host_join(self, host_id, host_addr, hostname):
         self.DB.host_register(host_id, host_addr, hostname )
+        emit("host-join", host_id, host_addr, hostname)
 
     def remote_host_exit(self, host_id):
         self.DB.host_unregister(host_id)
+        emit("host-leave", host_id)
 
     def remote_host_list(self):
         return self.DB.host_list()

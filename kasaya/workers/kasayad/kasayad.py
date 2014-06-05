@@ -8,7 +8,9 @@ from kasaya.core.events import add_event_handler
 from kasaya.core.worker.worker_base import WorkerBase
 from .syncworker import SyncWorker
 from .db.netstatedb import NetworkStateDB
-from .broadcast import UDPBroadcast
+#from .broadcast import UDPLoop
+from kasaya.core.protocol.comm import UDPMessageLoop, send_without_response
+from kasaya.core.protocol import messages
 from . import netsync
 import gevent
 
@@ -18,15 +20,16 @@ class KasayaNetworkSyncIO(netsync.KasayaNetworkSync):
     """
     KasayaNetworkSync instance with working send/broadcast methods
     """
-    def __init__(self, parent, db, ID, hostname):
-        super(KasayaNetworkSyncIO, self).__init__(db, ID, hostname)
+    def __init__(self, parent, DB, ID, hostname):
         self.parent = parent
+        super(KasayaNetworkSyncIO, self).__init__(DB, ID, hostname)
 
-    def send_broadcast(self, msg):
-        pass
+    def send_broadcast(self, data):
+        self.parent.send_kasaya_broadcast( messages.net_sync_message(data) )
 
-    def send_message(self, addr, msg):
-        pass
+    def send_message(self, addr, data):
+        LOG.debug ("SEND " + str(addr) +"  "+ repr(data) )
+        self.parent.send_kasaya_message(addr, messages.net_sync_message(data) )
 
 
 
@@ -34,21 +37,31 @@ class KasayaDaemon(WorkerBase):
 
     def __init__(self):
         super(KasayaDaemon, self).__init__("kasayad", is_host=True)
+        self.hostname = system.get_hostname()
 
         # event handlers
         add_event_handler("host-join", self.on_remote_kasayad_start)
         add_event_handler("host-leave", self.on_remote_kasayad_stop)
-        add_event_handler("net-sync", self.on_remote_kasaya_message)
-
-        self.hostname = system.get_hostname()
-        LOG.info("Starting local kasaya daemon with ID: [%s]" % self.ID)
 
         self.DB = NetworkStateDB()  # database
-        self.BC = UDPBroadcast(self.ID) # broadcaster
-        self.WORKER = SyncWorker(server=self, database=self.DB)
-        self.SYNC = KasayaNetworkSyncIO(self, self.DB, self.ID, system.get_hostname() )
-        self.BC.set_own_ip(self.WORKER.own_ip)
+        self.BC = UDPMessageLoop(settings.BROADCAST_PORT, self.ID) # broadcaster
+        self.BC.register_message(messages.NET_SYNC, self.proc_sync_message)
 
+        self.SYNC = KasayaNetworkSyncIO(self, self.DB, self.ID, system.get_hostname() )
+        self.WORKER = SyncWorker(server=self, database=self.DB)
+
+
+    def start(self):
+        """
+        Run internal all services, register self in db and send network broadcast.
+        """
+        LOG.info("Starting local kasaya daemon with ID: [%s]" % self.ID)
+        # register self in database
+        self.DB.host_register(self.ID, "tcp://127.0.0.1:%i" % settings.KASAYAD_CONTROL_PORT, self.hostname )
+        # register own services
+        self.DB.service_update_list(self.ID, self.WORKER.local_services_list() )
+        # connect to network
+        self.SYNC.start()
 
 
     def close(self):
@@ -56,77 +69,58 @@ class KasayaDaemon(WorkerBase):
         Notifies network about shutting down, closes database
         and all used sockets.
         """
-        LOG.info("Stopping local kasaya daemon")
-        self.on_local_kasayad_stop(self.ID, local=True)
+        LOG.info("Stopping local kasaya daemon [id:%s]"%self.ID)
+        self.DB.host_unregister(self.ID)
+        self.SYNC.close()
+        #self.on_local_kasayad_stop(self.ID, local=True)
         self.WORKER.close()
         self.DB.close()
         self.BC.close()
 
 
-    # global network changes
+    # network state IO
 
-    def notify_kasayad_start(self, ID, hostname, ip, services, local=False):
-        """
-        Send information about startup of host to all other hosts in network.
-        """
-        isnew = self.DB.host_register(ID, hostname, ip, services)
-        if local:
-            # it is ourself starting, send broadcast to other kasaya daemons
-            self.BC.send_host_start(ID, hostname, ip, services)
+    def send_kasaya_broadcast(self, message):
+        self.BC.broadcast_message(message)
 
-        if isnew:
-            # new kasayad
-            # send request to local workers to send immadiately ping broadcast
-            # to inform new kasaya daemon about self
-            #self.WORKER.request_workers_broadcast()
-            # it's remote host starting, information is from broadcast
-            LOG.info("Remote kasaya daemon [%s] started, address [%s], ID [%s]" % (hostname, ip, ID) )
-            # if registered new kasayad AND it's not local host, then
-            # it must be new host in network, which don't know other hosts.
-            # We send again registering information about self syncd instance.
-            gevent.sleep(0.5)
-            self.notify_kasayad_self_start()
+    def send_kasaya_message(self, addr, message):
+        send_without_response(addr, message)
+
+    # incoming messages
+    def proc_sync_message(self, addr, msg):
+        LOG.debug ("received " + str(addr) +"  "+ repr(msg) )
+        senderaddr = "tcp://%s:%i" % (addr[0], settings.KASAYAD_CONTROL_PORT)
+        self.SYNC.receive_message(senderaddr, msg['data'])
 
 
-    def on_remote_kasaya_message(self, msg):
+    # local host changes
+    def worker_add(self):
+        pass
+
+    def worker_del(self):
+        pass
+
+    def service_add(self):
+        pass
+
+    def service_del(self):
         pass
 
 
-    def on_remote_kasayad_start(self, host_id, addr):
+    # global network changes
+
+    def on_remote_kasayad_start(self, host_id, addr, hostname):
         """
         Remote kasaya host started
         """
         # register self in database
-        self.DB.host_register(host_id, addr)
         LOG.info("Remote kasaya daemon started, address: %s [id:%s]" % (addr, host_id) )
-
-    def on_local_kasayad_start(self):
-        """
-        send information about self start to all hosts
-        """
-        # register self in database
-        self.DB.host_register(self.ID, self.WORKER.own_addr)
-        # register own services
-        self.DB.service_update_list(self.ID, self.WORKER.local_services_list() )
-        # broadcast own existence
-        self.BC.broadcast_host_start(self.WORKER.own_addr)
-
 
     def on_remote_kasayad_stop(self, host_id):
         """
         received information about kasaya host leaving network
         """
-        self.DB.host_unregister(self.ID)
         LOG.info("Remote kasaya daemon stopped, [id:%s]" % host_id)
-
-
-    def on_local_kasayad_stop(self, ID, local=False):
-        """
-        Send information about shutdown to all hosts in network
-        """
-        self.DB.host_unregister(self.ID)
-        #self.BC.broadcast_host_stop()
-
 
 
     def notify_kasayad_refresh(self, ID, services=None, local=False):
@@ -150,10 +144,14 @@ class KasayaDaemon(WorkerBase):
 
     # main loop
     def run(self):
-        self.on_local_kasayad_start()
+        # start after loops run
+        g=gevent.Greenlet( self.start )
+        g.start()
+        # run all loops
         try:
-            loops = self.WORKER.get_loops()
+            loops = []
             loops.append(self.BC.loop)
+            loops.append(self.WORKER.loop)
             loops = [ gevent.spawn(loop) for loop in loops ]
             gevent.joinall(loops)
         finally:

@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasa/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasatest/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasa/bin/python
 from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 
@@ -119,6 +119,7 @@ class KasayaTestPool(object):
         h = KasayaFakeSync(self, db, hid, hn)
         #h._my_pub_ip = ip
         self.hosts[hid] = h
+        h.start()
         return hid
 
     def _get_ip_for_host(self, hid):
