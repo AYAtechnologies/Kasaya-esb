@@ -82,7 +82,6 @@ class NetworkSync(object):
         - sender_addr - adderss of host which sends us message
         - msg - body of message
         """
-        #print "received msg from", sender_addr, msg
         try:
             fnc = self._methodmap[ msg['SMSG'] ]
             sid = msg['sender_id']
@@ -138,11 +137,11 @@ class NetworkSync(object):
         Add sender ID and send message to specified address or list of addresses
         """
         msg['sender_id'] = self.ID
-        try:
-            self.send_message(addr, msg)
-            return
-        except Exception:
-            pass
+        #try:
+        self.send_message(addr, msg)
+        return
+        #except Exception:
+        #    pass
         self.report_connection_error(host_addr=addr)
 
     # top level logic methods

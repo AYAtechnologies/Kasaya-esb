@@ -4,7 +4,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 # imports
 from kasaya.conf import settings
 from kasaya.core.lib import LOG, system
-from kasaya.core.events import add_event_handler
+from kasaya.core.events import add_event_handler, emit
 from kasaya.core.worker.worker_base import WorkerBase
 from .syncworker import SyncWorker
 from .db.netstatedb import NetworkStateDB
@@ -28,7 +28,7 @@ class KasayaNetworkSyncIO(netsync.KasayaNetworkSync):
         self.parent.send_kasaya_broadcast( messages.net_sync_message(data) )
 
     def send_message(self, addr, data):
-        LOG.debug ("SEND " + str(addr) +"  "+ repr(data) )
+        #LOG.debug ("SEND " + str(addr) +"  "+ repr(data) )
         self.parent.send_kasaya_message(addr, messages.net_sync_message(data) )
 
 
@@ -42,6 +42,8 @@ class KasayaDaemon(WorkerBase):
         # event handlers
         add_event_handler("host-join", self.on_remote_kasayad_start)
         add_event_handler("host-leave", self.on_remote_kasayad_stop)
+        #add_event_handler("local-worker-on", self.on_local_worker_start)
+        #add_event_handler("local-worker-off", self.on_local_worker_start)
 
         self.DB = NetworkStateDB()  # database
         self.BC = UDPMessageLoop(settings.BROADCAST_PORT, self.ID) # broadcaster
@@ -49,7 +51,10 @@ class KasayaDaemon(WorkerBase):
 
         self.SYNC = KasayaNetworkSyncIO(self, self.DB, self.ID, system.get_hostname() )
         self.WORKER = SyncWorker(server=self, database=self.DB)
+        #self.WMAN = WorkerManagement()
 
+    def _local_worker_addr(self, port):
+        return "tcp://127.0.0.1:%i" % port
 
     def start(self):
         """
@@ -93,12 +98,49 @@ class KasayaDaemon(WorkerBase):
         self.SYNC.receive_message(senderaddr, msg['data'])
 
 
-    # local host changes
-    def worker_add(self):
-        pass
+    # event driven worker management
+    def __send_message_to_worker(self, worker_id, message):
+        """
+        Send control message to local worker
+        """
+        worker = self.DB.worker_get(worker_id)
+
+
+    def local_worker_add(self, worker_id, address, service, pid):
+        """
+        Local worker started in offline state.
+        on event: worker-local-add
+        emit: worker-local-start
+        """
+        self.DB.worker_register(self.ID, worker_id, service, address, pid, online=False)
+        LOG.info("Local worker [%s] started, address [%s] [id:%s]" % (service, address, worker_id) )
+        emit("worker-local-start", worker_id)
+
+    def worker_start(self, worker_id):
+        """
+        Set worker online
+        """
+        worker = self.DB.worker_get(worker_id)
+        if worker['id']!=self.ID:
+            LOD.error("Local worker is registered under wrong host_id")
+            return
+        # configure new worker
+        params = {}
+        res = send_and_receive_response(worker['addr'], msg)
+        self.DB.worker_set_state( worker_id, True )
+        self.SYNC.local_worker_add(worker_id, service, address)
+
+    def worker_stop(self, worker_id):
+        """
+        Set worker offline
+        """
 
     def worker_del(self):
-        pass
+        """
+        Remove worker
+        """
+
+
 
     def service_add(self):
         pass

@@ -486,7 +486,7 @@ class MessageLoop(object):
 
             # run handler
             try:
-                result = handler(msgdata)
+                result = handler(address, msgdata)
             except Exception as e:
                 #LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
                 if not resreq:

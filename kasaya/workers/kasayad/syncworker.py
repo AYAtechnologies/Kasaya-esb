@@ -39,8 +39,8 @@ class SyncWorker(object):
         add_event_handler("worker-local-start", self.worker_start_local )
         add_event_handler("worker-local-stop", self.worker_stop_local )
         add_event_handler("worker-local-wait", self.worker_prepare )
-        add_event_handler("worker-remote-join", self.worker_start_remote )
-        add_event_handler("worker-remote-leave", self.worker_stop_remote )
+        #add_event_handler("worker-remote-join", self.worker_start_remote )
+        #add_event_handler("worker-remote-leave", self.worker_stop_remote )
         add_event_handler("connection-end", self.handle_connection_end )
 
         # cache
@@ -49,7 +49,7 @@ class SyncWorker(object):
         # kasayad <--> kasayad communication
         self.intersync = MessageLoop( 'tcp://0.0.0.0:'+str(settings.KASAYAD_CONTROL_PORT) )
         self.intersync.register_message(messages.CTL_CALL, self.handle_global_control_request)
-        self.intersync.register_message(messages.NET_SYNC, self.handle_global_control_request)
+        self.intersync.register_message(messages.NET_SYNC, self.DAEMON.proc_sync_message)
         # local worker <-> kasayad dialog on public port
         self.intersync.register_message(messages.WORKER_LIVE, self.handle_worker_live)
         self.intersync.register_message(messages.WORKER_LEAVE, self.handle_worker_leave)
@@ -136,7 +136,7 @@ class SyncWorker(object):
     # local message handlers
     # -----------------------------------
 
-    def handle_worker_live(self, msg):
+    def handle_worker_live(self, senderaddr, msg):
         """
         Receive worker's ping singnal.
         This function is triggered only by local worker.
@@ -165,14 +165,14 @@ class SyncWorker(object):
         if wrkr is not None:
             emit("worker-local-stop", ssid )
 
-    def handle_worker_leave(self, msg):
+    def handle_worker_leave(self, senderaddr, msg):
         """
         Local worker is going down,
         generate event worker-local-stop
         """
         emit("worker-local-stop", msg['id'] )
 
-    def handle_name_query(self, msg):
+    def handle_name_query(self, senderaddr, msg):
         """
         Odpowiedź na pytanie o adres workera
         """
@@ -186,7 +186,7 @@ class SyncWorker(object):
             'addr':addr,
         }
 
-    def handle_name_query_multi(self, msg):
+    def handle_name_query_multi(self, senderaddr, msg):
         """
         Send all workers for given service
         """
@@ -201,7 +201,7 @@ class SyncWorker(object):
             'timeout':10,
         }
 
-    def handle_local_control_request(self, msg):
+    def handle_local_control_request(self, senderaddr, msg):
         """
         control requests from localhost
         """
@@ -210,8 +210,16 @@ class SyncWorker(object):
 
 
 
-    # worker state changes, high level functions
-    # ------------------------------------------
+    # worker lifetime cycles
+    # ----------------------
+    # 1 - ADD   --> DB register
+    # |
+    # 2 - START --> NET register
+    # |
+    # 3 - STOP  --> NET unregister
+    # |
+    # 4 - DEL - ->  DB delete
+    #
 
     def worker_prepare(self, worker_id):
         """
@@ -244,12 +252,12 @@ class SyncWorker(object):
         # emit signal
         emit("worker-local-wait", worker_id)
 
-    def worker_start_remote(self, worker_id, host_id, address, service):
-        """
-        Remote worker started
-        """
-        self.DB.worker_register(host_id, worker_id, service, address)
-        LOG.info("Remote worker [%s] started, address [%s] [id:%s]" % (service, address, worker_id) )
+    #def worker_start_remote(self, worker_id, host_id, address, service):
+    #    """
+    #    Remote worker started
+    #    """
+    #    self.DB.worker_register(host_id, worker_id, service, address)
+    #    LOG.info("Remote worker [%s] started, address [%s] [id:%s]" % (service, address, worker_id) )
 
     def worker_stop_local(self, worker_id):
         """
@@ -259,12 +267,12 @@ class SyncWorker(object):
         LOG.info("Local worker stopped [id:%s]" % worker_id )
         #self.BC.broadcast_worker_stop(worker_id)
 
-    def worker_stop_remote(self, worker_id):
-        """
-        Remote worker stopped
-        """
-        self.DB.worker_unregister(ID=worker_id)
-        LOG.info("Remote worker stopped [id:%s]" % worker_id )
+    #def worker_stop_remote(self, worker_id):
+    #    """
+    #    Remote worker stopped
+    #    """
+    #    self.DB.worker_unregister(ID=worker_id)
+    #    LOG.info("Remote worker stopped [id:%s]" % worker_id )
 
 
 
@@ -284,14 +292,13 @@ class SyncWorker(object):
             raise RedirectRequiredEx(host_id)
 
 
-    def handle_global_control_request(self, msg):
+    def handle_global_control_request(self, senderaddr, msg):
         """
         Control requests from remote hosts
         """
         result = self.ctl.handle_request(msg)
         return result
         #return {"message":messages.RESULT, "result":result }
-
 
     def CTL_global_services(self):
         """
@@ -423,3 +430,25 @@ class SyncWorker(object):
         svlist = self.local_services_list(rescan=True)
         # send nwe list of services to kasaya daemon instance
         #self.DAEMON.notify_kasayad_refresh(self.DAEMON.ID, svlist, True)
+
+
+
+    def worker_address_preprocess(self, ID, addr):
+        """
+        ID - worker ID
+        addr - worker address
+        """
+        return addr
+
+    def worker_local_add(self):
+
+        pass
+
+    def worker_local_del(self):
+        pass
+
+    def remote_worker_add(self):
+        pass
+
+    def remote_worker_del(self):
+        pass

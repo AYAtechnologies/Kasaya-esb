@@ -89,7 +89,7 @@ class TaskExecutor(object):
     # task handling
 
 
-    def handle_task_request(self, msgdata):
+    def handle_task_request(self, addr, msgdata):
         """
         Prepare data for processing in task. Extracts parameters from message and check context.
         Valid request requires in message such fields: method, context, args, kwargs
