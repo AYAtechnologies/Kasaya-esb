@@ -36,7 +36,7 @@ class SyncWorker(object):
         #self.pinger = PingDB()
 
         # bind events
-        add_event_handler("worker-local-start", self.worker_start_local )
+        #add_event_handler("worker-local-start", self.worker_start_local )
         add_event_handler("worker-local-stop", self.worker_stop_local )
         add_event_handler("worker-local-wait", self.worker_prepare )
         #add_event_handler("worker-remote-join", self.worker_start_remote )
@@ -145,7 +145,7 @@ class SyncWorker(object):
 
         if wrkr is None:
             # new local worker just started
-            emit("worker-local-start", msg['id'], msg['addr'], msg['service'], msg['pid'] )
+            emit("local-worker-start", msg['id'], msg['addr'], msg['service'], msg['pid'] )
         return
 
         if (msg['addr']!=wrkr['addr']) or (msg['service']!=wrkr['service']):
@@ -231,6 +231,7 @@ class SyncWorker(object):
 
         # all configuration of worker should be there
         pass
+
         # send information to worker to start processing tasks
         msg = {
             'message':messages.CTL_CALL,
@@ -240,17 +241,16 @@ class SyncWorker(object):
         LOG.debug("Local worker [%s] on [%s] is now online" % (wrknfo['service'], wrknfo['addr']) )
         # broadcast new worker state
         self.DB.worker_set_state( worker_id, True )
-        #self.BC.broadcast_worker_live(self.DAEMON.ID, worker_id, wrknfo['addr'], wrknfo['service'])
+        emit("local-worker-online", worker_id )
 
-
-    def worker_start_local(self, worker_id, address, service, pid):
-        """
-        Local worker started
-        """
-        self.DB.worker_register(self.DAEMON.ID, worker_id, service, address, pid, False)
-        LOG.info("Local worker [%s] started, address [%s] [id:%s]" % (service, address, worker_id) )
-        # emit signal
-        emit("worker-local-wait", worker_id)
+    #def worker_start_local(self, worker_id, address, service, pid):
+    #    """
+    #    Local worker started
+    #    """
+    #    self.DB.worker_register(self.DAEMON.ID, worker_id, service, address, pid, False)
+    #    LOG.info("Local worker [%s] started, address [%s] [id:%s]" % (service, address, worker_id) )
+    #    # emit signal
+    #    emit("local-worker-wait", worker_id)
 
     #def worker_start_remote(self, worker_id, host_id, address, service):
     #    """
@@ -439,16 +439,3 @@ class SyncWorker(object):
         addr - worker address
         """
         return addr
-
-    def worker_local_add(self):
-
-        pass
-
-    def worker_local_del(self):
-        pass
-
-    def remote_worker_add(self):
-        pass
-
-    def remote_worker_del(self):
-        pass

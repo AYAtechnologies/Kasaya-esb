@@ -381,6 +381,8 @@ class MessageLoop(object):
             return ip
 
         # interfaces list
+        # TODO: use of netifaces should be optional
+        # if exists, then use it, if not, skip this point
         iflist = all_interfaces()
 
         # is interface name used?
