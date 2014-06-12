@@ -54,8 +54,23 @@ class NetworkSync(object):
         self._disable_forwarding = False  # disable forwarding of messages to other hosts
         self._disable_reping = False      # disable ping with counter after registering new host
 
+        # file with known hosts dump for easy network joining
+        self.known_hosts_dump_file = None
+        self._dump_sheduled = False
+
     def start(self):
-        self._broadcast()
+        khlist = self.load_known_hosts()
+        # try to join using previously known hosts
+        succ = 0
+        if not khlist is None:
+            for addr in khlist:
+                if self.send_ping(addr, no_fail_report=True):
+                    succ += 1
+                if succ>2:
+                    return
+        # if normal join fails, send broadcast
+        if succ<1:
+            self._broadcast()
 
     def close(self):
         """
@@ -64,15 +79,46 @@ class NetworkSync(object):
         if not self.online:
             # already off
             return
+        self.dump_known_hosts()
         self.online = False
         self.counter += 1
         self._host_leave_forwarder(self.ID, self.counter)
 
+    # connecting to newtork without broadcast
     def known_hosts(self):
         """
         List of locally known hosts
         """
         return self.counters.keys()
+
+    def dump_known_hosts(self):
+        """
+        Dumps known hosts to file for broadcastless connection next time
+        """
+        if self.known_hosts_dump_file is None:
+            return
+        self._dump_sheduled = False
+        with file(self.known_hosts_dump_file,"w") as dumpfile:
+            for kh in self.remote_host_list():
+                if kh['id']==self.ID:
+                    continue
+                dumpfile.write( kh['addr'] )
+                dumpfile.write( "\n" )
+
+    def load_known_hosts(self):
+        """
+        Load known hosts from file and return as set()
+        """
+        if self.known_hosts_dump_file is None:
+            return
+        res = set()
+        try:
+            with file(self.known_hosts_dump_file,"r") as dumpfile:
+                for ln in dumpfile.readlines():
+                    res.add( ln.strip() )
+        except IOError:
+            pass
+        return res
 
     # send and receive network messages
 
@@ -132,17 +178,19 @@ class NetworkSync(object):
         if self.online:
             self.send_broadcast(msg)
 
-    def _send(self, addr, msg):
+    def _send(self, addr, msg, no_fail_report=False):
         """
         Add sender ID and send message to specified address or list of addresses
         """
         msg['sender_id'] = self.ID
-        #try:
-        self.send_message(addr, msg)
-        return
-        #except Exception:
-        #    pass
-        self.report_connection_error(host_addr=addr)
+        try:
+            self.send_message(addr, msg)
+            return True
+        except Exception:
+            pass
+        if not no_fail_report:
+            self.report_connection_error(host_addr=addr)
+        return False
 
     # top level logic methods
 
@@ -292,6 +340,11 @@ class NetworkSync(object):
             self._host_check_is_sync_required, host_id, counter
         )
 
+        # dump new known hosts list
+        if not self._dump_sheduled:
+            self._dump_sheduled = True
+            self.delay( self.FULL_SYNC_DELAY*3, self.dump_known_hosts )
+
         # after some time send to newly joined host ping
         # with own counter state. This is usefull after
         # reconnecting host which previously loosed connection
@@ -329,13 +382,16 @@ class NetworkSync(object):
         if self.is_local_state_actual(host_id, counter):
             return
         # unregister and delete host data
-        #self.set_counter(host_id, counter)
         try:
             del self.lost_hosts[host_id]
         except KeyError:
             pass
         self.remote_host_exit(host_id)
         del self.counters[host_id]
+        # dump changes
+        if not self._dump_sheduled:
+            self._dump_sheduled = True
+            self.delay( self.FULL_SYNC_DELAY*3, self.dump_known_hosts )
         # notify neighbours
         self._host_leave_forwarder( host_id, counter, sender_id )
     def _host_leave_forwarder(self, host_id, counter, sender_id=None ):
@@ -455,7 +511,7 @@ class NetworkSync(object):
             )
 
     # network input / output methods
-    def send_ping(self, addr):
+    def send_ping(self, addr, no_fail_report=False):
         """
         Send ping to host.
         noreports parameter is used to disable broken connection reporting.
@@ -464,7 +520,7 @@ class NetworkSync(object):
             "SMSG"    : _MSG_PING,
             "counter" : self.counter,
         }
-        self._send(addr, msg)
+        return self._send(addr, msg, no_fail_report=no_fail_report)
 
     def on_ping(self, addr, msg):
         """
@@ -594,7 +650,6 @@ class NetworkSync(object):
         Incoming request for full host report.
         Result will be transmitted back asynchronously.
         """
-        #print self.ID , "RECEIVED FULL SYNC REQUEST",msg
         self.send_host_full_state( addr )
 
     def send_full_sync_request(self, addr):

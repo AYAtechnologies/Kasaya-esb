@@ -638,5 +638,9 @@ class UDPMessageLoop(object):
         """
         msg['__sid__'] = self.ID
         msg = self.serializer.serialize(msg, resreq=False)
-        self.SOCK.sendto(msg, ('<broadcast>', self.port) )
+        try:
+            self.SOCK.sendto(msg, ('<broadcast>', self.port) )
+            return True
+        except socket.error as e:
+            return False
 

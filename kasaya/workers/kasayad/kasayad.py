@@ -23,6 +23,7 @@ class KasayaNetworkSyncIO(netsync.KasayaNetworkSync):
     def __init__(self, parent, DB, ID, hostname):
         self.parent = parent
         super(KasayaNetworkSyncIO, self).__init__(DB, ID, hostname)
+        self.known_hosts_dump_file = settings.KASAYAD_HOST_LIST_DUMP_FILE
 
     def send_broadcast(self, data):
         self.parent.send_kasaya_broadcast( messages.net_sync_message(data) )

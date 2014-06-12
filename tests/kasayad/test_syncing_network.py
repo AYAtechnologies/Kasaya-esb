@@ -62,13 +62,6 @@ class KasayaFakeSync(KasayaNetworkSync):
         g = gevent.Greenlet( self.TP.send_message, addr, msg)
         g.start()
 
-    def remote_property_set(self, host_id, key, data):
-        self
-        print self.ID, "remote set", host_id, key, data
-
-    def remote_property_delete(self, host_id, key, data):
-        print self.ID, "remote delete", host_id, key
-
 
 class KasayaTestPool(object):
 
@@ -105,7 +98,7 @@ class KasayaTestPool(object):
     def items(self):
         return self.hosts.items()
 
-    def new_host(self, hid=None):
+    def new_host(self, hid=None, dont_start=False):
         if hid is None:
         #    hid = make_kasaya_id(True)
             hid = self.__hl[0]
@@ -117,9 +110,11 @@ class KasayaTestPool(object):
         ip = "192.168.%i.%i" % (random.randint(1,254), random.randint(1,254))
         self.__ips[hid] = ip
         h = KasayaFakeSync(self, db, hid, hn)
-        #h._my_pub_ip = ip
+        # add to pool
         self.hosts[hid] = h
-        h.start()
+        # start if not disabled
+        if not dont_start:
+            h.start()
         return hid
 
     def _get_ip_for_host(self, hid):
@@ -606,6 +601,43 @@ class NetSyncTest(unittest.TestCase):
             wrkr = p.DB.worker_get("W01")
             self.assertEqual(wrkr['host_id'], host.ID)
 
+    def test_joining_without_broadcast(self):
+        pool = KasayaTestPool()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        gevent.wait()
+
+        dumpname = "/tmp/test_kasaya_dump_file"
+        # test dump
+        dumphost = pool['A']
+        dumphost.known_hosts_dump_file = dumpname
+        dumphost.dump_known_hosts()
+        f = file(dumpname, "r")
+        addresses = set()
+        for ln in f.readlines():
+            addresses.add( ln.strip() )
+
+        for kh in dumphost.known_hosts():
+            self.assertIn( pool._get_ip_for_host(kh), addresses )
+        self.assertItemsEqual( dumphost.load_known_hosts(), addresses )
+
+        # test join without broadcast
+        pool.disable_broadcast = True
+        nh = pool.new_host(dont_start=True)
+        nh = pool[nh]
+        gevent.wait()
+
+        # set dump file name and start host
+        nh.known_hosts_dump_file = dumpname
+        nh.start()
+        gevent.wait()
+
+        # check if host is knowing all other hosts
+        self.assertItemsEqual( nh.known_hosts(),  set( pool.keys() ) - set( nh.ID )  )
 
 
 if __name__ == '__main__':

@@ -61,7 +61,9 @@ SOCKET_BACKLOG = 50
 BROADCAST_PORT = 4040
 # port na którym prowadzona jest synchronizacja pomiędzy serwerami syncd i zarządzanie siecią
 KASAYAD_CONTROL_PORT = 4041
-
+# file with dump of all locally known hosts
+# used to start serive without broadcast
+KASAYAD_HOST_LIST_DUMP_FILE = "/tmp/kasaya_known_hosts"
 
 
 
