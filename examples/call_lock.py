@@ -1,5 +1,6 @@
-#!/usr/bin/env python
+#!/home/moozg/venvs/kasatest/bin/python
 #coding: utf-8
+#!/usr/bin/env python
 from __future__ import unicode_literals
 #from kasaya.conf import load_config_from_file
 import sys
@@ -17,7 +18,8 @@ if __name__=="__main__":
     #try:
     #CC = Context()
     #s = CC.sync
-    print sync.kasatest_a.aa.bb("A")#test_empty("A")
+    #print sync.kasatest_a.aa.bb("A")#test_empty("A")
+    print sync.locka.burak()
 '''
     cc = Context()
     cc['test'] = "jajeczko"

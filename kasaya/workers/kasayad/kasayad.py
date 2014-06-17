@@ -45,7 +45,8 @@ class KasayaDaemon(WorkerBase):
 
         add_event_handler("local-worker-start", self.on_local_worker_start )
         add_event_handler("local-worker-online", self.on_local_worker_online )
-        #add_event_handler("local-worker-off", self.on_local_worker_start)
+        add_event_handler("local-worker-offline", self.on_local_worker_offline)
+        add_event_handler("local-worker-stop", self.on_local_worker_stop)
 
         self.DB = NetworkStateDB()  # database
         self.BC = UDPMessageLoop(settings.BROADCAST_PORT, self.ID) # broadcaster
@@ -134,29 +135,34 @@ class KasayaDaemon(WorkerBase):
             addr = "tcp://:%s" % port
             self.SYNC.local_worker_add( worker['id'], worker['service'], addr )
 
-
-    def worker_start(self, worker_id):
+    def on_local_worker_offline(self, worker_id):
         """
-        Set worker online
+        Local worker is going offline.
         """
         worker = self.DB.worker_get(worker_id)
+        if worker is None: return
         if worker['host_id']!=self.ID: return
-        # configure new worker
-        params = {}
-        res = send_and_receive_response(worker['addr'], msg)
-        self.DB.worker_set_state( worker_id, True )
-        self.SYNC.local_worker_add(worker_id, service, address)
+        if not worker['online']:
+            # worker is already offline
+            return
+        self.DB.worker_set_state(worker_id, False)
+        self.SYNC.local_worker_del( worker_id )
+        LOG.info("Local worker [%s] is going offline, address [%s] [id:%s]." % (worker['service'], worker['addr'], worker_id) )
 
-    def worker_stop(self, worker_id):
+    def on_local_worker_stop(self, worker_id):
         """
-        Set worker offline
+        Worker is shutting down, or died unexpectly.
+        If worker has satus online, it will be automatically
+        switched to offline before unregistering.
         """
-
-    def worker_del(self):
-        """
-        Remove worker
-        """
-
+        worker = self.DB.worker_get(worker_id)
+        if worker is None: return
+        if worker['host_id']!=self.ID: return
+        if worker['online']:
+            # firstly - unregister worker and notify network
+            self.on_local_worker_offline(worker_id)
+        self.DB.worker_unregister(ID=worker_id)
+        LOG.info("Local worker [%s] is going shutting down, address [%s] [id:%s]." % (worker['service'], worker['addr'], worker_id) )
 
 
     def service_add(self):

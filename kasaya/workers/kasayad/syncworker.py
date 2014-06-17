@@ -32,15 +32,8 @@ class SyncWorker(object):
     def __init__(self, server, database):
         self.DAEMON = server
         self.DB = database
-        #self.BC = broadcaster
-        #self.pinger = PingDB()
 
         # bind events
-        #add_event_handler("worker-local-start", self.worker_start_local )
-        add_event_handler("worker-local-stop", self.worker_stop_local )
-        add_event_handler("worker-local-wait", self.worker_prepare )
-        #add_event_handler("worker-remote-join", self.worker_start_remote )
-        #add_event_handler("worker-remote-leave", self.worker_stop_remote )
         add_event_handler("connection-end", self.handle_connection_end )
 
         # cache
@@ -152,10 +145,10 @@ class SyncWorker(object):
             # worker properties are different, assume that
             # old worker died silently and new appears under same ID
             # (it's just impossible!)
-            emit("worker-local-stop", worker_id )
+            emit("local-worker-stop", worker_id )
             return
 
-    def handle_connection_end(self, addr, ssid):
+    def handle_connection_end(self, senderaddr, ssid):
         """
         This is event handler for connection-end.
         """
@@ -163,14 +156,13 @@ class SyncWorker(object):
         # unexpected connection lost with local worker
         wrkr = self.DB.worker_get(ssid)
         if wrkr is not None:
-            emit("worker-local-stop", ssid )
+            emit("local-worker-stop", ssid )
 
     def handle_worker_leave(self, senderaddr, msg):
         """
-        Local worker is going down,
-        generate event worker-local-stop
+        Local worker is going down.
         """
-        emit("worker-local-stop", msg['id'] )
+        emit("local-worker-stop", msg['id'] )
 
     def handle_name_query(self, senderaddr, msg):
         """
@@ -242,37 +234,6 @@ class SyncWorker(object):
         # broadcast new worker state
         self.DB.worker_set_state( worker_id, True )
         emit("local-worker-online", worker_id )
-
-    #def worker_start_local(self, worker_id, address, service, pid):
-    #    """
-    #    Local worker started
-    #    """
-    #    self.DB.worker_register(self.DAEMON.ID, worker_id, service, address, pid, False)
-    #    LOG.info("Local worker [%s] started, address [%s] [id:%s]" % (service, address, worker_id) )
-    #    # emit signal
-    #    emit("local-worker-wait", worker_id)
-
-    #def worker_start_remote(self, worker_id, host_id, address, service):
-    #    """
-    #    Remote worker started
-    #    """
-    #    self.DB.worker_register(host_id, worker_id, service, address)
-    #    LOG.info("Remote worker [%s] started, address [%s] [id:%s]" % (service, address, worker_id) )
-
-    def worker_stop_local(self, worker_id):
-        """
-        Local worker stopped
-        """
-        self.DB.worker_unregister(ID=worker_id)
-        LOG.info("Local worker stopped [id:%s]" % worker_id )
-        #self.BC.broadcast_worker_stop(worker_id)
-
-    #def worker_stop_remote(self, worker_id):
-    #    """
-    #    Remote worker stopped
-    #    """
-    #    self.DB.worker_unregister(ID=worker_id)
-    #    LOG.info("Remote worker stopped [id:%s]" % worker_id )
 
 
 

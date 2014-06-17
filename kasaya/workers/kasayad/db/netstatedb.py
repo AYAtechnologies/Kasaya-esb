@@ -208,7 +208,17 @@ class NetworkStateDB(object):
 
     def worker_get(self, worker_id):
         """
-        Return worker details for given ID
+        Return worker details for given ID.
+        Result:
+            None - if worker is not existing
+            {
+                'id' - worker identifier
+                'host_id' - host id on which is worker running
+                'service' - service name of worker
+                'addr' - network address of worker
+                'pid' - local process id of worker (only for own local hosts)
+                'online' - is online status (for remote workers always True)
+            }
         """
         return self.LLDB.worker_get(worker_id)
 

@@ -29,7 +29,7 @@ def task_c(param):
 
 
 @Task(name="burak")
-def task_c():
+def task_d():
     print ("Test buraka")
     #raise Exception("Task się wywalił :(")
     return "Udane"

@@ -50,7 +50,11 @@ class task(object):
     def __call__(self, func):
         _func_only(func)
         worker_methods_db.register_task(
-            self.name, func, self.timeout, self.permissions, self.close_dj_conn)
+            self.name,
+            func,
+            self.timeout,
+            self.permissions,
+            self.close_dj_conn)
         return func
 
 

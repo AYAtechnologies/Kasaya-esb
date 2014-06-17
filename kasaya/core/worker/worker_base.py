@@ -44,7 +44,7 @@ class WorkerBase(object):
 
 def exception_catcher(func, *args, **kwargs):
     """
-    This function catches exceptions and tracebacks inside greenlets.
+    This function catches exception tracebacks inside greenlets.
     """
     try:
         return func(*args, **kwargs)
