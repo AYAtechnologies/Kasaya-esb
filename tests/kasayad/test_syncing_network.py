@@ -129,6 +129,23 @@ class KasayaTestPool(object):
                 return self[h]
         raise KeyError("Host with ip %s not found" % ip)
 
+    def _replace_ID(self, old_id, new_id):
+        """
+        Change ID of host to simulate of death and rebirth of kasaya daemon
+        """
+        # replace address table
+        ip = self.__ips[old_id]
+        del self.__ips[old_id]
+        self.__ips[new_id] = ip
+        # replace host in hosts dict
+        h = self.hosts[old_id]
+        self.hosts[new_id] = h
+        del self.hosts[old_id]
+        # change host ID
+        h.ID = new_id
+        return h
+
+
     # fake network operations
     def send_broadcast(self, sender, msg):
         fnc = self.link_accept
@@ -638,6 +655,25 @@ class NetSyncTest(unittest.TestCase):
 
         # check if host is knowing all other hosts
         self.assertItemsEqual( nh.known_hosts(),  set( pool.keys() ) - set( nh.ID )  )
+
+    def test_host_dead_and_replace(self):
+        pool = KasayaTestPool()
+        pool.new_host("A") # << our zombie
+        pool.new_host("B")
+        pool.new_host("C")
+        pool.new_host("D")
+        gevent.wait()
+
+        # kill and rebirth A as new host Y
+        nh = pool._replace_ID("A", "Y")
+        # send notification on start about host Y
+        nh._broadcast()
+        gevent.wait()
+
+        for h in "BCDY":
+            host = pool[h]
+            should_know = set("BCDY") - set(h)
+            self.assertItemsEqual( should_know, host.known_hosts() )
 
 
 if __name__ == '__main__':
