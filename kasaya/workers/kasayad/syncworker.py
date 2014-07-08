@@ -129,19 +129,38 @@ class SyncWorker(object):
     # local message handlers
     # -----------------------------------
 
+    def local_worker_addr_process(self, waddr):
+        """
+        Before sending local worker address to network,
+        we should process it and cut out internal IP address.
+        Remote address of worker will be designated from worker port and host address.
+        """
+        # split and check protocol
+        prefix, addr = waddr.split("//",1)
+        if prefix!="tcp:":
+            return waddr
+        # tcp proto, check address
+        addr, port = addr.rsplit(":",1)
+        # if all interfaces address, then remove it
+        if addr=="0.0.0.0":
+            return prefix+"//:"+port
+        return waddr
+
+
     def handle_worker_live(self, senderaddr, msg):
         """
         Receive worker's ping singnal.
         This function is triggered only by local worker.
         """
         wrkr = self.DB.worker_get(msg['id'])
-
+        new_addr = msg['addr']
         if wrkr is None:
             # new local worker just started
-            emit("local-worker-start", msg['id'], msg['addr'], msg['service'], msg['pid'] )
+            new_addr = self.local_worker_addr_process(new_addr)
+            emit("local-worker-start", msg['id'], new_addr, msg['service'], msg['pid'] )
         return
 
-        if (msg['addr']!=wrkr['addr']) or (msg['service']!=wrkr['service']):
+        if (new_addr!=wrkr['addr']) or (msg['service']!=wrkr['service']):
             # worker properties are different, assume that
             # old worker died silently and new appears under same ID
             # (it's just impossible!)

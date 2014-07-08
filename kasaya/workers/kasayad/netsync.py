@@ -661,7 +661,7 @@ class NetworkSync(object):
 
     def on_host_full_state(self, addr, msg):
         """
-        Remote host data is out of sync, send full sync request and process response
+        Remote host data is sending own full state report.
           - hostid - remote host id
           - addr - remote addess
         """
@@ -695,7 +695,7 @@ class NetworkSync(object):
 
     def send_host_full_state(self, addr):
         """
-        Send full state to specified host
+        Send full state to specified host.
         """
         msg = { 'SMSG' : _MSG_FULL_STATE,
             "host_id"  : self.ID,
@@ -887,7 +887,8 @@ class KasayaNetworkSync(NetworkSync):
             return
         if pt==_WORKER_ADD:
             # worker add
-            self.DB.worker_register(host_id, data['worker_id'], data['service'], data['worker_addr'] )
+            wa = self.worker_addr_process(data['worker_addr'], host_id)
+            self.DB.worker_register(host_id, data['worker_id'], data['service'], wa )
         elif pt==_WORKER_DEL:
             # worker delete
             wid = data['worker_id']
@@ -898,7 +899,6 @@ class KasayaNetworkSync(NetworkSync):
         elif pt==_SERVICE_DEL:
             # service delete
             self.DB.service_del(host_id, data['service'])
-
 
     # kasaya single changes
     def local_worker_add(self, worker_id, service_name, worker_addr):
@@ -930,3 +930,26 @@ class KasayaNetworkSync(NetworkSync):
             'service'    : service_name,
         }
         self.distribute_change(msg)
+
+
+    def worker_addr_process(self, worker_addr, host_id):
+        """
+        Remote workers doesn't send own IP address, only protocol and port.
+        If remote protocol is tcp, and there is no IP, we need to check create
+        full address using host IP and worker port
+        """
+        # worker address
+        wproto, waddr = worker_addr.split("//",1)
+        waddr, wport = waddr.rsplit(":",1)
+        if wproto!="tcp:":
+            return worker_addr
+
+        # host address
+        hostip = self.hostid2addr(host_id)
+        if hostip is None:
+            return worker_addr
+        proto, addr = hostip.split("//",1)
+        addr, port = addr.rsplit(":",1)
+
+        # make new worker address
+        return wproto+"//"+addr+":"+wport
