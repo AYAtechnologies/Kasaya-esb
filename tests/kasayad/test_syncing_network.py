@@ -1,6 +1,6 @@
-#!/home/moozg/venvs/kasatest/bin/python
-#coding: utf-8
 #!/home/moozg/venvs/kasa/bin/python
+#coding: utf-8
+#!/home/moozg/venvs/kasatest/bin/python
 from __future__ import division, absolute_import, unicode_literals
 import unittest, os, random
 
@@ -20,7 +20,6 @@ class KasayaNullSync(KasayaNetworkSync):
         pass
     def send_message(self, addr, msg):
         pass
-
 
 class KasayaFakeSync(KasayaNetworkSync):
 
@@ -62,6 +61,8 @@ class KasayaFakeSync(KasayaNetworkSync):
         g = gevent.Greenlet( self.TP.send_message, addr, msg)
         g.start()
 
+    def worker_addr_process(self, worker_addr, host_id):
+        return worker_addr
 
 class KasayaTestPool(object):
 
@@ -86,6 +87,16 @@ class KasayaTestPool(object):
         print " broadcast", self.disable_broadcast
         print "COUNTERS:  send", self.send_counter, " broadcast", self.broadcast_counter
 
+    def remove(self, ID):
+        """
+        Remove silently host from network (simulate death)
+        Result is dying host IP
+        """
+        res = self.__ips[ID]
+        del self.__ips[ID]
+        del self.hosts[ID]
+        return res
+
     # To be like a dict...
     def keys(self):
         return self.hosts.keys()
@@ -98,7 +109,7 @@ class KasayaTestPool(object):
     def items(self):
         return self.hosts.items()
 
-    def new_host(self, hid=None, dont_start=False):
+    def new_host(self, hid=None, dont_start=False, host_addr=None):
         if hid is None:
         #    hid = make_kasaya_id(True)
             hid = self.__hl[0]
@@ -107,7 +118,10 @@ class KasayaTestPool(object):
         self.__cnt += 1
         hn = "host_%i" % self.__cnt
         # new host
-        ip = "192.168.%i.%i" % (random.randint(1,254), random.randint(1,254))
+        if host_addr is None:
+            ip = "192.168.%i.%i" % (random.randint(1,254), random.randint(1,254))
+        else:
+            ip = host_addr
         self.__ips[hid] = ip
         h = KasayaFakeSync(self, db, hid, hn)
         # add to pool
@@ -405,7 +419,7 @@ class NetSyncTest(unittest.TestCase):
         host.local_worker_del("W01")
         gevent.wait()
 
-        # noone host should know worker
+        # worker should be unknown in network
         for p in pool.keys():
             p = pool[p]
             nfo = p.DB.worker_get("W01")
@@ -638,6 +652,30 @@ class NetSyncTest(unittest.TestCase):
 
         # check if host is knowing all other hosts
         self.assertItemsEqual( nh.known_hosts(),  set( pool.keys() ) - set( nh.ID )  )
+
+    def test_host_replace_after_death(self):
+        pool = KasayaTestPool()
+        pool.new_host()
+        pool.new_host()
+        pool.new_host()
+        gevent.wait()
+
+        # kill host C
+        died_ip = pool.remove("C")
+        # respawn new one with same addres
+        nh = pool.new_host(host_addr=died_ip)
+        gevent.wait()
+
+        # check if all hosts dropped C and added D host
+
+        for h in ("A", "B"):
+            h = pool[h]
+            khlist = h.known_hosts()
+            self.assertIn ("D", khlist)
+            self.assertNotIn ("C", khlist)
+        #h = pool['A']
+        #print h.known_hosts()
+        #pool.PP()
 
 
 if __name__ == '__main__':

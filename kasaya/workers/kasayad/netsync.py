@@ -330,9 +330,13 @@ class NetworkSync(object):
         except KeyError:
             pass
 
-        # TODO: check address of new host
+        # check address of new host
         # if it's used by another host, then probably previous host
-        # died and new started in place of previous.
+        # died and new started in place.
+        oldhost = self.addr2hostid(host_addr)
+        while oldhost!=None:
+            self.host_died(oldhost['id'], no_forward=True)
+            oldhost = self.addr2hostid(host_addr)
 
         self.remote_host_join(host_id, host_addr, hostname )
         self.delay(
@@ -431,7 +435,7 @@ class NetworkSync(object):
         addr = self.hostid2addr(host_id)
         self.send_full_sync_request(addr)
 
-    def host_died(self, host_id):
+    def host_died(self, host_id, no_forward=False):
         """
         Called when remote host died unexpectly.
         """
@@ -439,6 +443,9 @@ class NetworkSync(object):
             return
         self.remote_host_exit(host_id)
         del self.counters[host_id]
+        # no forward - remove host locally only
+        if no_forward:
+            return
         self._host_died_forwarder(host_id)
     def _host_died_forwarder(self, host_id, sender_id=None):
         if self._disable_forwarding: return
