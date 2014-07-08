@@ -146,8 +146,10 @@ class KasayaDaemon(WorkerBase):
             # worker is already offline
             return
         self.DB.worker_set_state(worker_id, False)
-        self.SYNC.local_worker_del( worker_id )
         LOG.info("Local worker [%s] is going offline, address [%s] [id:%s]." % (worker['service'], worker['addr'], worker_id) )
+        # unregister worker from network
+        if worker['addr'].startswith("tcp://"):
+            self.SYNC.local_worker_del( worker_id )
 
     def on_local_worker_stop(self, worker_id):
         """

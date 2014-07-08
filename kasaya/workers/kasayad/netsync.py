@@ -277,23 +277,10 @@ class NetworkSync(object):
         """
         if self.is_host_known(sender_id):
             return True
-
-        #knownaddr = self.hostid2addr( sender_id )
-        #if knownaddr is None:
-            # new host!
-        #print self.ID,"incoming message from unknown host",sender_id, "registering..."
-        self.host_join(addr, sender_id, 0)
-        #return False
-
-        # everything is OK
-        #if sender_id==knownaddr:
-        #    return True
-
-        # known host address is different!
-        # something strange is happening.... :(
         # TODO:
         #   detected IP changes of remote host
-        #   do something in such case
+        #   do something in such strange case
+        self.host_join(addr, sender_id, 0)
         return False
 
     def host_join(self, host_addr, host_id, counter, hostname=None, sender_id=None, from_broadcast=False):
@@ -330,14 +317,10 @@ class NetworkSync(object):
         except KeyError:
             pass
 
-        # check address of new host
-        # if it's used by another host, then probably previous host
-        # died and new started in place.
-        oldhost = self.addr2hostid(host_addr)
-        while oldhost!=None:
-            self.host_died(oldhost['id'], no_forward=True)
-            oldhost = self.addr2hostid(host_addr)
+        # check address of new host (remove previous unregistered zombie hosts)
+        self._check_new_host_address(host_addr)
 
+        # register new host
         self.remote_host_join(host_id, host_addr, hostname )
         self.delay(
             self.FULL_SYNC_DELAY, # delay in seconds
@@ -372,6 +355,23 @@ class NetworkSync(object):
                 counter,
                 hostname
             )
+
+    def _check_new_host_address(self, host_addr):
+        """
+        When new host is joining network, there may be situation
+        when new host is replacing previous which died unexpectly
+        and works on same address.
+        When new one is joining to network, we should unregister
+        previous one to avoid leaving zombies in database.
+        """
+        existing_host = self.addr2hostid(host_addr)
+        if existing_host is None:
+            return
+        eid = existing_host['id']
+        if eid==self.ID:
+            return
+        # remove zombie!
+        self.host_died( existing_host['id'] )
 
 
     def host_leave(self, host_id, counter, sender_id=None):

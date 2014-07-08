@@ -143,6 +143,23 @@ class KasayaTestPool(object):
                 return self[h]
         raise KeyError("Host with ip %s not found" % ip)
 
+    def _replace_ID(self, old_id, new_id):
+        """
+        Change ID of host to simulate of death and rebirth of kasaya daemon
+        """
+        # replace address table
+        ip = self.__ips[old_id]
+        del self.__ips[old_id]
+        self.__ips[new_id] = ip
+        # replace host in hosts dict
+        h = self.hosts[old_id]
+        self.hosts[new_id] = h
+        del self.hosts[old_id]
+        # change host ID
+        h.ID = new_id
+        return h
+
+
     # fake network operations
     def send_broadcast(self, sender, msg):
         fnc = self.link_accept
@@ -673,9 +690,6 @@ class NetSyncTest(unittest.TestCase):
             khlist = h.known_hosts()
             self.assertIn ("D", khlist)
             self.assertNotIn ("C", khlist)
-        #h = pool['A']
-        #print h.known_hosts()
-        #pool.PP()
 
 
 if __name__ == '__main__':

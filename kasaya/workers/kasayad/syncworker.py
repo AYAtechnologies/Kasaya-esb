@@ -249,7 +249,7 @@ class SyncWorker(object):
             'method':'start'
         }
         res = send_and_receive_response(wrknfo['addr'], msg)
-        LOG.debug("Local worker [%s] on [%s] is now online" % (wrknfo['service'], wrknfo['addr']) )
+        #LOG.debug("Local worker [%s] on [%s] is now online" % (wrknfo['service'], wrknfo['addr']) )
         # broadcast new worker state
         self.DB.worker_set_state( worker_id, True )
         emit("local-worker-online", worker_id )

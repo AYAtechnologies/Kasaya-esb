@@ -236,7 +236,7 @@ class NetworkStateDB(object):
         Delete all workers for host
         """
         for w in self.LLDB.worker_list(host_id):
-            worker_unregister(w['id'])
+            self.worker_unregister(w['id'])
 
     def choose_worker_for_service(self, service):
         lst = self.LLDB.workers_for_service(service, True)
