@@ -146,7 +146,6 @@ class SyncWorker(object):
             return prefix+"//:"+port
         return waddr
 
-
     def handle_worker_live(self, senderaddr, msg):
         """
         Receive worker's ping singnal.
@@ -191,10 +190,15 @@ class SyncWorker(object):
         addr = self.DB.choose_worker_for_service(name)
         if not addr is None:
             addr = addr['addr']
+            # local addresses are stored without IP addres
+            # we should add localhost addr to them
+            if addr.startswith("tcp://:"):
+                port = addr.rsplit(":",1)[1]
+                addr = "tcp://127.0.0.1:"+port
         return {
-            'message':messages.WORKER_ADDR,
-            'service':name,
-            'addr':addr,
+            'message': messages.WORKER_ADDR,
+            'service': name,
+            'addr':    addr,
         }
 
     def handle_name_query_multi(self, senderaddr, msg):
@@ -206,10 +210,10 @@ class SyncWorker(object):
         if not addrlst is None:
             addrlst = [ a['addr'] for a in addrlst ]
         return {
-            'message':messages.WORKER_ADDR,
-            'service':name,
+            'message': messages.WORKER_ADDR,
+            'service': name,
             'addrlst': addrlst,
-            'timeout':10,
+            'timeout': 10,
         }
 
     def handle_local_control_request(self, senderaddr, msg):
@@ -410,12 +414,3 @@ class SyncWorker(object):
         svlist = self.local_services_list(rescan=True)
         # send nwe list of services to kasaya daemon instance
         #self.DAEMON.notify_kasayad_refresh(self.DAEMON.ID, svlist, True)
-
-
-
-    def worker_address_preprocess(self, ID, addr):
-        """
-        ID - worker ID
-        addr - worker address
-        """
-        return addr

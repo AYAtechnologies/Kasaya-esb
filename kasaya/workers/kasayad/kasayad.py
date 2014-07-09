@@ -113,6 +113,7 @@ class KasayaDaemon(WorkerBase):
         Local worker started in offline state.
         on event: worker-local-add
         """
+        print ("local"  , address)
         self.DB.worker_register(self.ID, worker_id, service, address, pid, online=False)
         #if address.startswith("tcp://"):
         #    port = address.rsplit(":",1)[1]
@@ -164,7 +165,7 @@ class KasayaDaemon(WorkerBase):
             # firstly - unregister worker and notify network
             self.on_local_worker_offline(worker_id)
         self.DB.worker_unregister(ID=worker_id)
-        LOG.info("Local worker [%s] is going shutting down, address [%s] [id:%s]." % (worker['service'], worker['addr'], worker_id) )
+        LOG.info("Local worker [%s] is shutting down, address [%s] [id:%s]." % (worker['service'], worker['addr'], worker_id) )
 
 
     def service_add(self):

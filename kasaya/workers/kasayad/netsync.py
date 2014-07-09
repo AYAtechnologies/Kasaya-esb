@@ -894,7 +894,7 @@ class KasayaNetworkSync(NetworkSync):
             return
         if pt==_WORKER_ADD:
             # worker add
-            wa = self.worker_addr_process(data['worker_addr'], host_id)
+            wa = self.remote_worker_addr_process(data['worker_addr'], host_id)
             self.DB.worker_register(host_id, data['worker_id'], data['service'], wa )
         elif pt==_WORKER_DEL:
             # worker delete
@@ -939,7 +939,7 @@ class KasayaNetworkSync(NetworkSync):
         self.distribute_change(msg)
 
 
-    def worker_addr_process(self, worker_addr, host_id):
+    def remote_worker_addr_process(self, worker_addr, host_id):
         """
         Remote workers doesn't send own IP address, only protocol and port.
         If remote protocol is tcp, and there is no IP, we need to check create
