@@ -6,6 +6,7 @@ from kasaya.core.lib import django_integration as DJI
 from kasaya.core.client import Context
 from kasaya.core.protocol import messages
 from kasaya.core.protocol.comm import send_and_receive, ConnectionClosed
+from kasaya.core.exceptions import TaskTimeoutException
 import weakref
 import traceback
 
@@ -147,9 +148,9 @@ class TaskExecutor(object):
             else:
                 # detect timeout!
                 try:
-                    with gevent.Timeout(task['timeout'], TaskTimeout):
+                    with gevent.Timeout(task['timeout'], TaskTimeoutException):
                         grn.join()
-                except TaskTimeout as e:
+                except TaskTimeoutException as e:
                     #LOG.info("Task [%s] timeout (after %i s)." % (task['name'], task['timeout']) )
                     self.stat_increment('tasks_error')
                     task['res_tout'] += 1  # increment task's timeout exception counter
