@@ -49,6 +49,16 @@ class ServiceBusException(Exception, ExtendedInfo):
 
 
 
+
+class TaskTimeoutException(RemoteException):
+    """
+    Task processing time exceeded
+    """
+    pass
+
+
+
+
 class SerializationError(ServiceBusException):
     """
     Serialization of data to transfer fails. Probably used transport desn't support used data type.

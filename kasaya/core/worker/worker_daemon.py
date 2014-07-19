@@ -237,7 +237,7 @@ class WorkerDaemon(WorkerBase, TaskExecutor):
     # --------------------
 
 
-    def handle_control_request(self, message):
+    def handle_control_request(self, addr, message):
         self._tasks_control += 1
         result = self.ctl.handle_request(message)
         return result

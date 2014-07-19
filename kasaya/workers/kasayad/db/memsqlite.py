@@ -24,12 +24,12 @@ class MemoryDB(BaseDB):
     # -------------------------
 
 
-    def host_add(self, ID, address):#, hostname):
+    def host_add(self, ID, address, hostname):
         self.SEMA.acquire()
         try:
             self.cur.execute(
-                "INSERT INTO hosts ('id','addr') VALUES (?,?)",
-                (ID, address))
+                "INSERT INTO hosts ('id','addr','hostname') VALUES (?,?,?)",
+                (ID, address, hostname))
             self.__db.commit()
         finally:
             self.SEMA.release()
@@ -72,6 +72,22 @@ class MemoryDB(BaseDB):
             yield { 'id':u, 'addr':a, 'hostname':h }
 
 
+    def host_update(self, ID, hostname=None):
+        """
+        Update host record in database
+        """
+        self.SEMA.acquire()
+        try:
+            if not hostname is None:
+                self.cur.execute(
+                    "UPDATE hosts SET hostname=? WHERE id=?;",
+                    (hostname, ID)
+                )
+            self.__db.commit()
+        finally:
+            self.SEMA.release()
+
+
 
     def service_add(self, host_id, name):
         """
@@ -80,8 +96,13 @@ class MemoryDB(BaseDB):
         self.SEMA.acquire()
         try:
             self.cur.execute(
+                "SELECT name FROM services WHERE host_id=? AND name=?",
+                (host_id, name) )
+            if len( self.cur.fetchall() )>0:
+                return
+            self.cur.execute(
                 "INSERT INTO services ('host_id','name') VALUES (?,?)",
-                (host_id, name))
+                (host_id, name) )
             self.__db.commit()
         finally:
             self.SEMA.release()

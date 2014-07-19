@@ -6,6 +6,7 @@ from kasaya.core.lib import django_integration as DJI
 from kasaya.core.client import Context
 from kasaya.core.protocol import messages
 from kasaya.core.protocol.comm import send_and_receive, ConnectionClosed
+from kasaya.core.exceptions import TaskTimeoutException
 import weakref
 import traceback
 
@@ -44,7 +45,7 @@ class WorkerBase(object):
 
 def exception_catcher(func, *args, **kwargs):
     """
-    This function catches exceptions and tracebacks inside greenlets.
+    This function catches exception tracebacks inside greenlets.
     """
     try:
         return func(*args, **kwargs)
@@ -89,7 +90,7 @@ class TaskExecutor(object):
     # task handling
 
 
-    def handle_task_request(self, msgdata):
+    def handle_task_request(self, addr, msgdata):
         """
         Prepare data for processing in task. Extracts parameters from message and check context.
         Valid request requires in message such fields: method, context, args, kwargs
@@ -147,9 +148,9 @@ class TaskExecutor(object):
             else:
                 # detect timeout!
                 try:
-                    with gevent.Timeout(task['timeout'], TaskTimeout):
+                    with gevent.Timeout(task['timeout'], TaskTimeoutException):
                         grn.join()
-                except TaskTimeout as e:
+                except TaskTimeoutException as e:
                     #LOG.info("Task [%s] timeout (after %i s)." % (task['name'], task['timeout']) )
                     self.stat_increment('tasks_error')
                     task['res_tout'] += 1  # increment task's timeout exception counter

@@ -28,7 +28,7 @@ class NetworkStateDB(object):
 
     # hosts
 
-    def host_register(self, host_id, address):# hostname, ip, services=None):
+    def host_register(self, host_id, address, hostname=None):
         """
         Register new host (kasayad instance).
         host_id - id of kasayad
@@ -48,7 +48,7 @@ class NetworkStateDB(object):
             #else:
             return False
         # register host
-        self.LLDB.host_add(host_id, address)
+        self.LLDB.host_add(host_id, address, hostname)
         # register services
         #if services is not None:
         #    self.service_update_list(host_id, services)
@@ -61,12 +61,23 @@ class NetworkStateDB(object):
           Zwraca True jeśli wyrejestrowano workera,
           False jeśli workera nie było w bazie
         """
-        # remove all services for host
-        for s in self.LLDB.service_list(host_id):
-            self.LLDB.service_del(host_id, s['service'])
-        # remove host
+        # remove all services
+        self.host_clean(host_id)
         self.LLDB.host_del(host_id)
-        #return {"addr":res[2],"hostname":res[1]}
+        # TODO: unregister all workers!
+
+    def host_clean(self, host_id):
+        """
+        Cleanup all workers and services for host.
+        """
+        self.worker_clear(host_id)
+        self.service_clear(host_id)
+
+    def host_set_hostname(self, host_id, hostname):
+        """
+        Update hostname field for host.
+        """
+        self.LLDB.host_update(host_id, hostname=hostname)
 
 
     def host_list(self):
@@ -75,6 +86,13 @@ class NetworkStateDB(object):
         """
         for h in self.LLDB.host_list():
             yield h
+
+
+    def host_info(self, host_id):
+        """
+        Known info about host
+        """
+        return self.LLDB.host_get(host_id)
 
 
     def host_addr_by_id(self, host_id):
@@ -106,7 +124,7 @@ class NetworkStateDB(object):
         """
         Usunięcie wszystkich serwisów z serwera
         """
-        for s in self.LLDB.service_list():
+        for s in self.LLDB.service_list(host_id):
             self.LLDB.service_del(host_id, s['service'])
 
     def service_list(self, host_id):
@@ -190,7 +208,17 @@ class NetworkStateDB(object):
 
     def worker_get(self, worker_id):
         """
-        Return worker details for given ID
+        Return worker details for given ID.
+        Result:
+            None - if worker is not existing
+            {
+                'id' - worker identifier
+                'host_id' - host id on which is worker running
+                'service' - service name of worker
+                'addr' - network address of worker
+                'pid' - local process id of worker (only for own local hosts)
+                'online' - is online status (for remote workers always True)
+            }
         """
         return self.LLDB.worker_get(worker_id)
 
@@ -203,6 +231,12 @@ class NetworkStateDB(object):
         for wrk in lst:
             yield wrk
 
+    def worker_clear(self, host_id):
+        """
+        Delete all workers for host
+        """
+        for w in self.LLDB.worker_list(host_id):
+            self.worker_unregister(w['id'])
 
     def choose_worker_for_service(self, service):
         lst = self.LLDB.workers_for_service(service, True)

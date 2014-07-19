@@ -381,6 +381,8 @@ class MessageLoop(object):
             return ip
 
         # interfaces list
+        # TODO: use of netifaces should be optional
+        # if exists, then use it, if not, skip this point
         iflist = all_interfaces()
 
         # is interface name used?
@@ -486,7 +488,7 @@ class MessageLoop(object):
 
             # run handler
             try:
-                result = handler(msgdata)
+                result = handler(address, msgdata)
             except Exception as e:
                 #LOG.info("Exception [%s] when processing message [%s]. Message: %s." % (result['name'], msg, result['description']) )
                 if not resreq:
@@ -537,4 +539,110 @@ class MessageLoop(object):
             messages.noop_message(),
             resreq = False
         )
+
+
+class UDPMessageLoop(object):
+
+    def __init__(self, port, ID):
+        global emit
+        from kasaya.core.events import emit
+        from gevent import socket
+        self.__is_running = True
+        self._msgdb = {}
+        self.ID = ID
+        self.port = port
+        self.SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.SOCK.bind(('',port))
+        self.SOCK.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.serializer = Serializer()
+
+    def stop(self):
+        """
+        Request warm stop, exits loop after finishing current task
+        """
+        self.__is_running = False
+
+    def close(self):
+        self.stop()
+        self.SOCK.close()
+
+    def register_message(self, message, func):
+        self._msgdb[message]=func
+
+    def loop(self):
+        while self.__is_running:
+            # receive data
+            msgdata, addr = self.SOCK.recvfrom(4096)
+            # skip own broadcast messages
+            #if addr[0]==self.own_ip:
+            #    continue
+            # deserialize
+            try:
+                msgdata, repreq = self.serializer.deserialize(msgdata)
+            except NotOurMessage:
+                continue
+            except Exception:
+                LOG.warning("Message from broadcast deserialisation error")
+                LOG.debug("Broken message body dump in hex (only first 1024 bytes):\n%s" % msgdata[:1024].encode("hex"))
+                continue
+
+            # received own broadcast?
+            try:
+                if msgdata['__sid__'] == self.ID:
+                    continue
+            except KeyError:
+                continue
+
+            # message type
+            try:
+                msg = msgdata['message']
+            except KeyError:
+                LOG.debug("Decoded message is incomplete. Message dump: %s" % repr(msgdata) )
+                continue
+            # find handler
+            try:
+                handler = self._msgdb[ msg ]
+            except KeyError:
+                # unknown messages are ignored silently
+                LOG.warning("Unknown message received [%s]" % msg)
+                LOG.debug("Message body dump:\n%s" % repr(msgdata) )
+                continue
+            # run handler
+            try:
+                handler(addr, msgdata)
+            except Exception as e:
+                if LOG.level>10:
+                    continue
+                import traceback
+                # log exception details
+                excname = e.__class__.__name__
+                # traceback
+                tback = traceback.format_exc()
+                try:
+                    tback = unicode(tback, "utf-8")
+                except:
+                    tback = repr(tback)
+                # error message
+                errmsg = e.message
+                try:
+                    errmsg = unicode(errmsg, "utf-8")
+                except:
+                    errmsg = repr(errmsg)
+                # log & clean
+                LOG.error("Exception [%s] when processing message [%s]. Message: %s." % (excname, msg, errmsg) )
+                LOG.debug("Message dump: %s" % repr(msgdata) )
+                LOG.debug(tback)
+                del excname, tback, errmsg
+
+    def broadcast_message(self, msg):
+        """
+        Wysłanie komunikatu do wszystkich odbiorców w sieci
+        """
+        msg['__sid__'] = self.ID
+        msg = self.serializer.serialize(msg, resreq=False)
+        try:
+            self.SOCK.sendto(msg, ('<broadcast>', self.port) )
+            return True
+        except socket.error as e:
+            return False
 
